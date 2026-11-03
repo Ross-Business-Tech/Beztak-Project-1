@@ -1,122 +1,108 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
 import './App.css'
+import { ORDERS, TRUCKS, SOURCES, findOrders, etaText } from './data.js'
 
-function App() {
-  const [count, setCount] = useState(0)
+const statusClass = (s) =>
+  s === 'Delivered' ? 'ok' : s === 'On time' || s === 'Loaded' ? 'good' : 'warn'
 
+function OrderCard({ order }) {
+  const truck = TRUCKS.find((t) => t.id === order.truck)
+  const last = order.events[order.events.length - 1]
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <section className="card order-card">
+      <div className="order-head">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <div className="muted">Order #{order.id}</div>
+          <h2>{order.customer}</h2>
+          <div className="muted">{order.address} · {order.items}</div>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+        <span className={`pill ${statusClass(order.status)}`}>{order.status}</span>
+      </div>
 
-      <div className="ticks"></div>
+      <div className="facts">
+        <div><span className="label">Expected</span><strong>{etaText(order)}</strong></div>
+        <div><span className="label">Promised</span><strong>{order.promised}</strong></div>
+        <div><span className="label">Truck</span><strong>{truck ? `${truck.id} · ${truck.driver}` : 'Not on a truck yet'}</strong></div>
+        <div><span className="label">Stops away</span><strong>{order.stopsAway ?? '—'}</strong></div>
+      </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      {order.reason && (
+        <div className="reason">
+          <strong>Why:</strong> {order.reason}
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <div className="latest">
+        <span className="label">Latest update · {last.time}</span>
+        <p>{last.note}</p>
+        <span className="source">Source: {SOURCES[last.source]}</span>
+      </div>
+
+      <div className="script">
+        <span className="label">What to tell the customer</span>
+        <p>{customerScript(order)}</p>
+      </div>
+    </section>
   )
 }
 
-export default App
+export function customerScript(o) {
+  if (o.status === 'Delivered') return `Good news, your order was delivered at ${etaText(o).replace('Delivered at ', '')}. ${o.deliveredTo}.`
+  if (o.status === 'Held at warehouse') return `Part of your order was out of stock, so it's being held. ${o.reason} Expected: ${etaText(o)}.`
+  if (o.status === 'Delayed') return `Your order is on its way, ${o.stopsAway} stops out, but running late: ${o.reason.toLowerCase()} New arrival window: ${etaText(o)}.`
+  return `Your order is ${o.status === 'Loaded' ? 'loaded on the truck' : 'on its way'}${o.stopsAway ? `, ${o.stopsAway} stop${o.stopsAway > 1 ? 's' : ''} away` : ''}. Expected ${etaText(o)}.`
+}
+
+export default function App() {
+  const [query, setQuery] = useState('')
+  const [selectedId, setSelectedId] = useState('1042')
+  const results = query ? findOrders(query) : ORDERS
+  const selected = ORDERS.find((o) => o.id === selectedId)
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="logo">⚓🍇</span>
+          <div>
+            <strong>Harbor &amp; Vine</strong>
+            <span>Order Tracker · Rep Console</span>
+          </div>
+        </div>
+        <div className="today">Today 10:30 AM · 1,800 deliveries · 300 drivers</div>
+      </header>
+
+      <main className="layout">
+        <aside className="card sidebar">
+          <label className="label" htmlFor="search">Find an order</label>
+          <input
+            id="search"
+            type="search"
+            placeholder="Order # or name, e.g. 1042"
+            value={query}
+            onChange={(ev) => setQuery(ev.target.value)}
+          />
+          <ul className="results">
+            {results.length === 0 && <li className="muted">No orders match “{query}”.</li>}
+            {results.map((o) => (
+              <li key={o.id}>
+                <button
+                  className={o.id === selectedId ? 'result active' : 'result'}
+                  onClick={() => setSelectedId(o.id)}
+                >
+                  <span>
+                    <strong>#{o.id}</strong> {o.customer}
+                  </span>
+                  <span className={`dot ${statusClass(o.status)}`}>{o.status}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+
+        <div className="main">{selected && <OrderCard order={selected} />}</div>
+      </main>
+      <footer className="foot">Demo with made-up sample data · Harbor &amp; Vine Distribution (fictional client)</footer>
+    </div>
+  )
+}
