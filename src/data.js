@@ -23,6 +23,7 @@ export const TRUCKS = [
 
 // time helpers: minutes since 6:00 AM -> "h:mm AM"
 export function clock(min) {
+  if (min < 0) return 'Yesterday ' + clock(min + 1440)
   const total = 6 * 60 + min
   let h = Math.floor(total / 60)
   const m = total % 60

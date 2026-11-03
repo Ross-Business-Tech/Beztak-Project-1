@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import './App.css'
 import { ORDERS, TRUCKS, SOURCES, findOrders, etaText } from './data.js'
+import MapView from './MapView.jsx'
+import Timeline from './Timeline.jsx'
 
 const statusClass = (s) =>
   s === 'Delivered' ? 'ok' : s === 'On time' || s === 'Loaded' ? 'good' : 'warn'
@@ -100,7 +102,25 @@ export default function App() {
           </ul>
         </aside>
 
-        <div className="main">{selected && <OrderCard order={selected} />}</div>
+        <div className="main">
+          <section className="card">
+            <div className="section-head">
+              <h3>Live delivery map</h3>
+              <span className="muted">Tap a pin to open that order</span>
+            </div>
+            <MapView selected={selected} onSelect={setSelectedId} />
+          </section>
+          {selected && <OrderCard order={selected} />}
+          {selected && (
+            <section className="card">
+              <div className="section-head">
+                <h3>Order journey · #{selected.id}</h3>
+                <span className="muted">Every update, with where it came from</span>
+              </div>
+              <Timeline order={selected} />
+            </section>
+          )}
+        </div>
       </main>
       <footer className="foot">Demo with made-up sample data · Harbor &amp; Vine Distribution (fictional client)</footer>
     </div>
