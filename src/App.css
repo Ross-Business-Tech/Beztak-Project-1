@@ -26,3 +26,6 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
 .msg{background:var(--bg);border-radius:10px;padding:10px 12px;margin:0}.msg.agent{background:color-mix(in srgb,var(--brand) 12%,transparent)}
 .back{display:none}
 @media(max-width:760px){.desk{grid-template-columns:1fr}.hide-m{display:none}.back{display:block}}
+.mail{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.mail-head{padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;color:var(--mute);overflow-wrap:anywhere}
+.mail p{margin:0;padding:12px}
