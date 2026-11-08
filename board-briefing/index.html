@@ -10,78 +10,80 @@
 <header class="top no-print">
   <div class="wrap">
     <h1>Monthly Board Briefing</h1>
-    <p>Turn a month of chatbot questions into two slide decks: an update for leadership and a plan for the team. Everything stays on this computer.</p>
+    <p>One questions file, two things: an executive deck for leadership, and a Manual Improvement Dashboard where the team picks, assigns and tracks the changes. Everything stays on this computer.</p>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="steps no-print" aria-label="Set up this month's briefing">
-    <div class="step">
-      <span class="n">1</span>
-      <div class="body">
-        <h2>Add the questions file</h2>
-        <p class="hint">The CSV or JSON export of questions, with several months of history so the trend can be drawn.</p>
-        <div id="drop" class="drop" tabindex="0">
-          <input type="file" id="file" accept=".csv,.json,text/csv,application/json" aria-label="Choose the questions file">
-          <span><strong>Choose a file</strong> or drop it here</span>
+  <details id="setup" class="setup no-print" open>
+    <summary><b>Setup</b> <span id="setup-sum">Add the questions file to begin</span></summary>
+    <section class="steps" aria-label="Set up this month's briefing">
+      <div class="step">
+        <span class="n">1</span>
+        <div class="body">
+          <h2>Add the questions file</h2>
+          <p class="hint">The CSV or JSON export of questions, with several months of history so the trend can be drawn.</p>
+          <div id="drop" class="drop" tabindex="0">
+            <input type="file" id="file" accept=".csv,.json,text/csv,application/json" aria-label="Choose the questions file">
+            <span><strong>Choose a file</strong> or drop it here</span>
+          </div>
+          <p class="alt">No file handy? <button type="button" class="link" id="sample">Try it with sample data</button> <span id="forget-wrap" hidden> · <button type="button" class="link" id="forget">Forget the saved file</button></span></p>
+          <p id="status" class="status" role="status"></p>
         </div>
-        <p class="alt">No file handy? <button type="button" class="link" id="sample">Try it with sample data</button></p>
-        <p id="status" class="status" role="status"></p>
       </div>
-    </div>
 
-    <div class="step">
-      <span class="n">2</span>
-      <div class="body">
-        <h2>Pick the month</h2>
-        <label class="field"><span class="sr">Month to report</span>
-          <select id="month" disabled><option>Add a file first</option></select></label>
-        <p class="hint" id="month-hint">The latest complete month is chosen for you.</p>
-      </div>
-    </div>
-
-    <div class="step">
-      <span class="n">3</span>
-      <div class="body">
-        <h2>Make it yours <span class="opt">optional</span></h2>
-        <div class="grid">
-          <label class="field"><span>Company or team name</span><input id="org" type="text" maxlength="60" autocomplete="off"></label>
-          <label class="field"><span>Prepared by</span><input id="preparedBy" type="text" maxlength="60" placeholder="e.g. Operations Excellence team" autocomplete="off"></label>
-          <label class="field"><span>Goal: share answered by the bot</span><div class="unit"><input id="goal" type="number" min="1" max="100" step="1"><b>%</b></div></label>
-          <label class="field"><span>Minutes a person spends on a ticket</span><div class="unit"><input id="minutesPerTicket" type="number" min="1" max="600" step="1"><b>min</b></div></label>
-          <label class="field"><span>Accent color</span><input id="brand" type="color"></label>
-          <label class="field"><span>Board email addresses</span><input id="recipients" type="text" placeholder="name@company.com, name2@company.com" autocomplete="off"></label>
+      <div class="step">
+        <span class="n">2</span>
+        <div class="body">
+          <h2>Pick the month</h2>
+          <label class="field"><span class="sr">Month to report</span>
+            <select id="month" disabled><option>Add a file first</option></select></label>
+          <p class="hint" id="month-hint">The latest complete month is chosen for you.</p>
         </div>
-        <label class="field wide"><span>A short note in your own words (added to both emails, and shown on the plan deck's last slide)</span>
-          <textarea id="note" rows="3" maxlength="420" placeholder="One or two sentences in your own words. What went well, what you need."></textarea></label>
       </div>
-    </div>
-  </section>
+
+      <div class="step">
+        <span class="n">3</span>
+        <div class="body">
+          <h2>Make it yours <span class="opt">optional</span></h2>
+          <div class="grid">
+            <label class="field"><span>Company or team name</span><input id="org" type="text" maxlength="60" autocomplete="off"></label>
+            <label class="field"><span>Prepared by</span><input id="preparedBy" type="text" maxlength="60" placeholder="e.g. Operations Excellence team" autocomplete="off"></label>
+            <label class="field"><span>Goal: share answered by the bot</span><div class="unit"><input id="goal" type="number" min="1" max="100" step="1"><b>%</b></div></label>
+            <label class="field"><span>Minutes a person spends on a ticket</span><div class="unit"><input id="minutesPerTicket" type="number" min="1" max="600" step="1"><b>min</b></div></label>
+            <label class="field"><span>Accent color</span><input id="brand" type="color"></label>
+            <label class="field"><span>Email addresses for the deck</span><input id="recipients" type="text" placeholder="name@company.com, name2@company.com" autocomplete="off"></label>
+            <label class="field wide2"><span>Team members, for assigning changes (separate with commas)</span><input id="team" type="text" maxlength="400" placeholder="Priya, Marcus, Dana" autocomplete="off"></label>
+          </div>
+          <label class="field wide"><span>A short note in your own words (added to the email)</span>
+            <textarea id="note" rows="3" maxlength="420" placeholder="One or two sentences. What went well, what you need."></textarea></label>
+        </div>
+      </div>
+    </section>
+  </details>
 
   <div id="warnings" class="warnings no-print" hidden></div>
 
   <section id="empty" class="empty no-print">
-    <h2>You get two decks</h2>
+    <h2>What you get</h2>
     <ol>
-      <li><b>Executive update (5 slides).</b> For leadership: what people ask most, did we hit the goal, what we changed and what it achieved.</li>
-      <li><b>Improvement plan (6 slides).</b> The condensed numbers, then what to fix next, an action table to assign owners, and the next steps.</li>
+      <li><b>Executive deck (6 slides).</b> For leadership: did we hit the goal, the trend, what people ask most, what past updates achieved, and what comes next.</li>
+      <li><b>Manual Improvement Dashboard (2 pages).</b> For the team: every change to make, ranked. Open one to see all the questions behind it, then mark it an action item or dismiss it, and assign an owner.</li>
     </ol>
-    <p class="hint">The plan also carries hidden appendix slides: the top questions for each category that needs work.</p>
+    <p class="hint">The answer rate leaves out questions that should go to a person (personal or approval questions, and topics outside the manual), and says how many.</p>
   </section>
 
-  <section id="result" hidden>
-    <div class="decks no-print" role="group" aria-label="Choose the deck">
-      <button type="button" class="seg on" id="seg-update" aria-pressed="true"><b>Executive update</b><span id="seg-update-n"></span></button>
-      <button type="button" class="seg" id="seg-plan" aria-pressed="false"><b>Improvement plan</b><span id="seg-plan-n"></span></button>
-    </div>
-    <p class="hint no-print" id="seg-note"></p>
+  <nav id="tabs" class="tabs no-print" role="tablist" aria-label="Choose a view" hidden>
+    <button type="button" role="tab" id="tab-deck" aria-selected="true" class="tab on">Executive deck <span class="sub">6 slides</span></button>
+    <button type="button" role="tab" id="tab-dash" aria-selected="false" class="tab">Manual improvement dashboard <span class="sub" id="tab-dash-n"></span></button>
+  </nav>
+
+  <section id="view-deck" hidden>
     <div class="actions no-print" id="actions">
       <button type="button" class="primary" id="dl-pptx">Download PowerPoint</button>
-      <button type="button" id="dl-both">Download both decks</button>
       <button type="button" id="dl-pdf">Save as PDF</button>
       <button type="button" id="dl-eml">Email draft with the deck attached</button>
       <button type="button" id="copy-email">Copy email text</button>
-      <label class="check" id="pdf-opt" hidden><input type="checkbox" id="pdf-appendix"> Include the hidden appendix in the PDF</label>
       <span id="action-msg" class="msg" role="status"></span>
     </div>
     <div id="email-box" class="email no-print" hidden>
@@ -91,16 +93,22 @@
     </div>
     <div id="slides" class="slides" aria-label="Slide preview"></div>
   </section>
+
+  <section id="view-dash" class="dash no-print" hidden aria-label="Manual improvement dashboard">
+    <div id="dash-root"></div>
+  </section>
 </main>
 
 <script src="js/engine/data.js"></script>
 <script src="js/engine/analytics.js"></script>
+<script src="js/improve.js"></script>
 <script src="js/briefing.js"></script>
 <script src="js/slides.js"></script>
 <script src="js/render-html.js"></script>
 <script src="js/render-pptx.js"></script>
 <script src="js/email.js"></script>
 <script src="js/vendor/pptxgen.bundle.js"></script>
+<script src="js/dashboard.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

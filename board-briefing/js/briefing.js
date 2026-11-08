@@ -8,12 +8,12 @@
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./engine/data.js'), require('./engine/analytics.js'));
+    module.exports = factory(require('./engine/data.js'), require('./engine/analytics.js'), require('./improve.js'));
   } else {
     root.QAD = root.QAD || {};
-    root.QAD.briefing = factory(root.QAD.data, root.QAD.analytics);
+    root.QAD.briefing = factory(root.QAD.data, root.QAD.analytics, root.QAD.improve);
   }
-})(typeof self !== 'undefined' ? self : globalThis, function (D, A) {
+})(typeof self !== 'undefined' ? self : globalThis, function (D, A, IM) {
   'use strict';
 
   const DAY = 24 * 60 * 60 * 1000;
@@ -24,6 +24,7 @@
     minutesPerTicket: 12,
     brand: '#1473E6',
     recipients: '',
+    team: '',
     preparedBy: '',
     note: ''
   });
@@ -108,6 +109,9 @@
    * @param ym         the month to report, 'YYYY-MM'
    * @param settings   { goal, minutesPerTicket, org, ... }
    * @param sections   optional [{ title, category, publishedAt }]
+   *
+   * The answer rate is the fair one: answered / (all questions minus the ones that go to a person
+   * on purpose, such as personal or approval questions and topics outside the manual).
    */
   function build(questions, ym, settings, sections) {
     const cfg = Object.assign({}, DEFAULTS, settings || {});
@@ -124,9 +128,19 @@
     const prevOk = prev.length >= 20;
     const b = A.breakdown(cur);
     const pb = prevOk ? A.breakdown(prev) : null;
+    const eligible = b.total - b.byDesign;
+    const rate = b.fixableRate; // the fair rate
     const warnings = [];
     if (cur.length < 20) warnings.push('Only ' + cur.length + ' questions in ' + range.label + '. The numbers may swing a lot.');
     if (!prevOk) warnings.push('There is little or no data for ' + prevRange.label + ', so there is no month-on-month comparison.');
+    // The importer fills a missing theme with the question wording and a missing reason with "no match",
+    // so these checks look for exactly that: nothing was ever grouped, and every ticket looks like a gap.
+    if (cur.length >= 20 && !cur.some(function (q) { return q.theme && q.theme !== String(q.normalized_text || '').slice(0, 120); })) {
+      warnings.push('The file has no "theme" column, so similar questions are grouped by their exact wording. Topics will look more scattered than they are.');
+    }
+    if (b.tickets >= 10 && b.counts['no-match'] === b.tickets) {
+      warnings.push('Every question sent to a person is marked "manual has nothing on this". If the file has no "escalation_reason" column, add it, so personal or approval questions are not counted as gaps.');
+    }
 
     // Last six months of answer rates, skipping months with no data or a partial first month.
     const monthsInfo = availableMonths(upTo);
@@ -136,7 +150,7 @@
       const info = monthsInfo.filter(function (m) { return m.ym === k; })[0];
       if (!info || !info.complete) continue;
       const mb = A.breakdown(inMonth(upTo, monthRange(k)));
-      series.push({ ym: k, label: monthRange(k).short, total: mb.total, answered: mb.answered, rate: mb.rate });
+      series.push({ ym: k, label: monthRange(k).short, total: mb.total, answered: mb.answered, eligible: mb.total - mb.byDesign, rate: mb.fixableRate, tickets: mb.tickets });
     }
 
     // Manual updates published before the end of the month, and what each achieved.
@@ -170,26 +184,26 @@
       updates: impacts
     };
 
-    // Next changes to the manual, ranked by tickets they would remove.
+    // The ranking window: this month and the two before it, so one odd month does not reorder the list.
+    const completeBefore = [0, 1, 2].map(function (i) { return shiftYm(ym, -i); }).filter(function (k) {
+      const info = monthsInfo.filter(function (m) { return m.ym === k; })[0];
+      return info && info.complete;
+    });
+    const winMonths = Math.max(1, completeBefore.length);
+    const winStart = monthRange(shiftYm(ym, -2)).start.getTime();
+    const prevWinStart = monthRange(shiftYm(ym, -5)).start.getTime();
+    const inWin = function (q) { const t = Date.parse(q.submitted_at); return t >= winStart && t < endMs; };
+    const inPrevWin = function (q) { const t = Date.parse(q.submitted_at); return t >= prevWinStart && t < winStart; };
+    const win = upTo.filter(inWin);
+    const prevWin = upTo.filter(inPrevWin);
+    const windowInfo = { months: winMonths, label: winMonths === 1 ? range.label : monthRange(shiftYm(ym, -(winMonths - 1))).short + ' to ' + range.short + ' ' + range.start.getFullYear() };
+
+    // Changes to the manual, ranked by tickets over the window.
     const suc = A.typicalFixSuccess(impacts);
-    const fixesAll = A.fixList(cur, prev).filter(function (t) { return t.kind === 'add' || t.kind === 'clarify'; });
-    const toFix = function (t) {
-      const more = Math.max(1, Math.round(t.tickets * suc.factor));
-      return {
-        theme: t.theme,
-        kind: t.kind,
-        tickets: t.tickets,
-        more: more,
-        hours: (more * minutes) / 60,
-        example: t.examples[0] || '',
-        note: t.note,
-        section: t.section,
-        rising: t.rising
-      };
-    };
-    const fixes = fixesAll.slice(0, 3).map(toFix);
-    const fixesTracker = fixesAll.slice(0, 12).map(toFix);
-    const proj = A.projectRate(b, fixesAll.slice(0, 3), suc.factor);
+    const changes = IM.build(win, prevWin, { months: winMonths, factor: suc.factor, minutes: minutes });
+    const fixes = changes.slice(0, 3);
+    const moreFromFixes = fixes.reduce(function (a, f) { return a + f.more; }, 0);
+    const projectedRate = eligible ? ((b.answered + moreFromFixes) / eligible) * 100 : null;
 
     // Why questions went to a person.
     const reasons = REASON_INFO.map(function (r) {
@@ -202,49 +216,25 @@
     const review = sectionRows.filter(function (s) { return s.flag === 'clarify' || s.flag === 'unused'; }).slice(0, 4)
       .map(function (s) { return { title: s.title, flag: s.flag, cited: s.cited, unclearRate: s.unclearRate }; });
 
-    // The topics people ask about most (answered or not), for the update deck.
-    const allThemes = A.themeStats(cur, prev);
-    const topN = allThemes.slice().sort(function (a, z) { return z.asked - a.asked || (a.theme < z.theme ? -1 : 1); }).slice(0, 6);
+    // The topics people ask about most over the window. "By design" = sent to a person on purpose.
+    const designN = function (t) { return (t.reasons.policy || 0) + (t.reasons['out-of-scope'] || 0); };
+    const topN = A.themeStats(win, prevWin).slice().sort(function (a, z) { return z.asked - a.asked || (a.theme < z.theme ? -1 : 1); }).slice(0, 6);
     const topQuestions = {
+      months: winMonths,
+      label: windowInfo.label,
       rows: topN.map(function (t) {
-        return { theme: t.theme, example: t.examples[0] || t.theme, asked: t.asked, answered: t.answered, tickets: t.tickets, answeredShare: t.answeredShare, kind: t.kind };
+        const design = designN(t);
+        const scope = t.asked - design;
+        return { theme: t.theme, example: t.examples[0] || t.theme, asked: t.asked, answered: t.answered, byDesign: design, gaps: t.tickets - design, tickets: t.tickets,
+          answeredShare: scope ? (t.answered / scope) * 100 : null, kind: t.kind };
       }),
-      share: b.total ? (topN.reduce(function (a, t) { return a + t.asked; }, 0) / b.total) * 100 : 0
+      share: win.length ? (topN.reduce(function (a, t) { return a + t.asked; }, 0) / win.length) * 100 : 0
     };
 
     const goal = Number(cfg.goal);
-    const need = Math.max(0, Math.ceil((goal / 100) * b.total) - b.answered);
-    const delta = pb && b.rate != null && pb.rate != null ? b.rate - pb.rate : null;
-    const hoursSavedByBot = (b.answered * minutes) / 60;
-
-    // Categories that need work: where the manual had nothing or did not settle the question,
-    // with the questions people asked most in each.
-    const catRows = A.categoryStats(cur, D.OPS_CATEGORIES);
-    const catIds = new Set(catRows.map(function (c) { return c.id; }));
-    const catOf = function (id) { return catIds.has(id) ? id : D.UNCATEGORIZED_ID; };
-    const themeRows = A.themeStats(cur, prev).filter(function (t) { return !t.resolved && t.tickets > 0 && (t.kind === 'add' || t.kind === 'clarify'); });
-    const openIn = function (id) { return themeRows.filter(function (t) { return catOf(t.categoryId) === id; }); };
-    const categories = catRows.map(function (c) { return { row: c, open: openIn(c.id) }; })
-      .filter(function (c) { return c.open.reduce(function (a, t) { return a + t.tickets; }, 0) >= 3; })
-      .map(function (x) {
-        const c = x.row;
-        const fixable = x.open.reduce(function (a, t) { return a + t.tickets; }, 0);
-        return {
-          id: c.id,
-          name: c.name,
-          total: c.total,
-          answered: c.answered,
-          rate: c.answerRate,
-          fixable: fixable,
-          shareOfFixable: b.fixable ? (fixable / b.fixable) * 100 : 0,
-          themes: x.open.slice()
-            .sort(function (a, z) { return z.tickets - a.tickets || (a.theme < z.theme ? -1 : 1); })
-            .slice(0, 5)
-            .map(function (t) { return { theme: t.theme, kind: t.kind, tickets: t.tickets, asked: t.asked, examples: t.examples.slice(0, 2), note: t.note, section: t.section }; })
-        };
-      })
-      .sort(function (a, z) { return z.fixable - a.fixable; })
-      .slice(0, 6);
+    const need = Math.max(0, Math.ceil((goal / 100) * eligible) - b.answered);
+    const prevRate = pb ? pb.fixableRate : null;
+    const delta = pb && rate != null && prevRate != null ? rate - prevRate : null;
 
     return {
       cfg: cfg,
@@ -252,24 +242,30 @@
       prevRange: prevRange,
       b: b,
       pb: prevOk ? pb : null,
+      rate: rate,
+      strictRate: b.rate,
+      eligible: eligible,
+      byDesign: b.byDesign,
+      byDesignPolicy: b.counts.policy || 0,
+      byDesignScope: b.counts['out-of-scope'] || 0,
+      prevRate: prevRate,
       delta: delta,
       goal: goal,
-      vsGoal: b.rate == null ? null : b.rate - goal,
+      vsGoal: rate == null ? null : rate - goal,
       needForGoal: need,
       series: series,
       reasons: reasons,
       fixableTickets: b.fixable,
       fixablePct: b.tickets ? (b.fixable / b.tickets) * 100 : 0,
+      window: windowInfo,
+      changes: changes,
       fixes: fixes,
-      fixesTracker: fixesTracker,
       topQuestions: topQuestions,
-      categories: categories,
-      moreFromFixes: proj.more,
-      projectedRate: proj.rate,
+      moreFromFixes: moreFromFixes,
+      projectedRate: projectedRate,
       fixFactor: suc,
       roi: roi,
       review: review,
-      hoursSavedByBot: hoursSavedByBot,
       warnings: warnings
     };
   }

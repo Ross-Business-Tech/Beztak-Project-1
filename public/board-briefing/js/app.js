@@ -1,7 +1,9 @@
 /*
- * The Briefing Maker page: load a questions file, pick a month, preview the slides,
- * then download the PowerPoint, save a PDF, or get an email draft.
- * Nothing is uploaded anywhere; the file is read and processed in this browser tab.
+ * The Briefing Maker page: load a questions file, pick a month, then either
+ *   - preview and send the executive deck (PowerPoint, PDF, email draft), or
+ *   - work in the Manual Improvement Dashboard.
+ * Nothing is uploaded anywhere. The file is read in this browser tab, and the last file
+ * is kept on this computer (in the browser's storage) so the dashboard is there next time.
  */
 (function () {
   'use strict';
@@ -9,11 +11,11 @@
   const D = Q.data;
   const B = Q.briefing;
   const SETTINGS_KEY = 'monthly-board-briefing-settings-v1';
-  const FIELDS = ['org', 'preparedBy', 'goal', 'minutesPerTicket', 'brand', 'recipients', 'note'];
+  const FIELDS = ['org', 'preparedBy', 'goal', 'minutesPerTicket', 'brand', 'recipients', 'team', 'note'];
 
   const $ = function (id) { return document.getElementById(id); };
-  const state = { records: [], sections: [], ym: null, decks: null, which: 'update', brief: null, pptx: {} };
-  const deck = function () { return state.decks[state.which]; };
+  const state = { records: [], sections: [], ym: null, deck: null, brief: null, pptx: null, tab: 'deck' };
+  let dash = null;
 
   // ---------- settings (remembered on this computer) ----------
 
@@ -32,28 +34,54 @@
     return s;
   }
   function fillSettings(s) { FIELDS.forEach(function (f) { $(f).value = s[f] == null ? '' : s[f]; }); }
+  const teamList = function () { return String($('team').value || '').split(/[,;\n]+/).map(function (t) { return t.trim(); }).filter(Boolean).slice(0, 40); };
+
+  // ---------- keeping the last file on this computer ----------
+
+  const IDB = { name: 'monthly-board-briefing', store: 'files', key: 'questions' };
+  function idb(mode, fn) {
+    return new Promise(function (resolve, reject) {
+      let req;
+      try { req = indexedDB.open(IDB.name, 1); } catch (e) { reject(e); return; }
+      req.onupgradeneeded = function () { req.result.createObjectStore(IDB.store); };
+      req.onerror = function () { reject(req.error); };
+      req.onsuccess = function () {
+        const db = req.result;
+        const tx = db.transaction(IDB.store, mode);
+        const r = fn(tx.objectStore(IDB.store));
+        tx.oncomplete = function () { db.close(); resolve(r && r.result); };
+        tx.onerror = function () { db.close(); reject(tx.error); };
+      };
+    });
+  }
+  const keepFile = function (rec) { return idb('readwrite', function (s) { return s.put(rec, IDB.key); }).catch(function () { /* storage blocked: fine */ }); };
+  const savedFile = function () { return idb('readonly', function (s) { return s.get(IDB.key); }).catch(function () { return null; }); };
+  const forgetFile = function () { return idb('readwrite', function (s) { return s.delete(IDB.key); }).catch(function () { /* ignore */ }); };
 
   // ---------- loading a file ----------
 
   function setStatus(text, kind) { const el = $('status'); el.textContent = text; el.className = 'status' + (kind ? ' ' + kind : ''); }
   const nf = function (n) { return Number(n).toLocaleString('en-US'); };
 
-  function accept(result, label, sections) {
+  function accept(result, label, sections, opts) {
     if (!result.accepted.length) {
       setStatus('No usable questions were found in ' + label + '. ' + (result.rejected[0] ? 'First problem: row ' + result.rejected[0].row + ': ' + result.rejected[0].errors[0] : ''), 'err');
-      return;
+      return false;
     }
     state.records = result.accepted;
     state.sections = sections || [];
     const months = B.availableMonths(state.records);
     const first = months[0];
     const last = months[months.length - 1];
-    let msg = nf(state.records.length) + ' questions loaded from ' + label + ' (' + first.label + ' to ' + last.label + ').';
+    let msg = nf(state.records.length) + ' questions' + (opts && opts.restored ? ' restored from the last time (' : ' loaded from ') + label + (opts && opts.restored ? ')' : '') + ', ' + first.label + ' to ' + last.label + '.';
     if (result.rejected.length) msg += ' ' + nf(result.rejected.length) + ' rows were skipped (for example row ' + result.rejected[0].row + ': ' + result.rejected[0].errors[0] + ').';
     if (result.duplicates.length) msg += ' ' + nf(result.duplicates.length) + ' repeated question IDs were ignored.';
     setStatus(msg, result.rejected.length ? '' : 'ok');
     fillMonths(months);
+    $('forget-wrap').hidden = !(opts && (opts.keep || opts.restored));
     refresh();
+    $('setup').open = false;
+    return true;
   }
 
   function fillMonths(months) {
@@ -70,14 +98,19 @@
     sel.value = state.ym;
   }
 
+  function parseText(text, name) {
+    const parsed = /\.json$/i.test(name) ? D.parseJSONImport(text) : D.parseCSV(text);
+    if (parsed.error) return { error: parsed.error };
+    return { result: D.prepareImport(parsed.records, { categories: D.OPS_CATEGORIES, now: new Date(), existingIds: new Set() }) };
+  }
+
   function handleFile(file) {
     if (!file) return;
     if (file.size > 60 * 1024 * 1024) { setStatus('That file is larger than 60 MB. Export a shorter period.', 'err'); return; }
     file.text().then(function (text) {
-      const parsed = /\.json$/i.test(file.name) ? D.parseJSONImport(text) : D.parseCSV(text);
-      if (parsed.error) { setStatus(parsed.error, 'err'); return; }
-      const result = D.prepareImport(parsed.records, { categories: D.OPS_CATEGORIES, now: new Date(), existingIds: new Set() });
-      accept(result, file.name);
+      const p = parseText(text, file.name);
+      if (p.error) { setStatus(p.error, 'err'); return; }
+      if (accept(p.result, file.name, [], { keep: true })) keepFile({ name: file.name, text: text, at: Date.now() });
     }).catch(function () { setStatus('That file could not be read.', 'err'); });
   }
 
@@ -96,25 +129,45 @@
   function refresh() {
     const settings = readSettings();
     saveSettings(settings);
-    document.documentElement.style.setProperty('--brand', settings.brand || '#0f766e');
+    document.documentElement.style.setProperty('--brand', settings.brand || '#1473e6');
     if (!state.records.length) return;
     state.ym = $('month').value || state.ym;
-    state.pptx = {};
+    state.pptx = null;
     try {
       state.brief = B.build(state.records, state.ym, settings, state.sections);
-      state.decks = Q.slides.build(state.brief);
+      state.deck = Q.slides.build(state.brief);
     } catch (e) {
       setStatus('Could not build the briefing: ' + e.message, 'err');
       return;
     }
-    render();
+    $('empty').hidden = true;
+    $('tabs').hidden = false;
+    $('tab-dash-n').textContent = state.brief.changes.length + ' changes';
+    $('setup-sum').textContent = state.brief.range.label + '  ·  ' + nf(state.brief.b.total) + ' questions  ·  goal ' + state.brief.goal + '%  ·  click to change';
+    warnings();
+    if (!dash) dash = Q.dashboard.create($('dash-root'), { team: teamList });
+    dash.update(state.brief);
+    showTab(state.tab);
   }
 
   function warnings() {
     const el = $('warnings');
     const list = state.brief.warnings.slice();
     el.hidden = !list.length;
-    el.innerHTML = list.map(function (w) { const p = document.createElement('p'); p.textContent = w; return p.outerHTML; }).join('');
+    el.replaceChildren.apply(el, list.map(function (w) { const p = document.createElement('p'); p.textContent = w; return p; }));
+  }
+
+  // ---------- the two views ----------
+
+  function showTab(which) {
+    state.tab = which;
+    ['deck', 'dash'].forEach(function (k) {
+      $('tab-' + k).setAttribute('aria-selected', String(which === k));
+      $('tab-' + k).classList.toggle('on', which === k);
+      $('view-' + k).hidden = which !== k;
+    });
+    if (which === 'deck') renderDeck();
+    else dash.render();
   }
 
   function fit() {
@@ -125,45 +178,19 @@
     });
   }
 
-  function render() {
-    $('empty').hidden = true;
-    $('result').hidden = false;
-    warnings();
-    let seenHidden = false;
-    const html = deck().slides.map(function (sl, i) {
-      let head = '';
-      if (sl.hidden && !seenHidden) {
-        seenHidden = true;
-        head = '<div class="appendix-head no-print"><h2>Appendix: hidden slides</h2><p>These stay out of the slide show but travel inside the PowerPoint file. They hold the questions behind each category and a working table for deciding, assigning and tracking the changes. In PowerPoint, right-click a slide and choose Hide Slide to show or hide it.</p></div>';
-      }
-      return head + '<div class="slot' + (sl.hidden ? ' is-hidden' : '') + '">' + (sl.hidden ? '<p class="slot-tag no-print">Hidden slide</p>' : '') + '<div class="frame">' + Q.renderHtml.slideHtml(sl, i) + '</div></div>';
-    }).join('');
-    $('slides').innerHTML = html;
-    $('pdf-opt').hidden = !seenHidden;
+  function renderDeck() {
+    if (!state.deck) return;
+    $('slides').innerHTML = state.deck.slides.map(function (sl, i) { return '<div class="slot"><div class="frame">' + Q.renderHtml.slideHtml(sl, i) + '</div></div>'; }).join('');
     fit();
-    $('email-subject').textContent = deck().email.subject;
-    $('email-body').textContent = deck().email.body;
-    document.title = deck().fileBase;
-    ['update', 'plan'].forEach(function (k) {
-      $('seg-' + k).setAttribute('aria-pressed', String(state.which === k));
-      $('seg-' + k).classList.toggle('on', state.which === k);
-      $('seg-' + k + '-n').textContent = state.decks[k].visible + ' slides';
-    });
-    $('seg-note').textContent = state.which === 'update'
-      ? 'For leadership: the most-asked questions, whether we hit the goal, what we changed and what it did.'
-      : 'For the team: what to fix next, who does it and by when. A condensed view of the numbers, then the action plan.';
+    $('email-subject').textContent = state.deck.email.subject;
+    $('email-body').textContent = state.deck.email.body;
+    document.title = state.deck.fileBase;
   }
 
-  // ---------- outputs ----------
+  // ---------- outputs for the deck ----------
 
   function msg(text, bad) { const el = $('action-msg'); el.textContent = text; el.className = 'msg' + (bad ? ' err' : ''); }
-  function busy(on) { ['dl-pptx', 'dl-both', 'dl-pdf', 'dl-eml', 'copy-email'].forEach(function (id) { $(id).disabled = on; }); }
-
-  function makePptx(key) {
-    if (typeof window.PptxGenJS !== 'function') throw new Error('The PowerPoint writer did not load.');
-    const b = state.brief;
-    return Q.renderPptx.toPptx(window.PptxGenJS, state.decks[key], { title: state.decks[key].name + ', ' + b.range.label, author: b.cfg.preparedBy || b.cfg.org, company: b.cfg.org });
-  }
+  function busy(on) { ['dl-pptx', 'dl-pdf', 'dl-eml', 'copy-email'].forEach(function (id) { $(id).disabled = on; }); }
 
   function download(blob, name) {
     const url = URL.createObjectURL(blob);
@@ -173,59 +200,44 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
 
-  function pptxBytes(key) {
-    if (state.pptx[key]) return Promise.resolve(state.pptx[key]);
-    return Promise.resolve().then(function () { return makePptx(key).write({ outputType: 'uint8array' }); }).then(function (bytes) {
-      state.pptx[key] = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-      return state.pptx[key];
-    });
+  function pptxBytes() {
+    if (state.pptx) return Promise.resolve(state.pptx);
+    return Promise.resolve().then(function () {
+      if (typeof window.PptxGenJS !== 'function') throw new Error('The PowerPoint writer did not load.');
+      const b = state.brief;
+      return Q.renderPptx.toPptx(window.PptxGenJS, state.deck, { title: state.deck.name + ', ' + b.range.label, author: b.cfg.preparedBy || b.cfg.org, company: b.cfg.org }).write({ outputType: 'uint8array' });
+    }).then(function (bytes) { state.pptx = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes); return state.pptx; });
   }
 
   const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
   function onPptx() {
-    const key = state.which;
     busy(true); msg('Making the PowerPoint…');
-    pptxBytes(key).then(function (bytes) {
-      download(new Blob([bytes], { type: PPTX_MIME }), state.decks[key].fileBase + '.pptx');
-      msg('Saved ' + state.decks[key].fileBase + '.pptx to your Downloads folder.');
+    pptxBytes().then(function (bytes) {
+      download(new Blob([bytes], { type: PPTX_MIME }), state.deck.fileBase + '.pptx');
+      msg('Saved ' + state.deck.fileBase + '.pptx to your Downloads folder.');
     }).catch(function (e) { msg('Could not make the PowerPoint: ' + e.message, true); }).then(function () { busy(false); });
   }
 
-  function onBoth() {
-    busy(true); msg('Making both PowerPoints…');
-    const keys = ['update', 'plan'];
-    keys.reduce(function (chain, key, i) {
-      return chain.then(function () { return pptxBytes(key); }).then(function (bytes) {
-        return new Promise(function (resolve) { setTimeout(function () { download(new Blob([bytes], { type: PPTX_MIME }), state.decks[key].fileBase + '.pptx'); resolve(); }, i * 400); });
-      });
-    }, Promise.resolve()).then(function () { msg('Saved both decks to your Downloads folder. Your browser may ask to allow multiple downloads.'); })
-      .catch(function (e) { msg('Could not make the PowerPoints: ' + e.message, true); }).then(function () { busy(false); });
-  }
-
   function onEml() {
-    const key = state.which;
     busy(true); msg('Making the email draft…');
-    const s = state.brief.cfg;
-    pptxBytes(key).then(function (bytes) {
-      const d = state.decks[key];
-      const eml = Q.email.buildEml({ to: s.recipients, subject: d.email.subject, body: d.email.body, filename: d.fileBase + '.pptx', bytes: bytes });
+    pptxBytes().then(function (bytes) {
+      const d = state.deck;
+      const eml = Q.email.buildEml({ to: state.brief.cfg.recipients, subject: d.email.subject, body: d.email.body, filename: d.fileBase + '.pptx', bytes: bytes });
       download(new Blob([eml], { type: 'message/rfc822' }), d.fileBase + '-email.eml');
       msg('Saved the email draft. Open it from your Downloads folder and the deck is already attached.');
     }).catch(function (e) { msg('Could not make the email draft: ' + e.message, true); }).then(function () { busy(false); });
   }
 
   function onPdf() {
-    document.body.classList.toggle('with-appendix', $('pdf-appendix').checked);
     msg('In the print window, choose "Save as PDF" as the destination.');
     $('email-box').hidden = true;
     setTimeout(function () { window.print(); }, 60);
   }
 
   function onCopy() {
-    const box = $('email-box');
-    box.hidden = false;
-    const text = 'Subject: ' + deck().email.subject + '\n\n' + deck().email.body;
+    $('email-box').hidden = false;
+    const text = 'Subject: ' + state.deck.email.subject + '\n\n' + state.deck.email.body;
     const done = function () { msg('Email text copied. It is also shown below.'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { msg('It is shown below. Select it and copy.'); });
     else msg('It is shown below. Select it and copy.');
@@ -235,16 +247,17 @@
 
   function init() {
     fillSettings(loadSettings());
-    document.documentElement.style.setProperty('--brand', $('brand').value || '#0f766e');
+    document.documentElement.style.setProperty('--brand', $('brand').value || '#1473e6');
     FIELDS.forEach(function (f) { $(f).addEventListener('input', refreshSoon); });
     $('month').addEventListener('change', refresh);
     $('file').addEventListener('change', function (e) { handleFile(e.target.files[0]); e.target.value = ''; });
-    $('sample').addEventListener('click', loadSample);
-    $('dl-pptx').addEventListener('click', onPptx);
-    $('dl-both').addEventListener('click', onBoth);
-    ['update', 'plan'].forEach(function (k) {
-      $('seg-' + k).addEventListener('click', function () { if (!state.decks) return; state.which = k; $('email-box').hidden = true; render(); window.scrollTo({ top: $('result').offsetTop - 10, behavior: 'smooth' }); });
+    $('sample').addEventListener('click', function () { forgetFile(); loadSample(); });
+    $('forget').addEventListener('click', function () {
+      forgetFile().then(function () { $('forget-wrap').hidden = true; setStatus('Forgot the saved file. Your decisions in the dashboard are kept.', ''); });
     });
+    $('tab-deck').addEventListener('click', function () { if (state.brief) showTab('deck'); });
+    $('tab-dash').addEventListener('click', function () { if (state.brief) showTab('dash'); });
+    $('dl-pptx').addEventListener('click', onPptx);
     $('dl-pdf').addEventListener('click', onPdf);
     $('dl-eml').addEventListener('click', onEml);
     $('copy-email').addEventListener('click', onCopy);
@@ -255,6 +268,13 @@
     window.addEventListener('resize', fit);
     window.addEventListener('beforeprint', function () { document.querySelectorAll('.slide').forEach(function (s) { s.style.transform = 'none'; }); });
     window.addEventListener('afterprint', fit);
+
+    // Pick up where we left off: the last file, if this computer kept it.
+    savedFile().then(function (rec) {
+      if (!rec || !rec.text) return;
+      const p = parseText(rec.text, rec.name);
+      if (p.result) accept(p.result, rec.name, [], { restored: true });
+    });
   }
 
   init();

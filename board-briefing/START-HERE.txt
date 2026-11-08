@@ -1,72 +1,87 @@
 MONTHLY BOARD BRIEFING
 ======================
 
-Turns a month of chatbot questions into two slide decks, ready to attach to an email.
-Nothing is installed and nothing leaves your computer.
+One questions file, two things:
 
-  EXECUTIVE UPDATE (5 slides)   The one your client presents to their boss. How things
-                                are going: what people ask most, did we hit the goal,
-                                what we changed before and what it achieved.
-  IMPROVEMENT PLAN (6 slides)   The condensed working version. The same numbers in
-                                brief, then what to fix next, an action table to assign
-                                owners, and the next steps.
+  EXECUTIVE DECK (6 slides)             For leadership. Did we hit the goal, the trend, what people
+                                        ask most, what past manual updates achieved, and what
+                                        comes next. Download as PowerPoint or PDF, or open an
+                                        email draft with the deck attached.
+  MANUAL IMPROVEMENT DASHBOARD (2 pages) For the team. Every change to make to the manual, ranked.
+                                        Open one to see every question behind it, then mark it an
+                                        action item, in progress, done or dismissed, and assign an
+                                        owner.
+
+Nothing is installed and nothing leaves your computer.
 
 
 THE MONTHLY ROUTINE  (about five minutes)
 -----------------------------------------
 1. Double-click  index.html  in this folder. It opens in your web browser
    (Chrome, Edge, Safari or Firefox). No internet connection is needed.
-2. Click "Choose a file" and pick this month's questions export (CSV or JSON).
-   The file should hold several months of history, so the trend can be drawn.
-   The latest complete month is chosen for you.
-3. Add your name, your goal, and a short note if you like. These are remembered for next month.
-4. Choose a deck at the top of the preview (Executive update or Improvement plan), look it over,
-   then pick how to send it:
+2. Under Setup, click "Choose a file" and pick this month's questions export (CSV or JSON).
+   It should hold several months of history so the trend can be drawn. The latest complete
+   month is chosen for you. Add your goal, your name, your team members' names and a short
+   note if you like. These are remembered for next month.
+3. Executive deck tab: look the slides over, then pick how to send them.
      Download PowerPoint ................ the deck, to attach to any email
-     Download both decks ................ both PowerPoints at once
-     Email draft with the deck attached . a file that opens in Outlook or Apple Mail
-                                          with the addresses filled in and the deck already
-                                          attached. Review, then send.
+     Email draft with the deck attached . a file that opens in Outlook or Apple Mail with the
+                                          addresses filled in and the deck already attached
      Save as PDF ........................ choose "Save as PDF" in the print window
      Copy email text .................... the subject and message, to paste anywhere
-   Each deck has its own email text, so the boss gets the update and the team gets the plan.
+4. Manual improvement dashboard tab: work through the changes with your team (see below).
 
-Want to see it first? Click "Try it with sample data" (made-up questions).
+The page keeps the last questions file on this computer, so the dashboard is there the next
+time you open it. "Forget the saved file" under Setup removes it. Want to see everything first?
+Click "Try it with sample data" (made-up questions).
 
 
-WHAT THE SLIDES SAY
--------------------
-Every content slide has a numbered tab, a headline that states the takeaway, and a dark line
-at the bottom: a TAKEAWAY in the update, a NEXT STEP in the plan.
+THE ANSWER RATE
+---------------
+The rate on every slide is the fair one:
 
-EXECUTIVE UPDATE
-1. Cover          One sentence that sums up the month.
-2. Did we hit the goal   The share of questions the bot answered, against the goal.
-3. The trend      Six months of answer rate, with manual updates marked.
-4. Top questions  The six topics people asked about most, and how many the bot answered.
-5. What we changed  Each manual update, the questions it answered, tickets avoided, hours saved.
+     answered by the bot  /  (questions asked  -  questions that go to a person on purpose)
 
-IMPROVEMENT PLAN
+Questions that go to a person on purpose are personal, confidential or approval questions, and
+topics outside operating procedures (parking, IT). The bot is not meant to answer them, so they
+are left out of the rate. The deck always says how many were left out and shows the sum.
+
+
+THE EXECUTIVE DECK
+------------------
+Every content slide has a numbered tab, a headline that states the takeaway, and a dark
+TAKEAWAY line at the bottom that the presenter can read out. Speaker notes explain how each
+number was worked out. The PowerPoint is fully editable.
+
 1. Cover
-2. Snapshot       Goal progress, the tickets the manual could have answered, hours saved so far.
-3. Why tickets    How many questions went to a person, and how many the manual could have answered.
-4. What to change The three best changes, and how many more questions each would answer.
-5. Action plan    A table: tick Action item or Dismiss, name an owner and a date, track status.
-6. Next steps     Three things to agree, the next target, and your note.
+2. Did we hit the goal   The rate against the goal, and how the questions split: answered,
+                         not answered, and the ones that go to a person on purpose.
+3. The trend             The rate by month, with the manual updates marked and how many
+                         questions were asked each month.
+4. Top questions         The six topics people asked about most, over the last three months.
+5. What we changed       Each past manual update: questions answered, tickets avoided, staff
+                         hours saved (an estimate, and the minutes per ticket are shown).
+6. What comes next       The three biggest gaps in the manual and the answers each would add.
 
-Each slide has speaker notes that explain how the numbers were worked out.
-The PowerPoint is fully editable if you want to change a word or a color.
 
-THE HIDDEN APPENDIX  (in the Improvement plan, after the last slide)
----------------------------------------------------------------------
-Hidden slides stay out of the slide show but travel inside the PowerPoint file.
-  One slide per category that needs work: the top questions people asked, why each went to a
-  person, how staff resolved it, and how many more questions fixing it would answer.
-  If there are more than six suggested changes, the rest of the action table is here too.
-To show a hidden slide while presenting, right-click it in PowerPoint and choose Hide Slide
-again. "Save as PDF" leaves the appendix out unless you tick the box beside the button.
-The action table is a normal PowerPoint table: type into it and add rows. A change you
-dismissed will show up again next month if the questions keep coming.
+THE MANUAL IMPROVEMENT DASHBOARD
+--------------------------------
+Page 1, the list. Every change to make, ranked by tickets over the last three months so that
+one odd month does not reorder the list. Each row shows the type (add a section, or improve
+one), the category, the tickets, the answers it would add per month, its status and its owner.
+Filter by status or category, or search. "Open" hides anything done or dismissed.
+
+Page 2, one change. Click a row to see:
+  - the numbers: tickets, how often asked, the answers it would add, the staff time
+  - every question behind it, not answered first, with the date, why it went to a person,
+    the ticket, and how a person resolved it (search, filter and page through them)
+  - a starting point for the wording: how staff resolved the tickets, with a Copy button
+  - your decision: Action item, In progress, Done or Dismissed; an owner (type a name, or
+    click a team member); a due date; and notes. It saves as you type.
+
+Decisions are remembered from month to month. A dismissed change stays dismissed. To share
+the work with colleagues: "Download spreadsheet" gives an Excel-friendly file, and "Save team
+file" / "Load team file" moves everyone's decisions between computers (the newer decision wins).
 
 
 THE QUESTIONS FILE
@@ -79,37 +94,35 @@ Required columns:
   submitted_at        date and time asked, e.g. 2026-10-14T09:30:00Z
   resolution_status   Answered, Ticket Open or Ticket Closed
 
-Strongly recommended (the briefing is much richer with them):
+Strongly recommended (without them the page warns you, and the numbers are less useful):
   escalation_reason   why it went to a person: no-match, unclear, policy or out-of-scope
+                      (without it every question sent to a person counts as a gap)
   theme               the topic the bot grouped the question under
+                      (without it, questions are grouped by their exact wording)
   manual_section      the manual section the bot used or cited
   section_published_at  when that section was added to the manual (this is how
-                      "return on updates" is measured)
-  resolution_note     how the person resolved the ticket (becomes a starting point
-                      for new wording)
+                      "what we changed" is measured)
+  resolution_note     how the person resolved the ticket (the dashboard's wording starting point)
   category            Safety & Compliance, Equipment & Maintenance, Quality & Audits,
                       Shifts & Staffing, Procurement & Suppliers or Reporting & Records
 
 Rows that cannot be read are skipped, and the page tells you how many and why.
 
 
-HOW THE NUMBERS ARE WORKED OUT
-------------------------------
-Answer rate ........ questions answered from the manual / all questions asked that month.
-Fixable tickets .... tickets where the manual had nothing, or the section did not settle it.
-                     Tickets that go to a person by policy, or are outside the manual, are
-                     not counted as fixable.
-"More answered" .... each suggested change is assumed to let the bot answer the same share
-                     of repeat questions that your past updates did (a typical 80% if there
-                     is no history). It is an estimate, not a promise.
+HOW THE OTHER NUMBERS ARE WORKED OUT
+------------------------------------
+"More answered" .... each change is assumed to let the bot answer the same share of repeat
+                     questions that your past updates did (a typical 80% if there is no
+                     history). It is an estimate, not a promise.
 Staff hours saved .. questions answered x minutes a person would have spent on a ticket
-                     (default 12, change it in step 3) / 60.
+                     (default 12, change it in Setup) / 60. It assumes each answered question
+                     would otherwise have become a ticket.
 
 
 PRIVACY
 -------
-The file you choose is read inside your browser and never uploaded. The page remembers only
-your settings (name, goal, note, addresses) on this computer. Avoid putting names or other
+The file you choose is read inside your browser and never uploaded. The page keeps your
+settings, your decisions and the last file on this computer only. Avoid putting names or other
 personal details of employees into the questions file.
 
 
