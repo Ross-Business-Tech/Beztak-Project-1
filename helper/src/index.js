@@ -1,0 +1,96 @@
+// Beztakets email helper. Turns emails sent to the burner Gmail into tickets,
+// and sends ticket replies by email. All keys come from Cloudflare secrets.
+
+const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
+const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...cors } })
+const b64u = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const unb64u = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)))
+
+async function accessToken(env) {
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, refresh_token: env.GOOGLE_REFRESH_TOKEN, grant_type: 'refresh_token' }),
+  })
+  const d = await r.json()
+  if (!d.access_token) throw new Error('Google sign-in failed: ' + (d.error_description || d.error))
+  return d.access_token
+}
+const gmail = async (env, token, path, init) => {
+  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/' + path, { ...init, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' } })
+  if (!r.ok) throw new Error(`Gmail ${path} failed (${r.status})`)
+  return r.json()
+}
+const header = (m, name) => m.payload.headers.find((h) => h.name.toLowerCase() === name)?.value || ''
+const bodyText = (part) => {
+  if (!part) return ''
+  if (part.mimeType === 'text/plain' && part.body?.data) return unb64u(part.body.data)
+  for (const p of part.parts || []) { const t = bodyText(p); if (t) return t }
+  return ''
+}
+// Drop quoted earlier messages so a ticket thread stays readable.
+const stripQuote = (t) => t.split(/\r?\n(?:On .+ wrote:|-{2,} ?Original Message)/)[0].trim()
+
+async function getTicket(env, id) { return env.TICKETS.get('t:' + id, 'json') }
+async function saveTicket(env, t) {
+  await env.TICKETS.put('t:' + t.id, JSON.stringify(t))
+  const index = (await env.TICKETS.get('index', 'json')) || []
+  if (!index.includes(t.id)) await env.TICKETS.put('index', JSON.stringify([t.id, ...index]))
+}
+
+export async function pollInbox(env) {
+  const token = await accessToken(env)
+  const me = env.BURNER_EMAIL.toLowerCase()
+  const list = await gmail(env, token, 'messages?q=' + encodeURIComponent('in:inbox newer_than:7d') + '&maxResults=25')
+  for (const { id: msgId } of (list.messages || []).reverse()) {
+    if (await env.TICKETS.get('seen:' + msgId)) continue
+    const m = await gmail(env, token, `messages/${msgId}?format=full`)
+    const from = header(m, 'from')
+    await env.TICKETS.put('seen:' + msgId, '1', { expirationTtl: 60 * 60 * 24 * 14 })
+    if (from.toLowerCase().includes(me)) continue
+    const entry = { inbound: true, from, text: stripQuote(bodyText(m.payload)) || m.snippet, at: new Date(+m.internalDate).toISOString(), messageId: header(m, 'message-id') }
+    let t = await getTicket(env, m.threadId)
+    if (t) { t.replies.push(entry); if (t.status === 'Closed') t.status = 'Open' }
+    else t = { id: m.threadId, subject: header(m, 'subject') || '(no subject)', customer: from, status: 'Open', createdAt: entry.at, replies: [entry] }
+    await saveTicket(env, t)
+  }
+}
+
+export async function sendReply(env, id, text) {
+  const t = await getTicket(env, id)
+  if (!t) return null
+  const last = [...t.replies].reverse().find((r) => r.inbound)
+  const to = (t.customer.match(/<(.+)>/) || [null, t.customer])[1]
+  const subject = /^re:/i.test(t.subject) ? t.subject : 'Re: ' + t.subject
+  const lines = [`To: ${to}`, `Subject: ${subject.replace(/[\r\n]/g, ' ')}`, 'Content-Type: text/plain; charset=UTF-8']
+  if (last?.messageId) lines.push(`In-Reply-To: ${last.messageId}`, `References: ${last.messageId}`)
+  const token = await accessToken(env)
+  await gmail(env, token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw: b64u(lines.join('\r\n') + '\r\n\r\n' + text), threadId: id }) })
+  t.replies.push({ outbound: true, text, at: new Date().toISOString() })
+  await saveTicket(env, t)
+  return t
+}
+
+export default {
+  async scheduled(_e, env, ctx) { ctx.waitUntil(pollInbox(env)) },
+  async fetch(req, env, ctx) {
+    if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
+    if (req.headers.get('authorization') !== 'Bearer ' + env.HELPER_TOKEN) return json({ error: 'Not allowed' }, 401)
+    const url = new URL(req.url)
+    try {
+      if (url.pathname === '/tickets' && req.method === 'GET') {
+        if (url.searchParams.get('refresh')) await pollInbox(env)
+        const ids = (await env.TICKETS.get('index', 'json')) || []
+        return json((await Promise.all(ids.map((i) => getTicket(env, i)))).filter(Boolean))
+      }
+      const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)
+      if (m && req.method === 'POST') {
+        const { text } = await req.json()
+        if (!text || text.length > 10000) return json({ error: 'Reply text is required' }, 400)
+        const t = await sendReply(env, m[1], text)
+        return t ? json(t) : json({ error: 'Ticket not found' }, 404)
+      }
+      return json({ error: 'Not found' }, 404)
+    } catch (e) { return json({ error: e.message }, 500) }
+  },
+}

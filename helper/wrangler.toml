@@ -1,0 +1,16 @@
+name = "beztakets-helper"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# Checks the burner inbox every minute.
+[triggers]
+crons = ["* * * * *"]
+
+# Run once:  npx wrangler kv namespace create TICKETS
+# then paste the id it prints below.
+[[kv_namespaces]]
+binding = "TICKETS"
+id = "PASTE_KV_ID_HERE"
+
+# Secrets (never put these in this file). Add each with:  npx wrangler secret put NAME
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, HELPER_TOKEN, BURNER_EMAIL
