@@ -1,8 +1,15 @@
 MONTHLY BOARD BRIEFING
 ======================
 
-Turns a month of chatbot questions into eight slides for your executive board,
-ready to attach to an email. Nothing is installed and nothing leaves your computer.
+Turns a month of chatbot questions into two slide decks, ready to attach to an email.
+Nothing is installed and nothing leaves your computer.
+
+  EXECUTIVE UPDATE (5 slides)   The one your client presents to their boss. How things
+                                are going: what people ask most, did we hit the goal,
+                                what we changed before and what it achieved.
+  IMPROVEMENT PLAN (6 slides)   The condensed working version. The same numbers in
+                                brief, then what to fix next, an action table to assign
+                                owners, and the next steps.
 
 
 THE MONTHLY ROUTINE  (about five minutes)
@@ -12,49 +19,54 @@ THE MONTHLY ROUTINE  (about five minutes)
 2. Click "Choose a file" and pick this month's questions export (CSV or JSON).
    The file should hold several months of history, so the trend can be drawn.
    The latest complete month is chosen for you.
-3. Check the slides in the preview. Add your name, your goal, and a short note
-   to the board if you like. These are remembered for next month.
-4. Pick how to send it:
+3. Add your name, your goal, and a short note if you like. These are remembered for next month.
+4. Choose a deck at the top of the preview (Executive update or Improvement plan), look it over,
+   then pick how to send it:
      Download PowerPoint ................ the deck, to attach to any email
+     Download both decks ................ both PowerPoints at once
      Email draft with the deck attached . a file that opens in Outlook or Apple Mail
-                                          with the board addresses filled in and
-                                          the deck already attached. Review, then send.
+                                          with the addresses filled in and the deck already
+                                          attached. Review, then send.
      Save as PDF ........................ choose "Save as PDF" in the print window
      Copy email text .................... the subject and message, to paste anywhere
+   Each deck has its own email text, so the boss gets the update and the team gets the plan.
 
 Want to see it first? Click "Try it with sample data" (made-up questions).
 
 
-WHAT THE EIGHT SLIDES SAY
--------------------------
-Built to run a board meeting: a numbered tab on every slide that matches the agenda, a
-headline that states the takeaway, and a "For discussion" line at the bottom of each slide.
+WHAT THE SLIDES SAY
+-------------------
+Every content slide has a numbered tab, a headline that states the takeaway, and a dark line
+at the bottom: a TAKEAWAY in the update, a NEXT STEP in the plan.
+
+EXECUTIVE UPDATE
 1. Cover          One sentence that sums up the month.
-2. Agenda         The six things the meeting covers.
-3. Where we stand The share of questions the bot answered, against your goal.
-4. The trend      Six months of answer rate, with manual updates marked.
-5. Why tickets    How many questions went to a person, and how many the manual could have answered.
-6. What to change The three best changes to the manual, and how many more questions each would answer.
-7. Return         Questions answered by your updates, fewer tickets, and staff hours saved.
-8. Decisions      The three decisions to close the meeting, the next target, and your note.
+2. Did we hit the goal   The share of questions the bot answered, against the goal.
+3. The trend      Six months of answer rate, with manual updates marked.
+4. Top questions  The six topics people asked about most, and how many the bot answered.
+5. What we changed  Each manual update, the questions it answered, tickets avoided, hours saved.
+
+IMPROVEMENT PLAN
+1. Cover
+2. Snapshot       Goal progress, the tickets the manual could have answered, hours saved so far.
+3. Why tickets    How many questions went to a person, and how many the manual could have answered.
+4. What to change The three best changes, and how many more questions each would answer.
+5. Action plan    A table: tick Action item or Dismiss, name an owner and a date, track status.
+6. Next steps     Three things to agree, the next target, and your note.
 
 Each slide has speaker notes that explain how the numbers were worked out.
 The PowerPoint is fully editable if you want to change a word or a color.
 
-
-THE HIDDEN APPENDIX  (after slide 8)
-------------------------------------
-Hidden slides stay out of the slide show but travel inside the PowerPoint file, so you
-can open them if a board member asks "what are people actually asking?".
-  One slide per category that needs work: the top questions people asked, why each went
-  to a person, how staff resolved it, and how many more questions fixing it would answer.
-  A working table of every suggested change. For each one, tick "Action item" or
-  "Dismiss", write an owner and a due date, and track it as To do / In progress / Done.
-  It is a normal PowerPoint table: type into it, add rows, and bring it to next month's
-  meeting. (A change you dismissed will simply show up again next month if the questions
-  keep coming.)
-To show a hidden slide while presenting: right-click it in PowerPoint and choose Hide Slide
+THE HIDDEN APPENDIX  (in the Improvement plan, after the last slide)
+---------------------------------------------------------------------
+Hidden slides stay out of the slide show but travel inside the PowerPoint file.
+  One slide per category that needs work: the top questions people asked, why each went to a
+  person, how staff resolved it, and how many more questions fixing it would answer.
+  If there are more than six suggested changes, the rest of the action table is here too.
+To show a hidden slide while presenting, right-click it in PowerPoint and choose Hide Slide
 again. "Save as PDF" leaves the appendix out unless you tick the box beside the button.
+The action table is a normal PowerPoint table: type into it and add rows. A change you
+dismissed will show up again next month if the questions keep coming.
 
 
 THE QUESTIONS FILE

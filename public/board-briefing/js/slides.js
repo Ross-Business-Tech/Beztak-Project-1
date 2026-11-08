@@ -84,12 +84,18 @@
     s.text({ x: 1.2, y: 0.4, w: W - 1.2 - M, h: 1.05, text: title, size: size, bold: true, valign: 'middle' });
   }
   // The line that runs the meeting.
-  function discuss(s, text, blue) {
+  function discuss(s, text, blue, label) {
     s.rect({ x: 0, y: 6.4, w: W, h: 0.6, fill: CHAR });
     s.rect({ x: 0, y: 6.4, w: 0.2, h: 0.6, fill: blue });
-    s.text({ x: M, y: 6.4, w: 1.9, h: 0.6, text: 'FOR DISCUSSION', size: 13, bold: true, color: tint(blue, 0.5), valign: 'middle' });
+    s.text({ x: M, y: 6.4, w: 1.9, h: 0.6, text: label || 'FOR DISCUSSION', size: 13, bold: true, color: tint(blue, 0.5), valign: 'middle' });
     s.text({ x: 2.7, y: 6.4, w: W - 2.7 - M, h: 0.6, text: text, size: 18, color: 'FFFFFF', valign: 'middle' });
   }
+  // The dark line at the foot of a slide: a takeaway, a next step or a question, as the deck chooses.
+  function band(s, o, fallback, blue) {
+    const bd = o && o.band;
+    discuss(s, (bd && bd.text) || fallback, blue, (bd && bd.label) || 'FOR DISCUSSION');
+  }
+  const tabOf = function (o, d) { return (o && o.tab) || d; };
   function footer(s, b, n, total, o) {
     const dark = o && o.dark;
     const col = dark ? 'AEB5BF' : GREY_MID;
@@ -122,7 +128,7 @@
 
   // ---------- 1. cover ----------
 
-  function cover(b, blue) {
+  function cover(b, blue, o) {
     const s = new Slide(CHAR);
     // A cluster of hexagons holds the headline number.
     const hh = 4.0; const hw = hh * 1.1547;
@@ -134,12 +140,13 @@
     s.text({ x: hx, y: hy + 0.75, w: hw, h: 2.0, runs: [{ text: String(Math.round(b.b.rate || 0)), size: 100, bold: true, color: 'FFFFFF' }, { text: '%', size: 44, bold: true, color: 'FFFFFF' }], align: 'center', valign: 'middle' });
     s.text({ x: hx, y: hy + 2.65, w: hw, h: 0.5, text: 'answered by the bot', size: 18, color: 'FFFFFF', align: 'center' });
     s.rect({ x: 0, y: 2.0, w: 0.3, h: 1.9, fill: blue });
-    s.text({ x: M, y: 1.7, w: 7, h: 0.4, text: 'OPERATING MANUAL BRIEFING', size: 16, bold: true, color: tint(blue, 0.5) });
+    s.text({ x: M, y: 1.7, w: 7, h: 0.4, text: ((o && o.eyebrow) || 'OPERATING MANUAL BRIEFING'), size: 16, bold: true, color: tint(blue, 0.5) });
     s.text({ x: M, y: 2.15, w: 7.4, h: 1.7, text: b.range.label, size: 62, bold: true, color: 'FFFFFF', valign: 'middle' });
     s.text({ x: M, y: 4.0, w: 7, h: 0.45, text: b.cfg.org, size: 22, color: 'C9CFD6' });
     s.text({ x: M, y: 4.75, w: 6.9, h: 1.3, text: verdict(b), size: 22, color: 'FFFFFF' });
-    s.text({ x: M, y: 6.75, w: 7.5, h: 0.32, text: 'Prepared for the Executive Board' + (b.cfg.preparedBy ? '   ·   ' + b.cfg.preparedBy : ''), size: 13, color: 'AEB5BF' });
+    s.text({ x: M, y: 6.75, w: 7.5, h: 0.32, text: ((o && o.prepared) || 'Prepared for the Executive Board') + (b.cfg.preparedBy ? '   ·   ' + b.cfg.preparedBy : ''), size: 13, color: 'AEB5BF' });
     s.notes = 'Cover. One sentence that sums up the month: ' + verdict(b);
+    if (o && o.coverNote) s.notes += ' ' + o.coverNote;
     return s;
   }
 
@@ -180,12 +187,12 @@
 
   // ---------- 3. where we stand ----------
 
-  function standing(b, blue, n, total) {
+  function standing(b, blue, n, total, o) {
     const s = new Slide('FFFFFF');
     const bb = b.b;
     const title = bb.rate == null ? 'No questions recorded this month'
       : pct0(bb.rate) + ' answered by the bot, ' + (b.vsGoal >= 0 ? 'goal of ' + b.goal + '% met' : pts(b.vsGoal) + ' short of the ' + b.goal + '% goal');
-    header(s, '1', title, blue);
+    header(s, tabOf(o, '1'), title, blue);
     // Gauge
     const d = 4.0; const gx = M + 0.1; const gy = 1.95; const thick = 34;
     s.ring({ x: gx, y: gy, w: d, h: d, thick: thick, color: blue, pct: bb.rate || 0 });
@@ -216,7 +223,7 @@
     if (b.delta != null) chips.push((b.delta >= 0.05 ? '▲ ' : b.delta <= -0.05 ? '▼ ' : '● ') + (Math.abs(b.delta) >= 0.05 ? pts(b.delta) + (b.delta > 0 ? ' up on ' : ' down on ') : 'Level with ') + b.prevRange.name);
     chips.push(b.vsGoal >= 0 ? 'Goal met by ' + pts(b.vsGoal) : n0(b.needForGoal) + ' more answers needed to reach the goal');
     s.text({ x: rx, y: 5.3, w: rw, h: 0.9, text: chips.join('\n'), size: 18, bold: true, color: CHAR, valign: 'middle' });
-    discuss(s, b.vsGoal >= 0 ? 'Do we raise the ' + b.goal + '% goal?' : 'Is ' + b.goal + '% still the right goal, and by when?', blue);
+    band(s, o, b.vsGoal >= 0 ? 'Do we raise the ' + b.goal + '% goal?' : 'Is ' + b.goal + '% still the right goal, and by when?', blue);
     footer(s, b, n, total);
     s.notes = 'Answer rate = questions answered from the manual ÷ all questions asked in ' + b.range.label + '. ' +
       'Questions that go to a person are counted against the bot even when they are sent there by policy.' + (b.pb ? ' ' + b.prevRange.label + ' was ' + pct0(b.pb.rate) + '.' : '');
@@ -225,13 +232,13 @@
 
   // ---------- 4. the trend ----------
 
-  function trend(b, blue, n, total) {
+  function trend(b, blue, n, total, o) {
     const s = new Slide('FFFFFF');
-    header(s, '2', trendTitle(b), blue);
+    header(s, tabOf(o, '2'), trendTitle(b), blue);
     const data = b.series;
     if (data.length < 2) {
       s.text({ x: M, y: 2.3, w: W - 2 * M, h: 3.0, text: 'A trend line needs at least two full months of data. Add earlier months to the questions file to see it.', size: 26, color: GREY, valign: 'middle' });
-      discuss(s, 'Can we export earlier months so the next briefing shows a trend?', blue);
+      band(s, o, 'Can we export earlier months so the next briefing shows a trend?', blue);
       footer(s, b, n, total);
       s.notes = 'Not enough months in the data to draw a trend.';
       return s;
@@ -279,7 +286,7 @@
     });
     const first = data[0];
     const rising = data[data.length - 1].rate - first.rate >= 1;
-    discuss(s, rising ? 'Which of these updates should we repeat?' : 'What changed, and what do we do about it?', blue);
+    band(s, o, rising ? 'Which of these updates should we repeat?' : 'What changed, and what do we do about it?', blue);
     footer(s, b, n, total);
     s.notes = 'Monthly answer rate for the last ' + data.length + ' full months. Labels above the chart mark months in which a section was added to the manual. ' +
       'Months with no data or only a partial month of data are left out.';
@@ -288,10 +295,10 @@
 
   // ---------- 5. why people reach a person ----------
 
-  function reasons(b, blue, n, total) {
+  function reasons(b, blue, n, total, o) {
     const s = new Slide('FFFFFF');
     const tk = b.b.tickets;
-    header(s, '3', tk ? Math.round(b.fixablePct) + '% of tickets could be avoided by changing the manual' : 'Nothing went to a person this month', blue);
+    header(s, tabOf(o, '3'), tk ? Math.round(b.fixablePct) + '% of tickets could be avoided by changing the manual' : 'Nothing went to a person this month', blue);
     const d = 3.7; const gx = M + 0.2; const gy = 1.9;
     s.ring({ x: gx, y: gy, w: d, h: d, thick: 30, color: RED, pct: b.fixablePct });
     s.text({ x: gx, y: gy + 1.0, w: d, h: 1.0, text: tk ? Math.round(b.fixablePct) + '%' : '0', size: 60, bold: true, align: 'center', valign: 'middle' });
@@ -310,7 +317,7 @@
       s.rect({ x: rx, y: y + 0.84, w: rw - 1.9, h: 0.14, fill: GREY_LINE });
       if (r.count) s.rect({ x: rx, y: y + 0.84, w: Math.max(0.07, ((rw - 1.9) * r.count) / max), h: 0.14, fill: col });
     });
-    discuss(s, 'Do we accept that policy and out-of-scope tickets stay with people?', blue);
+    band(s, o, 'Do we accept that policy and out-of-scope tickets stay with people?', blue);
     footer(s, b, n, total);
     s.notes = 'Every ticket has one reason. "Nothing in the manual" and "section did not settle it" (red) can be fixed by editing the manual. ' +
       'Policy and out-of-scope questions (grey) are meant to reach a person.';
@@ -319,18 +326,18 @@
 
   // ---------- 6. what to change ----------
 
-  function fixes(b, blue, n, total) {
+  function fixes(b, blue, n, total, o) {
     const s = new Slide('FFFFFF');
     const list = b.fixes;
     if (!list.length) {
-      header(s, '4', 'No urgent changes to the manual this month', blue);
+      header(s, tabOf(o, '4'), 'No urgent changes to the manual this month', blue);
       s.text({ x: M, y: 2.2, w: 10.5, h: 3.2, text: 'No topic reached three tickets in the month. Topics appear here as soon as three or more questions on the same subject go to a person.', size: 26, color: GREY, valign: 'middle' });
-      discuss(s, 'Is there any change to the manual we want to make anyway?', blue);
+      band(s, o, 'Is there any change to the manual we want to make anyway?', blue);
       footer(s, b, n, total);
       s.notes = 'No fix reached the minimum of three tickets in the month.';
       return s;
     }
-    header(s, '4', (list.length === 3 ? 'Three' : String(list.length)) + ' changes lift the answer rate from ' + pct0(b.b.rate) + ' to about ' + pct0(b.projectedRate), blue);
+    header(s, tabOf(o, '4'), (list.length === 3 ? 'Three' : String(list.length)) + ' changes lift the answer rate from ' + pct0(b.b.rate) + ' to about ' + pct0(b.projectedRate), blue);
     const rowH = 1.4; const y0 = 1.75;
     list.forEach(function (f, i) {
       const y = y0 + i * rowH;
@@ -344,7 +351,7 @@
       s.text({ x: 9.2, y: y + 0.95, w: 3.38, h: 0.32, text: 'more answered a month', size: 15, color: GREY, align: 'right' });
     });
     s.line({ x1: M, y1: y0 + list.length * rowH, x2: W - M, y2: y0 + list.length * rowH, color: GREY_LINE });
-    discuss(s, 'Do we back these ' + (list.length === 1 ? 'change' : list.length + ' changes') + ', and who owns each?', blue);
+    band(s, o, 'Do we back these ' + (list.length === 1 ? 'change' : list.length + ' changes') + ', and who owns each?', blue);
     footer(s, b, n, total);
     s.notes = 'Estimate, not a promise: each fix is assumed to let the bot answer ' + Math.round(b.fixFactor.factor * 100) + '% of the repeat questions on its topic' +
       (b.fixFactor.fromHistory ? ' (the average of ' + b.fixFactor.n + ' of our own past updates)' : ' (a typical figure; there is not enough history yet)') +
@@ -354,18 +361,18 @@
 
   // ---------- 7. return on updates ----------
 
-  function roi(b, blue, n, total) {
+  function roi(b, blue, n, total, o) {
     const s = new Slide('FFFFFF');
     const r = b.roi;
     if (!r.count) {
-      header(s, '5', 'No manual updates are being tracked yet', blue);
+      header(s, tabOf(o, '5'), 'No manual updates are being tracked yet', blue);
       s.text({ x: M, y: 2.2, w: 10.5, h: 3.2, text: 'Once a section is published, next month\'s briefing will show how many questions it answered, how many tickets it removed and how much staff time it saved.', size: 26, color: GREY, valign: 'middle' });
-      discuss(s, 'Which change do we publish first?', blue);
+      band(s, o, 'Which change do we publish first?', blue);
       footer(s, b, n, total);
       s.notes = 'No sections were published during the period covered by the data.';
       return s;
     }
-    header(s, '5', 'Manual updates have saved about ' + hrs(r.hoursSince) + ' staff hours', blue);
+    header(s, tabOf(o, '5'), 'Manual updates have saved about ' + hrs(r.hoursSince) + ' staff hours', blue);
     const lw = 4.4;
     s.text({ x: M, y: 1.7, w: lw, h: 1.5, runs: [{ text: hrs(r.hoursSince), size: 88, bold: true, color: blue }, { text: '  hours', size: 26, color: GREY }], valign: 'middle' });
     s.text({ x: M, y: 3.15, w: lw, h: 0.35, text: 'of staff time saved', size: 18, color: GREY });
@@ -389,7 +396,7 @@
       s.rect({ x: rx, y: y + 0.66, w: Math.max(0.07, (bw * u.answersSince) / max), h: 0.24, fill: GREEN });
       s.text({ x: rx + bw + 0.1, y: y + 0.58, w: 1.1, h: 0.4, text: n0(u.answersSince), size: 24, bold: true, valign: 'middle' });
     });
-    discuss(s, 'Is this return enough to keep investing in the manual?', blue);
+    band(s, o, 'Is this return enough to keep investing in the manual?', blue);
     footer(s, b, n, total);
     s.notes = 'For each published update: questions on its topics that the bot answered since publishing, and tickets a week in the four weeks before publishing compared with the weeks since. ' +
       'Staff hours = answered questions × ' + b.cfg.minutesPerTicket + ' minutes ÷ 60; ' + n0(r.answersThisMonth) + ' of the answers came in ' + b.range.name + '. "Fewer tickets a month" converts the weekly drop at 52 ÷ 12 weeks per month. ' +
@@ -399,11 +406,12 @@
 
   // ---------- 8. decisions ----------
 
-  function decisions(b, blue, n, total, hasTracker) {
+  function decisions(b, blue, n, total, o) {
+    const hasTracker = !!(o && o.hasTracker);
     const s = new Slide('FFFFFF');
     const target = Math.max(b.projectedRate || 0, b.b.rate || 0);
     const nm = nextMonthName(b);
-    header(s, '6', 'Decisions for today', blue);
+    header(s, tabOf(o, '6'), (o && o.title) || 'Decisions for today', blue);
     const d = 3.5; const gx = M + 0.2; const gy = 1.8;
     s.ring({ x: gx, y: gy, w: d, h: d, thick: 28, color: blue, pct: target });
     s.text({ x: gx, y: gy + 0.85, w: d, h: 1.0, text: pct0(target), size: 58, bold: true, align: 'center', valign: 'middle' });
@@ -413,7 +421,7 @@
     const names = b.fixes.map(function (f) { return clip(f.theme, 34); }).join('  ·  ');
     const dec = [
       ['Back the changes to the manual', names || 'No changes proposed this month'],
-      ['Give each one an owner and a date', hasTracker ? 'Use the working table in the appendix' : 'Agree owners in the room'],
+      ['Give each one an owner and a date', hasTracker ? ((o && o.trackerRef) || 'Use the working table in the appendix') : 'Agree owners in the room'],
       ['Confirm the ' + nm + ' target', 'Aim for ' + pct0(target) + (b.moreFromFixes ? ', about ' + n0(b.moreFromFixes) + ' more answers a month' : '') + '; the goal stays at ' + b.goal + '%']
     ];
     dec.forEach(function (it, i) {
@@ -431,7 +439,7 @@
     }
     footer(s, b, n, total);
     s.notes = 'The three decisions that close the meeting. The target is the projected answer rate if the listed changes are made, an estimate based on how well past updates worked. ' +
-      (hasTracker ? 'The hidden appendix has a working table for recording each decision, owner and due date. ' : '') + 'A personal note can be added in the Briefing Maker and appears on this slide.';
+      (hasTracker ? ((o && o.trackerNote) || 'The hidden appendix has a working table for recording each decision, owner and due date. ') : '') + 'A personal note can be added in the Briefing Maker and appears on this slide.';
     return s;
   }
 
@@ -478,17 +486,23 @@
     return rows.slice(0, 12);
   }
 
-  function trackerSlides(b, blue, labelFor) {
+  // The working table. Hidden (in the appendix) or visible (a main slide in the plan deck).
+  function trackerPages(b) { return Math.ceil(trackerRows(b).length / 6); }
+
+  function trackerSlides(b, blue, o) {
     const rows = trackerRows(b);
     if (!rows.length) return [];
+    const hidden = !!(o && o.hidden);
     const per = 6;
     const pages = Math.ceil(rows.length / per);
     const out = [];
     const colW = [0.55, 2.7, 3.0, 1.55, 1.35, 0.95, 1.73];
     const border = function (c) { return [{ type: 'none' }, { type: 'none' }, { type: 'solid', pt: 0.75, color: c || GREY_LINE }, { type: 'none' }]; };
     for (let p = 0; p < pages; p++) {
-      const s = new Slide('FFFFFF', true);
-      header(s, 'A', 'Working plan: decide, assign, track' + (pages > 1 ? ' (' + (p + 1) + ' of ' + pages + ')' : ''), blue);
+      const hid = hidden || p >= ((o && o.visiblePages) || pages);
+      const s = new Slide('FFFFFF', hid);
+      const title = (hid ? 'Working plan' : 'Action plan') + ': decide, assign, track' + (pages > 1 ? ' (' + (p + 1) + ' of ' + pages + ')' : '');
+      header(s, hid ? 'A' : String(o.tab + p), title, blue);
       s.text({ x: M, y: 1.62, w: W - 2 * M, h: 0.34, text: 'Tick a decision for each change, then name an owner and a date. This is a normal PowerPoint table, so type straight into it.', size: 14, color: GREY });
       const head = ['#', 'CHANGE', 'CONTEXT', 'DECISION', 'OWNER', 'DUE', 'STATUS'].map(function (t, i) {
         return { text: t, size: 11, bold: true, color: 'FFFFFF', fill: CHAR, align: i === 0 ? 'center' : 'left', border: border(CHAR) };
@@ -506,58 +520,176 @@
         ];
       });
       s.table({ x: M, y: 2.1, w: W - 2 * M, colW: colW, rowH: [0.38].concat(body.map(function () { return 0.74; })), rows: [head].concat(body) });
-      footer(s, b, 0, 0, { label: labelFor(out.length) });
-      s.notes = 'Hidden appendix slide: the working plan. Every change suggested for the manual, ordered by how many tickets it would remove. ' +
+      if (hid) footer(s, b, 0, 0, { label: '@@APPENDIX@@' });
+      else footer(s, b, o.n + p, o.total);
+      s.notes = (hid ? 'Hidden appendix slide: the rest of the working plan. ' : 'The action plan: the top changes first. ') + 'Every change suggested for the manual, ordered by how many tickets it would remove. ' +
         'Tick Action item or Dismiss, write an owner and a due date, and track status as work proceeds. Rows can be added or deleted like any PowerPoint table.';
       out.push(s);
     }
     return out;
   }
 
+  // ---------- new slide: the most-asked questions (update deck) ----------
+
+  function topQuestions(b, blue, n, total, o) {
+    const s = new Slide('FFFFFF');
+    const tq = b.topQuestions;
+    const rows = tq.rows;
+    header(s, tabOf(o, '3'), rows.length ? (rows.length === 6 ? 'Six' : String(rows.length)) + ' topics made up ' + Math.round(tq.share) + '% of all questions' : 'No questions recorded this month', blue);
+    if (!rows.length) { footer(s, b, n, total); return s; }
+    // Legend
+    s.rect({ x: W - M - 4.6, y: 1.66, w: 0.2, h: 0.2, fill: GREEN });
+    s.text({ x: W - M - 4.3, y: 1.6, w: 2.0, h: 0.32, text: 'answered by the bot', size: 14, color: GREY, valign: 'middle' });
+    s.rect({ x: W - M - 2.1, y: 1.66, w: 0.2, h: 0.2, fill: RED });
+    s.text({ x: W - M - 1.8, y: 1.6, w: 1.8, h: 0.32, text: 'sent to a person', size: 14, color: GREY, valign: 'middle' });
+    s.text({ x: M, y: 1.6, w: 5, h: 0.32, text: 'WHAT PEOPLE ASKED ABOUT MOST', size: 12, bold: true, color: GREY, valign: 'middle' });
+    const bw = 8.3; const max = Math.max.apply(null, rows.map(function (r) { return r.asked; }).concat([1]));
+    rows.forEach(function (r, i) {
+      const y = 2.05 + i * 0.7;
+      s.line({ x1: M, y1: y, x2: W - M, y2: y, color: i === 0 ? CHAR : GREY_LINE, width: i === 0 ? 2 : 1 });
+      s.text({ x: M, y: y + 0.07, w: 0.4, h: 0.5, text: String(i + 1), size: 22, bold: true, color: blue, valign: 'middle' });
+      s.text({ x: M + 0.5, y: y + 0.03, w: bw, h: 0.34, text: '“' + clip(r.example, 60) + '”', size: 18, bold: true });
+      const full = (bw * r.asked) / max;
+      const ans = r.asked ? (full * r.answered) / r.asked : 0;
+      s.rect({ x: M + 0.5, y: y + 0.4, w: full, h: 0.18, fill: RED });
+      if (r.answered) s.rect({ x: M + 0.5, y: y + 0.4, w: Math.max(0.05, ans), h: 0.18, fill: GREEN });
+      s.text({ x: W - M - 3.0, y: y + 0.03, w: 1.0, h: 0.6, text: n0(r.asked), size: 26, bold: true, align: 'right', valign: 'middle' });
+      s.text({ x: W - M - 1.9, y: y + 0.03, w: 1.9, h: 0.6, text: 'asked  ·  ' + Math.round(r.answeredShare) + '% answered', size: 13, color: GREY, valign: 'middle' });
+    });
+    const gap = rows.slice().sort(function (a, z) { return z.tickets - a.tickets; })[0];
+    const allGood = rows.every(function (r) { return r.tickets === 0; });
+    band(s, o, allGood ? 'The topics people ask about most are all answered by the bot.' : 'Biggest gap among them: “' + clip(gap.example, 48) + '”, ' + n0(gap.tickets) + ' sent to a person.', blue);
+    footer(s, b, n, total);
+    s.notes = 'The topics people asked about most in ' + b.range.label + ', grouped by theme, with how many were answered by the bot (green) and how many went to a person (red). ' +
+      'The six topics shown made up ' + Math.round(tq.share) + '% of all ' + n0(b.b.total) + ' questions.';
+    return s;
+  }
+
+  // ---------- new slide: condensed snapshot (plan deck) ----------
+
+  function snapshot(b, blue, n, total, o) {
+    const s = new Slide('FFFFFF');
+    const bb = b.b;
+    header(s, tabOf(o, '1'), bb.rate == null ? 'No questions recorded this month' : pct0(bb.rate) + ' answered, ' + (b.vsGoal >= 0 ? 'goal of ' + b.goal + '% met' : pts(b.vsGoal) + ' short of the ' + b.goal + '% goal'), blue);
+    const d = 3.9; const gx = M + 0.15; const gy = 1.95; const thick = 32;
+    s.ring({ x: gx, y: gy, w: d, h: d, thick: thick, color: blue, pct: bb.rate || 0 });
+    s.text({ x: gx, y: gy + 1.1, w: d, h: 1.1, text: pct0(bb.rate), size: 64, bold: true, align: 'center', valign: 'middle' });
+    s.text({ x: gx, y: gy + 2.2, w: d, h: 0.4, text: 'answered by the bot', size: 17, color: GREY, align: 'center' });
+    const ang = (Math.min(100, b.goal) * 3.6 - 90) * Math.PI / 180;
+    const cx = gx + d / 2; const cy = gy + d / 2;
+    const rOut = d / 2 + 0.12; const rIn = d / 2 - thick / 72 - 0.12;
+    s.line({ x1: cx + rIn * Math.cos(ang), y1: cy + rIn * Math.sin(ang), x2: cx + rOut * Math.cos(ang), y2: cy + rOut * Math.sin(ang), color: CHAR, width: 3.5 });
+    s.text({ x: cx + (rOut + 0.5) * Math.cos(ang) - 0.7, y: cy + (rOut + 0.28) * Math.sin(ang) - 0.16, w: 1.4, h: 0.32, text: 'Goal ' + b.goal + '%', size: 14, bold: true, align: 'center' });
+    // Three things to know
+    const rx = 5.9; const rw = W - M - rx;
+    const dl = b.delta == null ? 'No earlier month to compare' : (b.delta >= 0.05 ? '▲ ' : b.delta <= -0.05 ? '▼ ' : '● ') + (Math.abs(b.delta) >= 0.05 ? pts(b.delta) + (b.delta > 0 ? ' up on ' : ' down on ') : 'Level with ') + b.prevRange.name;
+    const items = [
+      { big: n0(b.fixableTickets), cap: 'tickets a month the manual could have answered', c: blue },
+      { big: b.roi.count ? hrs(b.roi.hoursSince) + ' hrs' : '–', cap: b.roi.count ? 'staff time already saved by ' + b.roi.count + ' manual update' + (b.roi.count === 1 ? '' : 's') : 'no manual updates tracked yet', c: CHAR },
+      { big: b.moreFromFixes ? '+' + n0(b.moreFromFixes) : '–', cap: b.moreFromFixes ? 'more answered a month if the next changes are made' : 'no further changes suggested', c: CHAR }
+    ];
+    items.forEach(function (it, i) {
+      const y = 1.75 + i * 1.3;
+      s.line({ x1: rx, y1: y, x2: rx + rw, y2: y, color: i === 0 ? CHAR : GREY_LINE, width: i === 0 ? 2.5 : 1 });
+      s.text({ x: rx, y: y + 0.1, w: 2.6, h: 1.05, text: it.big, size: 50, bold: true, color: it.c, valign: 'middle' });
+      s.text({ x: rx + 2.75, y: y + 0.1, w: rw - 2.75, h: 1.05, text: it.cap, size: 18, color: GREY, valign: 'middle' });
+    });
+    s.line({ x1: rx, y1: 1.75 + 3 * 1.3, x2: rx + rw, y2: 1.75 + 3 * 1.3, color: GREY_LINE });
+    s.text({ x: rx, y: 5.7, w: rw, h: 0.5, text: dl, size: 17, bold: true, valign: 'middle' });
+    band(s, o, b.vsGoal >= 0 ? 'Hold the gain and keep closing the remaining gaps.' : 'Close the ' + pts(b.vsGoal) + ' gap by fixing the gaps in the manual.', blue);
+    footer(s, b, n, total);
+    s.notes = 'A one-page snapshot. Answer rate = questions answered from the manual ÷ all questions asked in ' + b.range.label + '. ' +
+      'Fixable tickets are those where the manual had nothing or the section did not settle the question. Estimates assume ' + b.cfg.minutesPerTicket + ' minutes of a person\'s time per ticket.';
+    return s;
+  }
+
   // ---------- email text ----------
 
-  function email(b) {
-    const subject = 'Operating manual briefing, ' + b.range.label + ': ' + pct0(b.b.rate) + ' of questions answered by the bot';
-    const lines = [
-      'Hello,', '',
-      'Attached is the ' + b.range.label + ' operating manual briefing (8 slides, built to run the meeting, plus hidden appendix slides with the detail and a working table for the changes).', '',
-      'The short version:',
-      '- ' + verdict(b)
-    ];
+  function emailUpdate(b) {
+    const subject = 'Operating manual update, ' + b.range.label + ': ' + pct0(b.b.rate) + ' of questions answered by the bot';
+    const lines = ['Hello,', '', 'Attached is the ' + b.range.label + ' operating manual update (5 slides, a two-minute read).', '', 'The short version:', '- ' + verdict(b)];
     if (b.delta != null) lines.push('- ' + (b.delta >= 0.05 ? 'Up ' : b.delta <= -0.05 ? 'Down ' : 'Unchanged, ') + (Math.abs(b.delta) >= 0.05 ? pts(b.delta) + ' ' : '') + 'on ' + b.prevRange.name + ' (' + pct0(b.pb.rate) + ').');
+    if (b.topQuestions.rows.length) lines.push('- The most-asked topic was “' + clip(b.topQuestions.rows[0].example, 70) + '” (' + n0(b.topQuestions.rows[0].asked) + ' questions).');
     if (b.roi.count) lines.push('- Manual updates have answered ' + n0(b.roi.answersSince) + ' questions, saving about ' + hrs(b.roi.hoursSince) + ' staff hours.');
-    if (b.fixes.length) lines.push('- Next: ' + b.fixes.length + ' manual change' + (b.fixes.length === 1 ? '' : 's') + ' could take the rate to about ' + pct0(b.projectedRate) + '.');
     if (String(b.cfg.note || '').trim()) lines.push('', b.cfg.note.trim());
     lines.push('', 'Best regards,', b.cfg.preparedBy || b.cfg.org);
     return { subject: subject, body: lines.join('\n') };
   }
 
-  // ---------- the deck ----------
-
-  function build(b) {
-    const blue = hex(b.cfg.brand) || '1473E6';
-    const total = 8;
-    const cats = b.categories || [];
-    const trackers = trackerSlides(b, blue, function () { return '@@APPENDIX@@'; });
-    const slides = [
-      cover(b, blue),
-      agenda(b, blue, 2, total),
-      standing(b, blue, 3, total),
-      trend(b, blue, 4, total),
-      reasons(b, blue, 5, total),
-      fixes(b, blue, 6, total),
-      roi(b, blue, 7, total),
-      decisions(b, blue, 8, total, trackers.length > 0)
-    ];
-    const appendixCount = cats.length + trackers.length;
-    cats.forEach(function (c, i) { slides.push(categorySlide(b, blue, c, i, cats.length, 'Appendix · ' + (i + 1) + ' of ' + appendixCount)); });
-    trackers.forEach(function (t, i) {
-      t.items.forEach(function (it) { if (it.t === 'text' && it.text === '@@APPENDIX@@') it.text = 'Appendix · ' + (cats.length + i + 1) + ' of ' + appendixCount; });
-      slides.push(t);
-    });
-    if (appendixCount) slides[total - 1].notes += ' The slides after this one are a hidden appendix: the questions behind each category and a working table for deciding and assigning the changes.';
-    return { w: W, h: H, font: SANS, slides: slides, visible: total, email: email(b), fileBase: 'Board-Briefing-' + b.range.ym };
+  function emailPlan(b) {
+    const subject = 'Operating manual improvement plan, ' + b.range.label + ': ' + (b.fixes.length ? b.fixes.length + ' change' + (b.fixes.length === 1 ? '' : 's') + ' to reach about ' + pct0(b.projectedRate) : 'no urgent changes');
+    const lines = ['Hello,', '', 'Attached is the ' + b.range.label + ' improvement plan for the operating manual.', '', 'Where we are: ' + verdict(b)];
+    if (b.fixes.length) {
+      lines.push('', 'Proposed changes:');
+      b.fixes.forEach(function (f, i) { lines.push((i + 1) + '. ' + (f.kind === 'add' ? 'Add' : 'Improve') + ': ' + f.theme + ' (about +' + n0(f.more) + ' answered a month)'); });
+      lines.push('', 'Together they would take the answer rate from ' + pct0(b.b.rate) + ' to about ' + pct0(b.projectedRate) + '.');
+    }
+    lines.push('', 'Please review the action plan slide, mark each change as an action item or dismiss it, and put an owner and a date against each one.');
+    if (String(b.cfg.note || '').trim()) lines.push('', b.cfg.note.trim());
+    lines.push('', 'Best regards,', b.cfg.preparedBy || b.cfg.org);
+    return { subject: subject, body: lines.join('\n') };
   }
 
-  return { build: build, W: W, H: H, FONT: SANS, verdict: verdict, email: email };
+  // ---------- the decks ----------
+
+  function sentence(b, kind) {
+    const up = b.delta != null && b.delta >= 0.05;
+    if (kind === 'goal') return b.vsGoal >= 0 ? 'We met the ' + b.goal + '% goal' + (up ? ', up ' + pts(b.delta) + ' on ' + b.prevRange.name + '.' : '.') : 'We reached ' + pct0(b.b.rate) + ', ' + pts(b.vsGoal) + ' short of the ' + b.goal + '% goal' + (up ? ', but up ' + pts(b.delta) + ' on ' + b.prevRange.name + '.' : '.');
+    if (kind === 'trend') {
+      const sr = b.series;
+      if (sr.length < 2) return 'More months of data will show the trend.';
+      const ch = Math.round(sr[sr.length - 1].rate) - Math.round(sr[0].rate);
+      return (ch >= 1 ? 'Up ' + pts(ch) : ch <= -1 ? 'Down ' + pts(ch) : 'Steady') + ' since ' + sr[0].label + (ch >= 1 && b.roi.count ? ', the same stretch in which the manual updates went live.' : '.');
+    }
+    return b.roi.count ? 'Updates answered ' + n0(b.roi.answersSince) + ' questions and saved about ' + hrs(b.roi.hoursSince) + ' staff hours.' : 'No manual updates have been tracked yet.';
+  }
+
+  /** Deck 1: the update a client presents upward. What people ask, did we hit the goal, what changed and what it did. */
+  function buildUpdate(b) {
+    const blue = hex(b.cfg.brand) || '1473E6';
+    const total = 5;
+    const T = { label: 'TAKEAWAY' };
+    const slides = [
+      cover(b, blue, { eyebrow: 'OPERATING MANUAL UPDATE', prepared: 'Prepared for leadership' }),
+      standing(b, blue, 2, total, { tab: '1', band: { label: T.label, text: sentence(b, 'goal') } }),
+      trend(b, blue, 3, total, { tab: '2', band: { label: T.label, text: sentence(b, 'trend') } }),
+      topQuestions(b, blue, 4, total, { tab: '3', band: { label: T.label } }),
+      roi(b, blue, 5, total, { tab: '4', band: { label: T.label, text: sentence(b, 'roi') } })
+    ];
+    return { id: 'update', name: 'Executive update', w: W, h: H, font: SANS, slides: slides, visible: total, email: emailUpdate(b), fileBase: 'Board-Update-' + b.range.ym };
+  }
+
+  /** Deck 2: the condensed improvement plan. What to fix next, who does it, and by when. */
+  function buildPlan(b) {
+    const blue = hex(b.cfg.brand) || '1473E6';
+    const total = 6; // cover, snapshot, gaps, changes, action plan, next steps
+    const N = 'NEXT STEP';
+    const cats = b.categories || [];
+    const biggest = b.reasons.filter(function (r) { return r.fixable; }).sort(function (a, z) { return z.count - a.count; })[0];
+    const trackers = trackerSlides(b, blue, { hidden: false, visiblePages: 1, tab: 4, n: 5, total: total });
+    const shownTrackers = trackers.filter(function (t) { return !t.hidden; });
+    const hiddenTrackers = trackers.filter(function (t) { return t.hidden; });
+    const slides = [
+      cover(b, blue, { eyebrow: 'IMPROVEMENT PLAN', prepared: 'Prepared for the operations team', coverNote: 'This deck is the working version: what to fix next, who owns it, and by when.' }),
+      snapshot(b, blue, 2, total, { tab: '1', band: { label: N } }),
+      reasons(b, blue, 3, total, { tab: '2', band: { label: N, text: biggest && biggest.count ? 'Start with “' + biggest.label.toLowerCase() + '”: ' + n0(biggest.count) + ' tickets.' : 'No fixable gaps this month.' } }),
+      fixes(b, blue, 4, total, { tab: '3', band: { label: N, text: 'Give each change an owner and a date on the next slide.' } })
+    ];
+    shownTrackers.forEach(function (t) { slides.push(t); });
+    const hasTracker = trackers.length > 0;
+    slides.push(decisions(b, blue, total, total, { tab: String(hasTracker ? 5 : 4), title: 'Next steps', hasTracker: hasTracker, trackerRef: 'Use the action plan on the previous slide', trackerNote: 'The action plan slide records each decision, owner and due date. ' }));
+    const visible = slides.length;
+    // Hidden appendix: the rest of the action plan, then the questions behind each category.
+    const appendix = hiddenTrackers.concat(cats.map(function (c, i) { return categorySlide(b, blue, c, i, cats.length, '@@APPENDIX@@'); }));
+    appendix.forEach(function (sl, i) {
+      sl.items.forEach(function (it) { if (it.t === 'text' && it.text === '@@APPENDIX@@') it.text = 'Appendix · ' + (i + 1) + ' of ' + appendix.length; });
+      slides.push(sl);
+    });
+    if (appendix.length) slides[visible - 1].notes += ' The slides after this one are a hidden appendix: the top questions behind each category that needs work' + (hiddenTrackers.length ? ', and the rest of the action plan.' : '.');
+    return { id: 'plan', name: 'Improvement plan', w: W, h: H, font: SANS, slides: slides, visible: visible, email: emailPlan(b), fileBase: 'Improvement-Plan-' + b.range.ym };
+  }
+
+  function build(b) { return { update: buildUpdate(b), plan: buildPlan(b) }; }
+
+  return { build: build, buildUpdate: buildUpdate, buildPlan: buildPlan, W: W, H: H, FONT: SANS, verdict: verdict };
 });

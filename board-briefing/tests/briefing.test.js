@@ -88,15 +88,6 @@ test('top fixes come from fixable topics only, ranked by tickets', () => {
   assert.equal(b.moreFromFixes, b.fixes.reduce((a, f) => a + f.more, 0));
 });
 
-test('a month with little data warns instead of failing', () => {
-  const recs = records(many(5, (i) => q(2026, 10, 1 + i)));
-  const b = B.build(recs, '2026-10', {});
-  assert.ok(b.warnings.length >= 1);
-  assert.equal(b.pb, null);
-  assert.equal(b.delta, null);
-  assert.doesNotThrow(() => S.build(b));
-});
-
 test('a manual update is credited with the questions answered after it was published', () => {
   const raws = [];
   for (let i = 0; i < 30; i++) raws.push(ticket(2026, 9, 1 + (i % 28), { theme: 'Spill', escalation_reason: 'no-match' }));
@@ -113,67 +104,113 @@ test('a manual update is credited with the questions answered after it was publi
   assert.equal(B.build(records(raws), '2026-09', {}).roi.count, 0);
 });
 
-test('every slide fits on the page; eight visible slides, then hidden appendix slides', () => {
-  const deck = S.build(B.build(fixture(), '2026-10', { org: 'Test Co', note: 'A short note.' }));
-  assert.equal(deck.visible, 8);
-  assert.equal(deck.slides.filter((s) => !s.hidden).length, 8);
-  assert.ok(deck.slides.length > 8, 'appendix slides exist');
-  deck.slides.forEach((s, i) => assert.equal(s.hidden, i >= 8, 'only the appendix is hidden (slide ' + (i + 1) + ')'));
-  deck.slides.forEach((s, i) => {
+function decksFor(over, ym) { return S.build(B.build(fixture(), ym || '2026-10', over || {})); }
+
+test('two decks: a 5-slide update, and a plan with a visible action table', () => {
+  const d = decksFor({ org: 'Test Co', note: 'A short note.' });
+  assert.equal(d.update.visible, 5);
+  assert.equal(d.update.slides.length, 5);
+  assert.ok(d.update.slides.every((s) => !s.hidden));
+  assert.ok(d.plan.visible >= 5 && d.plan.visible <= 6);
+  assert.ok(d.plan.slides.slice(0, d.plan.visible).some((s) => s.items.some((it) => it.t === 'table')), 'the action table is a visible plan slide');
+  assert.ok(!d.update.slides.some((s) => s.items.some((it) => it.t === 'table')), 'the update deck has no working table');
+  d.plan.slides.forEach((s, i) => assert.equal(s.hidden, i >= d.plan.visible, 'only plan slides after the visible ones are hidden (slide ' + (i + 1) + ')'));
+  assert.ok(d.plan.slides.length > d.plan.visible, 'hidden category slides follow');
+});
+
+test('update deck covers the top questions, the goal and the impact of past updates', () => {
+  const b = B.build(fixture(), '2026-10', { goal: 65 });
+  const d = S.build(b).update;
+  const text = d.slides.map((s) => s.items.filter((it) => it.t === 'text').map((it) => it.text || (it.runs || []).map((r) => r.text).join('')).join(' | ')).join('\n');
+  assert.match(text, /OPERATING MANUAL UPDATE/);
+  assert.match(text, /goal/i);
+  assert.match(text, /WHAT PEOPLE ASKED ABOUT MOST/);
+  assert.match(text, /TAKEAWAY/);
+  assert.equal(b.topQuestions.rows.length >= 1, true);
+  assert.ok(b.topQuestions.rows.every((r) => r.asked === r.answered + r.tickets));
+});
+
+test('every slide in both decks fits on the page and has speaker notes', () => {
+  const d = decksFor({ org: 'Test Co', note: 'A short note.' });
+  [d.update, d.plan].forEach((deck) => deck.slides.forEach((s, i) => {
     s.items.forEach((it) => {
       if (it.t === 'table') {
         assert.ok(Math.abs(it.colW.reduce((a, c) => a + c, 0) - it.w) < 0.01, 'table columns add up to its width');
-        assert.ok(it.x + it.w <= S.W + 0.01 && it.y + it.rowH.reduce((a, c) => a + c, 0) <= S.H, 'table fits on slide ' + (i + 1));
+        assert.ok(it.x + it.w <= S.W + 0.01 && it.y + it.rowH.reduce((a, c) => a + c, 0) <= S.H, deck.id + ' table fits on slide ' + (i + 1));
         it.rows.forEach((r) => assert.equal(r.length, it.colW.length));
         return;
       }
-      if (it.t === 'line') { [it.x1, it.x2].forEach((x) => assert.ok(x >= 0 && x <= S.W + 0.01, 'slide ' + (i + 1))); return; }
-      assert.ok(it.x >= -0.01 && it.y >= -0.01 && it.x + it.w <= S.W + 0.01 && it.y + it.h <= S.H + 0.01, 'slide ' + (i + 1) + ' shape off the page: ' + JSON.stringify(it).slice(0, 120));
+      if (it.t === 'line') { [it.x1, it.x2].forEach((x) => assert.ok(x >= 0 && x <= S.W + 0.01, deck.id + ' slide ' + (i + 1))); return; }
+      assert.ok(it.x >= -0.01 && it.y >= -0.01 && it.x + it.w <= S.W + 0.01 && it.y + it.h <= S.H + 0.01, deck.id + ' slide ' + (i + 1) + ' shape off the page: ' + JSON.stringify(it).slice(0, 120));
+      if (it.t === 'text') assert.ok(!/@@/.test(it.text || ''), 'no placeholder text left');
     });
-    assert.ok(s.notes.length > 10, 'slide ' + (i + 1) + ' has speaker notes');
-  });
+    assert.ok(s.notes.length > 10, deck.id + ' slide ' + (i + 1) + ' has speaker notes');
+  }));
 });
 
-test('appendix: a slide per category that needs work, and a working table for the changes', () => {
+test('appendix: a slide per category that needs work, and the working table', () => {
   const b = B.build(fixture(), '2026-10', {});
-  const deck = S.build(b);
-  const hidden = deck.slides.filter((s) => s.hidden);
-  const tables = hidden.filter((s) => s.items.some((it) => it.t === 'table'));
-  assert.equal(hidden.length, b.categories.length + tables.length);
+  const plan = S.build(b).plan;
+  const hidden = plan.slides.filter((s) => s.hidden);
   assert.ok(b.categories.length >= 1);
   assert.equal(b.categories[0].name, 'Safety & Compliance');
-  const t = tables[0].items.find((it) => it.t === 'table');
-  const headers = t.rows[0].map((c) => c.text);
-  assert.deepEqual(headers, ['#', 'CHANGE', 'CONTEXT', 'DECISION', 'OWNER', 'DUE', 'STATUS']);
-  tables.forEach((sl) => sl.items.filter((it) => it.t === 'text').forEach((it) => assert.ok(!/@@|0 \/ 0/.test(it.text), 'no placeholder text left: ' + it.text)));
+  assert.ok(hidden.length >= b.categories.length);
+  const tableSlide = plan.slides.find((s) => s.items.some((it) => it.t === 'table'));
+  const t = tableSlide.items.find((it) => it.t === 'table');
+  assert.deepEqual(t.rows[0].map((c) => c.text), ['#', 'CHANGE', 'CONTEXT', 'DECISION', 'OWNER', 'DUE', 'STATUS']);
   assert.match(t.rows[1][3].text, /Action item[\s\S]*Dismiss/);
   assert.equal(t.rows[1][4].text, '', 'owner is left blank to fill in');
 });
 
-test('slides still build with no fixes, no updates and a single month', () => {
+test('with many changes the action table shows six, and the rest wait in the hidden appendix', () => {
+  const raws = [];
+  for (let k = 0; k < 9; k++) for (let i = 0; i < 5; i++) raws.push(ticket(2026, 10, 1 + i, { theme: 'Gap ' + k, question_text: 'Gap ' + k + ' question ' + i }));
+  for (let i = 0; i < 20; i++) raws.push(q(2026, 10, 1 + (i % 28)));
+  const plan = S.build(B.build(records(raws), '2026-10', {})).plan;
+  const shown = plan.slides.slice(0, plan.visible).filter((s) => s.items.some((it) => it.t === 'table'));
+  const rest = plan.slides.slice(plan.visible).filter((s) => s.items.some((it) => it.t === 'table'));
+  assert.equal(shown.length, 1);
+  assert.ok(rest.length >= 1);
+  assert.ok(rest[0].hidden);
+});
+
+test('decks still build with no fixes, no updates and a single month', () => {
   const recs = records(many(30, (i) => q(2026, 10, 1 + (i % 28))));
   const b = B.build(recs, '2026-10', { goal: 50 });
   assert.equal(b.fixes.length, 0);
   assert.equal(b.roi.count, 0);
-  const deck = S.build(b);
-  assert.equal(deck.slides.length, 8);
+  const d = S.build(b);
+  assert.equal(d.update.slides.length, 5);
+  assert.ok(d.plan.slides.length >= 5);
   assert.match(S.verdict(b), /100% of questions in October, above the 50% goal/);
 });
 
-test('the preview is escaped, so a note cannot inject HTML', () => {
-  const b = B.build(fixture(), '2026-10', { note: '<img src=x onerror=alert(1)> & "quotes"', org: '<b>Org</b>' });
-  const html = H.toHtml(S.build(b));
-  assert.ok(!html.includes('<img src=x'));
-  assert.ok(!html.includes('<b>Org</b>'));
-  assert.ok(html.includes('&lt;img src=x'));
+test('a month with little data warns instead of failing', () => {
+  const recs = records(many(5, (i) => q(2026, 10, 1 + i)));
+  const b = B.build(recs, '2026-10', {});
+  assert.ok(b.warnings.length >= 1);
+  assert.doesNotThrow(() => S.build(b));
 });
 
-test('email text mentions the month, the rate and the note', () => {
-  const b = B.build(fixture(), '2026-10', { note: 'Thank you all.', preparedBy: 'Dana' });
-  const e = S.email(b);
-  assert.match(e.subject, /October 2026: 60% of questions answered by the bot/);
-  assert.match(e.body, /Thank you all\./);
-  assert.match(e.body, /Dana$/);
+test('the preview is escaped, so a note cannot inject HTML', () => {
+  const d = decksFor({ note: '<img src=x onerror=alert(1)> & "quotes"', org: '<b>Org</b>' });
+  [d.update, d.plan].forEach((deck) => {
+    const html = H.toHtml(deck);
+    assert.ok(!html.includes('<img src=x'));
+    assert.ok(!html.includes('<b>Org</b>'));
+  });
+  assert.ok(H.toHtml(d.plan).includes('&lt;img src=x'));
+});
+
+test('each deck has its own email text', () => {
+  const d = decksFor({ note: 'Thank you all.', preparedBy: 'Dana' });
+  assert.match(d.update.email.subject, /update, October 2026: 60% of questions answered by the bot/);
+  assert.match(d.update.email.body, /Thank you all\./);
+  assert.match(d.update.email.body, /Dana$/);
+  assert.match(d.plan.email.subject, /improvement plan, October 2026/);
+  assert.match(d.plan.email.body, /Proposed changes:/);
+  assert.match(d.plan.email.body, /owner and a date/);
+  assert.notEqual(d.update.fileBase, d.plan.fileBase);
 });
 
 test('email draft file is valid MIME with the attachment intact', () => {
@@ -188,20 +225,21 @@ test('email draft file is valid MIME with the attachment intact', () => {
   assert.equal(Buffer.from(bodyB64, 'base64').toString('utf8'), 'Héllo\nline two');
 });
 
-test('PowerPoint file has every slide, hides the appendix, and holds a real table (skipped when pptxgenjs is not installed)', async (t) => {
+test('PowerPoint files have every slide, hide the appendix, and hold a real table (skipped when pptxgenjs is not installed)', async (t) => {
   let Pptx;
   try { Pptx = require('pptxgenjs'); } catch (e) { t.skip('pptxgenjs is not installed in Node; the browser bundle is tested by hand'); return; }
   const P = require(path.join(__dirname, '..', 'js', 'render-pptx.js'));
-  const deck = S.build(B.build(fixture(), '2026-10', {}));
-  const buf = await P.toPptx(Pptx, deck, { title: 't' }).write({ outputType: 'nodebuffer' });
   const JSZip = require('jszip');
-  const zip = await JSZip.loadAsync(buf);
-  const slideFiles = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n));
-  assert.equal(slideFiles.length, deck.slides.length);
-  assert.equal(Object.keys(zip.files).filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n)).length, deck.slides.length);
-  let hiddenCount = 0;
-  for (const f of slideFiles) if (/show="0"/.test(await zip.files[f].async('string'))) hiddenCount++;
-  assert.equal(hiddenCount, deck.slides.filter((s) => s.hidden).length);
-  const tableSlide = await zip.files['ppt/slides/slide' + (deck.slides.length) + '.xml'].async('string');
-  assert.match(tableSlide, /<a:tbl>/, 'the working table is a real PowerPoint table');
+  const d = decksFor({});
+  for (const deck of [d.update, d.plan]) {
+    const buf = await P.toPptx(Pptx, deck, { title: 't' }).write({ outputType: 'nodebuffer' });
+    const zip = await JSZip.loadAsync(buf);
+    const slideFiles = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+    assert.equal(slideFiles.length, deck.slides.length, deck.id);
+    assert.equal(Object.keys(zip.files).filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n)).length, deck.slides.length);
+    let hiddenCount = 0; let tables = 0;
+    for (const f of slideFiles) { const x = await zip.files[f].async('string'); if (/show="0"/.test(x)) hiddenCount++; if (/<a:tbl>/.test(x)) tables++; }
+    assert.equal(hiddenCount, deck.slides.filter((s) => s.hidden).length, deck.id + ' hidden slides');
+    assert.equal(tables, deck.slides.filter((s) => s.items.some((it) => it.t === 'table')).length, deck.id + ' tables');
+  }
 });

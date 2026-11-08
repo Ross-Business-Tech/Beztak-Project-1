@@ -12,7 +12,8 @@
   const FIELDS = ['org', 'preparedBy', 'goal', 'minutesPerTicket', 'brand', 'recipients', 'note'];
 
   const $ = function (id) { return document.getElementById(id); };
-  const state = { records: [], sections: [], ym: null, deck: null, brief: null, pptxBytes: null };
+  const state = { records: [], sections: [], ym: null, decks: null, which: 'update', brief: null, pptx: {} };
+  const deck = function () { return state.decks[state.which]; };
 
   // ---------- settings (remembered on this computer) ----------
 
@@ -98,10 +99,10 @@
     document.documentElement.style.setProperty('--brand', settings.brand || '#0f766e');
     if (!state.records.length) return;
     state.ym = $('month').value || state.ym;
-    state.pptxBytes = null;
+    state.pptx = {};
     try {
       state.brief = B.build(state.records, state.ym, settings, state.sections);
-      state.deck = Q.slides.build(state.brief);
+      state.decks = Q.slides.build(state.brief);
     } catch (e) {
       setStatus('Could not build the briefing: ' + e.message, 'err');
       return;
@@ -129,7 +130,7 @@
     $('result').hidden = false;
     warnings();
     let seenHidden = false;
-    const html = state.deck.slides.map(function (sl, i) {
+    const html = deck().slides.map(function (sl, i) {
       let head = '';
       if (sl.hidden && !seenHidden) {
         seenHidden = true;
@@ -140,21 +141,28 @@
     $('slides').innerHTML = html;
     $('pdf-opt').hidden = !seenHidden;
     fit();
-    $('email-subject').textContent = state.deck.email.subject;
-    $('email-body').textContent = state.deck.email.body;
-    document.title = state.deck.fileBase;
+    $('email-subject').textContent = deck().email.subject;
+    $('email-body').textContent = deck().email.body;
+    document.title = deck().fileBase;
+    ['update', 'plan'].forEach(function (k) {
+      $('seg-' + k).setAttribute('aria-pressed', String(state.which === k));
+      $('seg-' + k).classList.toggle('on', state.which === k);
+      $('seg-' + k + '-n').textContent = state.decks[k].visible + ' slides';
+    });
+    $('seg-note').textContent = state.which === 'update'
+      ? 'For leadership: the most-asked questions, whether we hit the goal, what we changed and what it did.'
+      : 'For the team: what to fix next, who does it and by when. A condensed view of the numbers, then the action plan.';
   }
 
   // ---------- outputs ----------
 
   function msg(text, bad) { const el = $('action-msg'); el.textContent = text; el.className = 'msg' + (bad ? ' err' : ''); }
-  function busy(on) { ['dl-pptx', 'dl-pdf', 'dl-eml', 'copy-email'].forEach(function (id) { $(id).disabled = on; }); }
+  function busy(on) { ['dl-pptx', 'dl-both', 'dl-pdf', 'dl-eml', 'copy-email'].forEach(function (id) { $(id).disabled = on; }); }
 
-  function makePptx() {
-    if (typeof window.PptxGenJS !== 'function') return Promise.reject(new Error('The PowerPoint writer did not load.'));
+  function makePptx(key) {
+    if (typeof window.PptxGenJS !== 'function') throw new Error('The PowerPoint writer did not load.');
     const b = state.brief;
-    const pres = Q.renderPptx.toPptx(window.PptxGenJS, state.deck, { title: 'Operating manual briefing, ' + b.range.label, author: b.cfg.preparedBy || b.cfg.org, company: b.cfg.org });
-    return pres;
+    return Q.renderPptx.toPptx(window.PptxGenJS, state.decks[key], { title: state.decks[key].name + ', ' + b.range.label, author: b.cfg.preparedBy || b.cfg.org, company: b.cfg.org });
   }
 
   function download(blob, name) {
@@ -165,30 +173,44 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
 
-  function pptxBytes() {
-    if (state.pptxBytes) return Promise.resolve(state.pptxBytes);
-    return makePptx().write({ outputType: 'uint8array' }).then(function (bytes) {
-      state.pptxBytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-      return state.pptxBytes;
+  function pptxBytes(key) {
+    if (state.pptx[key]) return Promise.resolve(state.pptx[key]);
+    return Promise.resolve().then(function () { return makePptx(key).write({ outputType: 'uint8array' }); }).then(function (bytes) {
+      state.pptx[key] = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      return state.pptx[key];
     });
   }
 
   const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
   function onPptx() {
+    const key = state.which;
     busy(true); msg('Making the PowerPoint…');
-    pptxBytes().then(function (bytes) {
-      download(new Blob([bytes], { type: PPTX_MIME }), state.deck.fileBase + '.pptx');
-      msg('Saved ' + state.deck.fileBase + '.pptx to your Downloads folder.');
+    pptxBytes(key).then(function (bytes) {
+      download(new Blob([bytes], { type: PPTX_MIME }), state.decks[key].fileBase + '.pptx');
+      msg('Saved ' + state.decks[key].fileBase + '.pptx to your Downloads folder.');
     }).catch(function (e) { msg('Could not make the PowerPoint: ' + e.message, true); }).then(function () { busy(false); });
   }
 
+  function onBoth() {
+    busy(true); msg('Making both PowerPoints…');
+    const keys = ['update', 'plan'];
+    keys.reduce(function (chain, key, i) {
+      return chain.then(function () { return pptxBytes(key); }).then(function (bytes) {
+        return new Promise(function (resolve) { setTimeout(function () { download(new Blob([bytes], { type: PPTX_MIME }), state.decks[key].fileBase + '.pptx'); resolve(); }, i * 400); });
+      });
+    }, Promise.resolve()).then(function () { msg('Saved both decks to your Downloads folder. Your browser may ask to allow multiple downloads.'); })
+      .catch(function (e) { msg('Could not make the PowerPoints: ' + e.message, true); }).then(function () { busy(false); });
+  }
+
   function onEml() {
+    const key = state.which;
     busy(true); msg('Making the email draft…');
     const s = state.brief.cfg;
-    pptxBytes().then(function (bytes) {
-      const eml = Q.email.buildEml({ to: s.recipients, subject: state.deck.email.subject, body: state.deck.email.body, filename: state.deck.fileBase + '.pptx', bytes: bytes });
-      download(new Blob([eml], { type: 'message/rfc822' }), state.deck.fileBase + '-email.eml');
+    pptxBytes(key).then(function (bytes) {
+      const d = state.decks[key];
+      const eml = Q.email.buildEml({ to: s.recipients, subject: d.email.subject, body: d.email.body, filename: d.fileBase + '.pptx', bytes: bytes });
+      download(new Blob([eml], { type: 'message/rfc822' }), d.fileBase + '-email.eml');
       msg('Saved the email draft. Open it from your Downloads folder and the deck is already attached.');
     }).catch(function (e) { msg('Could not make the email draft: ' + e.message, true); }).then(function () { busy(false); });
   }
@@ -203,7 +225,7 @@
   function onCopy() {
     const box = $('email-box');
     box.hidden = false;
-    const text = 'Subject: ' + state.deck.email.subject + '\n\n' + state.deck.email.body;
+    const text = 'Subject: ' + deck().email.subject + '\n\n' + deck().email.body;
     const done = function () { msg('Email text copied. It is also shown below.'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { msg('It is shown below. Select it and copy.'); });
     else msg('It is shown below. Select it and copy.');
@@ -219,6 +241,10 @@
     $('file').addEventListener('change', function (e) { handleFile(e.target.files[0]); e.target.value = ''; });
     $('sample').addEventListener('click', loadSample);
     $('dl-pptx').addEventListener('click', onPptx);
+    $('dl-both').addEventListener('click', onBoth);
+    ['update', 'plan'].forEach(function (k) {
+      $('seg-' + k).addEventListener('click', function () { if (!state.decks) return; state.which = k; $('email-box').hidden = true; render(); window.scrollTo({ top: $('result').offsetTop - 10, behavior: 'smooth' }); });
+    });
     $('dl-pdf').addEventListener('click', onPdf);
     $('dl-eml').addEventListener('click', onEml);
     $('copy-email').addEventListener('click', onCopy);

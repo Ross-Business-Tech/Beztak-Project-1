@@ -202,6 +202,16 @@
     const review = sectionRows.filter(function (s) { return s.flag === 'clarify' || s.flag === 'unused'; }).slice(0, 4)
       .map(function (s) { return { title: s.title, flag: s.flag, cited: s.cited, unclearRate: s.unclearRate }; });
 
+    // The topics people ask about most (answered or not), for the update deck.
+    const allThemes = A.themeStats(cur, prev);
+    const topN = allThemes.slice().sort(function (a, z) { return z.asked - a.asked || (a.theme < z.theme ? -1 : 1); }).slice(0, 6);
+    const topQuestions = {
+      rows: topN.map(function (t) {
+        return { theme: t.theme, example: t.examples[0] || t.theme, asked: t.asked, answered: t.answered, tickets: t.tickets, answeredShare: t.answeredShare, kind: t.kind };
+      }),
+      share: b.total ? (topN.reduce(function (a, t) { return a + t.asked; }, 0) / b.total) * 100 : 0
+    };
+
     const goal = Number(cfg.goal);
     const need = Math.max(0, Math.ceil((goal / 100) * b.total) - b.answered);
     const delta = pb && b.rate != null && pb.rate != null ? b.rate - pb.rate : null;
@@ -252,6 +262,7 @@
       fixablePct: b.tickets ? (b.fixable / b.tickets) * 100 : 0,
       fixes: fixes,
       fixesTracker: fixesTracker,
+      topQuestions: topQuestions,
       categories: categories,
       moreFromFixes: proj.more,
       projectedRate: proj.rate,
