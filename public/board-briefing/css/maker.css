@@ -64,6 +64,12 @@ button:disabled { opacity: .55; cursor: wait; }
 
 /* Slide preview: every slide is a 1280 x 720 box, scaled to fit. */
 .slides { display: grid; gap: 18px; }
+.slot { display: block; }
+.slot-tag { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--warn); }
+.appendix-head { margin: 14px 0 -4px; padding: 14px 18px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px; }
+.appendix-head h2 { margin: 0 0 4px; }
+.appendix-head p { margin: 0; font-size: 14px; color: #7c2d12; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
 .frame { position: relative; width: 100%; overflow: hidden; border-radius: 6px; box-shadow: 0 1px 3px rgba(11,37,69,.2), 0 8px 24px rgba(11,37,69,.08); background: #fff; }
 .slide { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; transform-origin: 0 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .slide .sh { position: absolute; }
@@ -81,7 +87,9 @@ button:disabled { opacity: .55; cursor: wait; }
   .wrap { max-width: none; padding: 0; }
   main { padding: 0; }
   .slides { display: block; }
-  .frame { width: 13.333in !important; height: 7.5in !important; border-radius: 0; box-shadow: none; overflow: hidden; break-after: page; page-break-after: always; }
-  .frame:last-child { break-after: auto; page-break-after: auto; }
+  .slot.is-hidden { display: none; }
+  body.with-appendix .slot.is-hidden { display: block; }
+  .slot ~ .slot { break-before: page; page-break-before: always; }
+  .frame { width: 13.333in !important; height: 7.5in !important; border-radius: 0; box-shadow: none; overflow: hidden; }
   .slide { transform: none !important; }
 }

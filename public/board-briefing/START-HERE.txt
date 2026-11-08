@@ -39,6 +39,21 @@ Each slide has speaker notes that explain how the numbers were worked out.
 The PowerPoint is fully editable if you want to change a word or a color.
 
 
+THE HIDDEN APPENDIX  (after slide 7)
+------------------------------------
+Hidden slides stay out of the slide show but travel inside the PowerPoint file, so you
+can open them if a board member asks "what are people actually asking?".
+  One slide per category that needs work: the top questions people asked, why each went
+  to a person, how staff resolved it, and how many more questions fixing it would answer.
+  A working table of every suggested change. For each one, tick "Action item" or
+  "Dismiss", write an owner and a due date, and track it as To do / In progress / Done.
+  It is a normal PowerPoint table: type into it, add rows, and bring it to next month's
+  meeting. (A change you dismissed will simply show up again next month if the questions
+  keep coming.)
+To show a hidden slide while presenting: right-click it in PowerPoint and choose Hide Slide
+again. "Save as PDF" leaves the appendix out unless you tick the box beside the button.
+
+
 THE QUESTIONS FILE
 ------------------
 See sample/sample-questions.csv for the exact layout. One row per question.

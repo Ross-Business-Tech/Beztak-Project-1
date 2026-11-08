@@ -113,16 +113,40 @@ test('a manual update is credited with the questions answered after it was publi
   assert.equal(B.build(records(raws), '2026-09', {}).roi.count, 0);
 });
 
-test('every slide fits on the page and the deck has seven slides', () => {
+test('every slide fits on the page; seven visible slides, then hidden appendix slides', () => {
   const deck = S.build(B.build(fixture(), '2026-10', { org: 'Test Co', note: 'A short note.' }));
-  assert.equal(deck.slides.length, 7);
+  assert.equal(deck.visible, 7);
+  assert.equal(deck.slides.filter((s) => !s.hidden).length, 7);
+  assert.ok(deck.slides.length > 7, 'appendix slides exist');
+  deck.slides.forEach((s, i) => assert.equal(s.hidden, i >= 7, 'only the appendix is hidden (slide ' + (i + 1) + ')'));
   deck.slides.forEach((s, i) => {
     s.items.forEach((it) => {
+      if (it.t === 'table') {
+        assert.ok(Math.abs(it.colW.reduce((a, c) => a + c, 0) - it.w) < 0.01, 'table columns add up to its width');
+        assert.ok(it.x + it.w <= S.W + 0.01 && it.y + it.rowH.reduce((a, c) => a + c, 0) <= S.H, 'table fits on slide ' + (i + 1));
+        it.rows.forEach((r) => assert.equal(r.length, it.colW.length));
+        return;
+      }
       if (it.t === 'line') { [it.x1, it.x2].forEach((x) => assert.ok(x >= 0 && x <= S.W + 0.01, 'slide ' + (i + 1))); return; }
       assert.ok(it.x >= -0.01 && it.y >= -0.01 && it.x + it.w <= S.W + 0.01 && it.y + it.h <= S.H + 0.01, 'slide ' + (i + 1) + ' shape off the page: ' + JSON.stringify(it).slice(0, 120));
     });
     assert.ok(s.notes.length > 10, 'slide ' + (i + 1) + ' has speaker notes');
   });
+});
+
+test('appendix: a slide per category that needs work, and a working table for the changes', () => {
+  const b = B.build(fixture(), '2026-10', {});
+  const deck = S.build(b);
+  const hidden = deck.slides.filter((s) => s.hidden);
+  const tables = hidden.filter((s) => s.items.some((it) => it.t === 'table'));
+  assert.equal(hidden.length, b.categories.length + tables.length);
+  assert.ok(b.categories.length >= 1);
+  assert.equal(b.categories[0].name, 'Safety & Compliance');
+  const t = tables[0].items.find((it) => it.t === 'table');
+  const headers = t.rows[0].map((c) => c.text);
+  assert.deepEqual(headers, ['#', 'CHANGE', 'CONTEXT', 'DECISION', 'OWNER', 'DUE', 'STATUS']);
+  assert.match(t.rows[1][3].text, /Action item[\s\S]*Dismiss/);
+  assert.equal(t.rows[1][4].text, '', 'owner is left blank to fill in');
 });
 
 test('slides still build with no fixes, no updates and a single month', () => {
@@ -163,7 +187,7 @@ test('email draft file is valid MIME with the attachment intact', () => {
   assert.equal(Buffer.from(bodyB64, 'base64').toString('utf8'), 'Héllo\nline two');
 });
 
-test('PowerPoint file has seven slides with notes (skipped when pptxgenjs is not installed)', async (t) => {
+test('PowerPoint file has every slide, hides the appendix, and holds a real table (skipped when pptxgenjs is not installed)', async (t) => {
   let Pptx;
   try { Pptx = require('pptxgenjs'); } catch (e) { t.skip('pptxgenjs is not installed in Node; the browser bundle is tested by hand'); return; }
   const P = require(path.join(__dirname, '..', 'js', 'render-pptx.js'));
@@ -171,6 +195,12 @@ test('PowerPoint file has seven slides with notes (skipped when pptxgenjs is not
   const buf = await P.toPptx(Pptx, deck, { title: 't' }).write({ outputType: 'nodebuffer' });
   const JSZip = require('jszip');
   const zip = await JSZip.loadAsync(buf);
-  assert.equal(Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).length, 7);
-  assert.equal(Object.keys(zip.files).filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n)).length, 7);
+  const slideFiles = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+  assert.equal(slideFiles.length, deck.slides.length);
+  assert.equal(Object.keys(zip.files).filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n)).length, deck.slides.length);
+  let hiddenCount = 0;
+  for (const f of slideFiles) if (/show="0"/.test(await zip.files[f].async('string'))) hiddenCount++;
+  assert.equal(hiddenCount, deck.slides.filter((s) => s.hidden).length);
+  const tableSlide = await zip.files['ppt/slides/slide' + (deck.slides.length) + '.xml'].async('string');
+  assert.match(tableSlide, /<a:tbl>/, 'the working table is a real PowerPoint table');
 });

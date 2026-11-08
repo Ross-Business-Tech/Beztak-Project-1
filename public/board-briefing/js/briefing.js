@@ -22,7 +22,7 @@
     org: 'Operations',
     goal: 65,
     minutesPerTicket: 12,
-    brand: '#0F766E',
+    brand: '#1E6B52',
     recipients: '',
     preparedBy: '',
     note: ''
@@ -173,7 +173,7 @@
     // Next changes to the manual, ranked by tickets they would remove.
     const suc = A.typicalFixSuccess(impacts);
     const fixesAll = A.fixList(cur, prev).filter(function (t) { return t.kind === 'add' || t.kind === 'clarify'; });
-    const fixes = fixesAll.slice(0, 3).map(function (t) {
+    const toFix = function (t) {
       const more = Math.max(1, Math.round(t.tickets * suc.factor));
       return {
         theme: t.theme,
@@ -186,7 +186,9 @@
         section: t.section,
         rising: t.rising
       };
-    });
+    };
+    const fixes = fixesAll.slice(0, 3).map(toFix);
+    const fixesTracker = fixesAll.slice(0, 12).map(toFix);
     const proj = A.projectRate(b, fixesAll.slice(0, 3), suc.factor);
 
     // Why questions went to a person.
@@ -205,6 +207,35 @@
     const delta = pb && b.rate != null && pb.rate != null ? b.rate - pb.rate : null;
     const hoursSavedByBot = (b.answered * minutes) / 60;
 
+    // Categories that need work: where the manual had nothing or did not settle the question,
+    // with the questions people asked most in each.
+    const catRows = A.categoryStats(cur, D.OPS_CATEGORIES);
+    const catIds = new Set(catRows.map(function (c) { return c.id; }));
+    const catOf = function (id) { return catIds.has(id) ? id : D.UNCATEGORIZED_ID; };
+    const themeRows = A.themeStats(cur, prev).filter(function (t) { return !t.resolved && t.tickets > 0 && (t.kind === 'add' || t.kind === 'clarify'); });
+    const openIn = function (id) { return themeRows.filter(function (t) { return catOf(t.categoryId) === id; }); };
+    const categories = catRows.map(function (c) { return { row: c, open: openIn(c.id) }; })
+      .filter(function (c) { return c.open.reduce(function (a, t) { return a + t.tickets; }, 0) >= 3; })
+      .map(function (x) {
+        const c = x.row;
+        const fixable = x.open.reduce(function (a, t) { return a + t.tickets; }, 0);
+        return {
+          id: c.id,
+          name: c.name,
+          total: c.total,
+          answered: c.answered,
+          rate: c.answerRate,
+          fixable: fixable,
+          shareOfFixable: b.fixable ? (fixable / b.fixable) * 100 : 0,
+          themes: x.open.slice()
+            .sort(function (a, z) { return z.tickets - a.tickets || (a.theme < z.theme ? -1 : 1); })
+            .slice(0, 5)
+            .map(function (t) { return { theme: t.theme, kind: t.kind, tickets: t.tickets, asked: t.asked, examples: t.examples.slice(0, 2), note: t.note, section: t.section }; })
+        };
+      })
+      .sort(function (a, z) { return z.fixable - a.fixable; })
+      .slice(0, 6);
+
     return {
       cfg: cfg,
       range: range,
@@ -220,6 +251,8 @@
       fixableTickets: b.fixable,
       fixablePct: b.tickets ? (b.fixable / b.tickets) * 100 : 0,
       fixes: fixes,
+      fixesTracker: fixesTracker,
+      categories: categories,
       moreFromFixes: proj.more,
       projectedRate: proj.rate,
       fixFactor: suc,

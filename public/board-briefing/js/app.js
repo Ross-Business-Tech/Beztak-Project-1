@@ -128,8 +128,17 @@
     $('empty').hidden = true;
     $('result').hidden = false;
     warnings();
-    const html = state.deck.slides.map(function (s, i) { return '<div class="frame">' + Q.renderHtml.slideHtml(s, i) + '</div>'; }).join('');
+    let seenHidden = false;
+    const html = state.deck.slides.map(function (sl, i) {
+      let head = '';
+      if (sl.hidden && !seenHidden) {
+        seenHidden = true;
+        head = '<div class="appendix-head no-print"><h2>Appendix: hidden slides</h2><p>These stay out of the slide show but travel inside the PowerPoint file. They hold the questions behind each category and a working table for deciding, assigning and tracking the changes. In PowerPoint, right-click a slide and choose Hide Slide to show or hide it.</p></div>';
+      }
+      return head + '<div class="slot' + (sl.hidden ? ' is-hidden' : '') + '">' + (sl.hidden ? '<p class="slot-tag no-print">Hidden slide</p>' : '') + '<div class="frame">' + Q.renderHtml.slideHtml(sl, i) + '</div></div>';
+    }).join('');
     $('slides').innerHTML = html;
+    $('pdf-opt').hidden = !seenHidden;
     fit();
     $('email-subject').textContent = state.deck.email.subject;
     $('email-body').textContent = state.deck.email.body;
@@ -185,6 +194,7 @@
   }
 
   function onPdf() {
+    document.body.classList.toggle('with-appendix', $('pdf-appendix').checked);
     msg('In the print window, choose "Save as PDF" as the destination.');
     $('email-box').hidden = true;
     setTimeout(function () { window.print(); }, 60);

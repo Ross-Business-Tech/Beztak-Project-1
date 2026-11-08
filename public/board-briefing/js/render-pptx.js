@@ -19,6 +19,7 @@
     deck.slides.forEach(function (sd) {
       const slide = pres.addSlide();
       slide.background = { color: sd.bg };
+      if (sd.hidden) slide.hidden = true; // skipped in the slide show, still in the file
       sd.items.forEach(function (it) {
         if (it.t === 'rect' || it.t === 'oval') {
           const o = { x: it.x, y: it.y, w: it.w, h: it.h, fill: { color: it.fill || 'FFFFFF' }, line: it.line ? { color: it.line, width: it.lineWidth || 1 } : { type: 'none' } };
@@ -36,6 +37,19 @@
             x: x, y: y, w: Math.abs(it.x2 - it.x1), h: Math.abs(it.y2 - it.y1), flipV: goesUp,
             line: { color: it.color, width: it.width, dashType: it.dash ? 'dash' : 'solid' }
           });
+        } else if (it.t === 'table') {
+          const rows = it.rows.map(function (row) {
+            return row.map(function (c) {
+              const o = { fontFace: c.font || 'Trebuchet MS', fontSize: c.size || 12, bold: !!c.bold, italic: !!c.italic, color: c.color || '1B2A24', align: c.align || 'left', valign: 'middle', fill: { color: c.fill || 'FFFFFF' }, border: c.border };
+              if (c.runs) {
+                return { text: c.runs.map(function (r) {
+                  return { text: r.text, options: { fontFace: r.font || o.fontFace, fontSize: r.size || o.fontSize, bold: r.bold != null ? r.bold : o.bold, italic: r.italic != null ? r.italic : o.italic, color: r.color || o.color, breakLine: !!r.br } };
+                }), options: o };
+              }
+              return { text: c.text, options: o };
+            });
+          });
+          slide.addTable(rows, { x: it.x, y: it.y, w: it.w, colW: it.colW, rowH: it.rowH, margin: [0, 0.09, 0, 0.09], autoPage: false });
         } else if (it.t === 'text') {
           const base = { x: it.x, y: it.y, w: it.w, h: it.h, fontFace: it.font, fontSize: it.size, bold: !!it.bold, italic: !!it.italic, color: it.color, align: it.align, valign: it.valign, margin: 0, fit: 'none', wrap: true };
           if (it.runs) {
