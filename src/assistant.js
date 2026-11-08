@@ -102,15 +102,20 @@ const idf = (t) => Math.log(1 + (N - (df[t] || 0) + 0.5) / ((df[t] || 0) + 0.5))
 
 const avgIdf = Object.keys(df).reduce((s, t) => s + idf(t), 0) / Object.keys(df).length
 
-function search(query) {
+function search(query, context = '') {
+  const expand = (w) => [stem(w), ...(SYN[w] || SYN[stem(w)] || '').split(' ').filter(Boolean).map((s) => stem(s.replace(/[()]/g, '')))]
   const base = [...new Set(words(query))]
   // each word the employee typed, plus its synonyms
-  const groups = base.map((w) => [stem(w), ...(SYN[w] || SYN[stem(w)] || '').split(' ').filter(Boolean).map((s) => stem(s.replace(/[()]/g, '')))])
+  const groups = base.map(expand)
+  // words from the earlier question (for follow-ups) count at half weight
+  const ctxGroups = [...new Set(words(context))].filter((w) => !base.includes(w)).map(expand)
+  const gw = new Map(ctxGroups.map((g) => [g, 0.8]))
+  groups.push(...ctxGroups)
   // the words they typed count fully; synonyms we added count less
   const q = new Map()
-  for (const g of groups) g.forEach((t, i) => q.set(t, Math.max(q.get(t) || 0, i === 0 ? 1 : 0.6)))
+  for (const g of groups) g.forEach((t, i) => q.set(t, Math.max(q.get(t) || 0, (i === 0 ? 1 : 0.6) * (gw.get(g) || 1))))
   // words the handbook never uses count, but not more than a typical word
-  const wt = (g) => Math.min(idf(g[0]), avgIdf)
+  const wt = (g) => Math.min(idf(g[0]), avgIdf) * (gw.get(g) || 1)
   const totalWeight = groups.reduce((s, g) => s + wt(g), 0) || 1
   const k1 = 1.2, b = 0.6
   return DOCS.map((d) => {
@@ -147,7 +152,7 @@ const SMALLTALK = /^\s*(hi|hello|hey|good (morning|afternoon|evening)|thanks|tha
  * Answer one employee message. Returns a structured reply the UI renders.
  * kind: 'answer' | 'notfound' | 'crisis' | 'smalltalk'
  */
-export function answer(message) {
+export function answer(message, context = '') {
   const text = message.trim()
   const reply = { kind: 'answer', alerts: [], notes: [], results: [], contact: null }
 
@@ -166,7 +171,7 @@ export function answer(message) {
   if (FRAUD.test(text)) reply.alerts.push('fraud')
   for (const [re, msg] of OUT_OF_SCOPE) if (re.test(text)) reply.notes.push({ type: 'scope', text: msg })
 
-  const hits = search(text)
+  const hits = search(text, context)
   const top = hits[0]
   // need a reasonably strong match before we show a policy as "the answer"
   if (top && top.score >= 2.5 && top.coverage >= 0.45 && top.coverage < 0.6) reply.partial = true
@@ -204,3 +209,26 @@ export const SUGGESTED = [
   'Can I work from home?',
   'How do I report harassment?',
 ]
+
+// ---------- follow-up questions ----------
+// "what about part-time?", "is it paid?", "how do I request it?" only make sense with the previous question.
+const EXPLICIT = /^(and|but|also|so|then|ok(ay)?,?|what about|how about|what if|what happens (after|next|then)|what('s| is) next|after that)\b/i
+const FOLLOW_START = /^(and|but|also|so|then|ok(ay)?,?|what about|how about|what if|what happens|what('s| is) next|after|is (that|it|there)|are (they|those|there)|does (that|it|this)|do (they|i|we)|can i|could i|should i|how (do|long|much|many|far|soon|often)|when|where|who|why|which|for)\b/i
+const PRONOUN = /\b(it|that|this|they|them|those|these|there|same|one)\b/i
+
+/** Answer a message, using the previous question as context when it reads like a follow-up. */
+export function answerInContext(message, prev) {
+  const alone = answer(message)
+  if (!prev || ['crisis', 'smalltalk'].includes(alone.kind) || alone.alerts.length) return alone
+  const n = words(message).length
+  const looksLikeFollowUp = n <= 5 && (FOLLOW_START.test(message.trim()) || PRONOUN.test(message))
+  const weakAlone = alone.kind === 'notfound' || alone.partial
+  if (!looksLikeFollowUp && !(weakAlone && n <= 5)) return alone
+  // a clear new question ("when is payday?") stands on its own
+  if (n >= 3 && alone.kind === 'answer' && !alone.partial && !PRONOUN.test(message) && !EXPLICIT.test(message.trim())) return alone
+  const together = answer(message, prev.query)
+  if (together.kind !== 'answer') return alone
+  // only say "following up" when the earlier question actually changed the answer
+  const changed = together.results[0] !== alone.results[0]
+  return changed ? { ...together, followUp: prev.topic } : together
+}

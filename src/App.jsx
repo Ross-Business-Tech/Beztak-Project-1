@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { answer, cite, CONTACTS, DOC, SUGGESTED, TICKET_TYPES } from './assistant.js'
+import { answerInContext, cite, CONTACTS, DOC, SUGGESTED, TICKET_TYPES } from './assistant.js'
 import './App.css'
 
 // ---------- small helpers ----------
@@ -70,7 +70,7 @@ function Reply({ r, onAsk, onTicket }) {
         <p>Ask me about pay, time off, benefits, leave, or workplace rules. I answer only from the approved Employee Handbook and show where each answer comes from.</p>
         <p className="muted">In an emergency, call <a href="tel:911">911</a> first.</p>
         <div className="chips">
-          {SUGGESTED.map((s) => <button key={s} className="chip" onClick={() => onAsk(s)}>{s}</button>)}
+          {SUGGESTED.map((s) => <button key={s} className="chip" onClick={() => onAsk(s, { fresh: true })}>{s}</button>)}
         </div>
       </div>
     )
@@ -121,6 +121,7 @@ function Reply({ r, onAsk, onTicket }) {
           {r.timeSensitive && (
             <p className="note note-time">⏱ This may be time-sensitive. If it's urgent, contact {r.contact.name} directly at <a href={`tel:${r.contact.phone.replace(/\D/g, '')}`}>{r.contact.phone}</a> instead of waiting.</p>
           )}
+          {r.followUp && <p className="followup">↪ Following up on <strong>{r.followUp}</strong></p>}
           {r.partial && <p className="muted small-text">I didn't find an exact match. This is the closest policy I found, so check that it fits your situation:</p>}
           <article className="answer">
             <h3>{titleOf(best)}</h3>
@@ -261,11 +262,21 @@ export default function App() {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [messages])
 
-  const ask = (q) => {
+  // remembers the last question that got a real answer, so follow-ups like "is it paid?" make sense
+  const lastTopic = useRef(null)
+  const ask = (q, { fresh = false } = {}) => {
     const text = q.trim()
     if (!text) return
     setTab('ask')
-    setMessages((m) => [...m, { from: 'me', text }, { from: 'bot', r: answer(text) }])
+    const r = answerInContext(text, fresh ? null : lastTopic.current)
+    if (r.kind === 'answer') {
+      const best = r.results[0]
+      // follow-ups keep the original topic plus the latest detail ("PTO" + "part-time")
+      lastTopic.current = r.followUp
+        ? { root: lastTopic.current.root, query: `${lastTopic.current.root} ${text}`, topic: titleOf(best) }
+        : { root: text, query: text, topic: titleOf(best) }
+    }
+    setMessages((m) => [...m, { from: 'me', text }, { from: 'bot', r }])
     setInput('')
   }
 
