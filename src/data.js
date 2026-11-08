@@ -13,7 +13,7 @@ export const TOPIC_LABELS = { benefits: 'Benefits', payroll: 'Payroll', timeoff:
 
 // Questions the AI can answer on its own.
 export const KNOWLEDGE = [
-  { topic: 'timeoff', keys: ['how many vacation', 'vacation days', 'pto balance', 'how much pto', 'paid time off'], answer: 'Full-time employees get 15 days of paid vacation per year, plus 10 company holidays. You can see your current balance in the HR portal under Time Off.' },
+  { topic: 'timeoff', keys: ['how many vacation', 'vacation days per year', 'paid time off'], answer: 'Full-time employees get 15 days of paid vacation per year, plus 10 company holidays. You can see your current balance in the HR portal under Time Off.' },
   { topic: 'timeoff', keys: ['request time off', 'request vacation', 'book vacation', 'take a day off'], answer: 'To request time off, open the HR portal, choose Time Off → New Request, pick your dates, and submit. Your manager will get a notification to approve it.' },
   { topic: 'payroll', keys: ['pay date', 'payday', 'when do i get paid', 'pay schedule'], answer: 'We pay every second Friday. If a payday falls on a holiday, you are paid on the working day before.' },
   { topic: 'payroll', keys: ['pay stub', 'payslip', 'w-2', 'w2', 'tax form'], answer: 'Pay stubs and tax forms are in the HR portal under Pay → Documents. Tax forms are posted by January 31 each year.' },
@@ -21,6 +21,41 @@ export const KNOWLEDGE = [
   { topic: 'benefits', keys: ['401k', '401(k)', 'retirement match'], answer: 'The company matches 100% of your 401(k) contributions up to 4% of your pay. You are eligible after 30 days of employment.' },
   { topic: 'onboarding', keys: ['first day', 'what do i bring', 'new hire paperwork'], answer: 'On your first day, bring a photo ID and your signed offer letter. Your manager will meet you at reception at 9:00am, and IT will set up your laptop.' },
   { topic: 'general', keys: ['dress code', 'work from home policy', 'remote work policy', 'hybrid policy'], answer: 'We follow a hybrid model: three days in the office and two days remote each week, agreed with your manager. The dress code is business casual.' },
+]
+
+// Questions the assistant must NEVER answer itself. Checked before anything else.
+// Each one sends the ticket to a person and records the reason.
+export const ESCALATIONS = [
+  { id: 'pto-balance', reason: 'Requires access to individual employee records', topic: 'timeoff', tag: 'personal-record', example: 'How many PTO hours do I personally have left?',
+    test: /(how many|how much|what('| i)?s my|check my).*(pto|vacation|sick|leave|time off).*(left|remain|personally|balance|have i|do i have)|my (pto|vacation|sick) (balance|hours)/,
+    extra: 'Your personal balance is kept in your employee record, so a team member will confirm it for you.' },
+  { id: 'paycheck-less', reason: 'Requires investigation of personal payroll information', topic: 'payroll', tag: 'pay-error', example: 'Why was my paycheck $200 less this week?',
+    test: /(paycheck|pay check|pay|salary|check).*(less|short|lower|smaller|missing|wrong|incorrect|didn't|did not)|why (was|is) my (pay|paycheck)/,
+    extra: 'Payroll will look into the details of your pay and reply to you directly.' },
+  { id: 'take-off', reason: 'May require manager approval', topic: 'timeoff', tag: 'needs-approval', example: 'Can I take tomorrow off?',
+    test: /\bcan i\b.*\b(take|have|get)\b.*\boff\b|\b(am i allowed|may i)\b.*\boff\b/,
+    extra: 'Time off needs your manager\'s approval. A team member will follow up, and you can also submit a request in the HR portal.' },
+  { id: 'promotion', reason: 'Depends on management decisions', topic: 'general', tag: 'management-decision', example: 'Will I get promoted next month?',
+    test: /promot|pay (raise|increase)|get a raise/,
+    extra: 'Promotion and pay decisions are made by management, so a person on the team will respond.' },
+  { id: 'coworker-pay', reason: 'Confidential employee information', topic: 'relations', tag: 'confidential', example: 'How much does my coworker make?',
+    test: /(coworker|co-worker|colleague|teammate|manager|boss|someone|\w+'s).*(salary|make|earn|paid|pay)\b|(salary|pay) of (my|a|the) (coworker|colleague|manager|boss)/,
+    extra: 'We cannot share information about other employees.' },
+  { id: 'bereavement', reason: 'Requires appropriate authorization', topic: 'timeoff', tag: 'needs-approval', example: 'Can you approve my bereavement leave?',
+    test: /approve.*(leave|bereavement|time off|request|pto)|bereavement/,
+    extra: 'We are sorry for your loss. Leave must be approved by an authorized team member, who will contact you shortly.' },
+  { id: 'write-up', reason: 'Requires details about an individual incident', topic: 'relations', tag: 'confidential', example: 'Why did my manager write me up?',
+    test: /write.?up|written up|disciplin|formal warning|why did my manager/,
+    extra: 'This involves a specific incident, so a person from Employee Relations will speak with you.' },
+  { id: 'fired', reason: 'Confidential personnel decision', topic: 'relations', tag: 'confidential', example: 'Am I going to get fired?',
+    test: /(am i|will i be|going to be|about to be).*(fired|laid off|let go|terminated)|get fired/,
+    extra: 'This is a confidential matter, so a person from Employee Relations will contact you personally.' },
+  { id: 'direct-deposit', reason: 'Requires secure authentication and an authorized process', topic: 'payroll', tag: 'security', example: 'Can you change my direct deposit information?',
+    test: /(change|update|switch|edit).*(direct deposit|bank|routing number|account number)/,
+    extra: 'For your security, please do not send bank details by email. Payroll will contact you through the secure HR portal.' },
+  { id: 'password', reason: 'Unauthorized access request', topic: 'relations', tag: 'security', example: "What is the password to my manager's account?",
+    test: /password.*(manager|boss|coworker|colleague|someone|his|her|their)|(manager|boss|coworker|colleague)'?s? .*(password|account|login)|access (to )?(my |a |someone's )?(manager|boss|coworker|colleague)/,
+    extra: 'We cannot share or give access to anyone else\'s account. This request has been logged for review.' },
 ]
 
 // Words that hint at a topic, used when no ready answer exists.

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AGENTS, HR_ADDRESS, KNOWLEDGE } from './data'
+import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE } from './data'
 import { ackText, topicLabel, triage } from './triage'
 import { agentName, dueInfo, pendingAdviceFor } from './util'
 
@@ -10,21 +10,24 @@ export function Compose({ tickets, onClose, onCreate }) {
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
-  const examples = [
+  const answerable = [
     ['How many vacation days do I get?', 'Hi, how many vacation days do I get per year?'],
-    ['Missing overtime pay', 'I have not been paid for my overtime last week. Please fix this asap.'],
-    ['Issue with my manager', 'My manager has been treating me unfairly and I would like to talk to someone confidentially.'],
+    ['When is payday?', 'When do I get paid this month? What is the pay schedule?'],
+    ['401(k) match', 'Does the company match 401k contributions?'],
+    ['Open enrollment dates', 'When is open enrollment for health insurance?'],
+    ['Dress code', 'What is the dress code and the work from home policy?'],
   ]
+  const personal = ESCALATIONS.map((e) => [e.example, e.example])
   const submit = (e) => {
     e.preventDefault()
     const r = triage(subject, body)
     const now = new Date().toISOString()
-    const text = r.resolved ? r.answer : ackText(name, agentName(r.assignee), r.urgent, r.sensitive)
+    const text = r.resolved ? r.answer : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
     onCreate({
       id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body, customer: name || 'Employee',
       email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,
       topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note,
-      tags: [...(r.resolved ? ['ai-resolved'] : []), ...(r.sensitive ? ['sensitive'] : [])],
+      tags: [...(r.resolved ? ['ai-resolved'] : []), ...(r.tags || (r.sensitive ? ['sensitive'] : []))],
       replies: [{ from: 'HR Assistant (automated)', text, at: now, email: true, ai: true }],
     })
   }
@@ -33,7 +36,12 @@ export function Compose({ tickets, onClose, onCreate }) {
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2>Simulate an incoming email</h2>
         <p className="mute small">Stands in for a real email arriving at the HR inbox ({HR_ADDRESS}). The automated assistant reads it, creates the ticket, replies when it can, and assigns it to the right person.</p>
-        <div className="row">{examples.map(([s, b]) => <button key={s} type="button" className="chip" onClick={() => { setSubject(s); setBody(b) }}>{s}</button>)}</div>
+        <label>Load a sample question
+          <select value="" onChange={(e) => { const all = [...answerable, ...personal]; const x = all[Number(e.target.value)]; if (x) { setSubject(x[0]); setBody(x[1]) } }}>
+            <option value="">Choose a sample…</option>
+            <optgroup label="Assistant should answer">{answerable.map((x, i) => <option key={x[0]} value={i}>{x[0]}</option>)}</optgroup>
+            <optgroup label="Must go to a person">{personal.map((x, i) => <option key={x[0]} value={answerable.length + i}>{x[0]}</option>)}</optgroup>
+          </select></label>
         <label>From (name)<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Kim" /></label>
         <label>From (email)<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alex.kim@examplecompany.com" /></label>
         <label>Subject<input required value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
@@ -96,6 +104,10 @@ export function Documents({ docs, setDocs }) {
       <section className="panel pad"><h3>Egnyte</h3>
         <p><span className="badge red">Not connected</span></p>
         <p className="mute">Documents stored in Egnyte will be listed here once the connection is set up. Until then the assistant does not read uploaded documents: its replies come from the fixed answers below.</p>
+      </section>
+      <section className="panel pad"><h3>Never answered automatically</h3>
+        <p className="mute">These always go to a person, with the reason recorded on the ticket.</p>
+        {ESCALATIONS.map((e) => <div key={e.id} className="kb"><b>{e.example}</b><span className="mute small">{e.reason}</span></div>)}
       </section>
       <section className="panel pad"><h3>Fixed answers used for automatic replies</h3>
         {KNOWLEDGE.map((k) => <div key={k.keys[0]} className="kb"><span className="badge grey">{topicLabel(k.topic)}</span><b>Triggers on: {k.keys.join(', ')}</b><p>{k.answer}</p></div>)}
