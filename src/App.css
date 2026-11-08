@@ -86,3 +86,14 @@
 .contact-list li { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
 .contact-links { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; margin-top: 4px; }
 .followup { font-size: 13px; color: var(--muted); margin: 0 0 6px !important; }
+.manual h2 { font-size: 18px; color: var(--navy); margin: 4px 0 2px; }
+.manual-filter { width: 100%; border: 1px solid var(--border); border-radius: 999px; padding: 10px 16px; margin: 10px 0 12px; background: #fff; font-size: 16px; }
+.manual-section { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+.manual-section summary { cursor: pointer; font-weight: 600; color: var(--navy); }
+.sec-num { color: var(--gold); font-weight: 700; margin-right: 2px; }
+.tabs button { padding: 6px 10px; }
+@media (max-width: 480px) {
+  .top { flex-wrap: wrap; row-gap: 8px; }
+  .tabs { width: 100%; }
+  .tabs button { flex: 1; }
+}

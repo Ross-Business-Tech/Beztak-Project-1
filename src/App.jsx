@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { answerInContext, cite, CONTACTS, DOC, SUGGESTED, TICKET_TYPES } from './assistant.js'
+import { SECTIONS } from './data/opsManual.js'
 import './App.css'
 
 // ---------- small helpers ----------
@@ -23,30 +24,35 @@ function PolicyText({ text }) {
   )
 }
 
-const titleOf = (c) => (c.q ? c.q.replace(/\?\s.*$/, '?') : c.sub || c.sectionTitle)
-const ticketTypeFor = (section) => ({ 10: 'payroll', 7: 'payroll', 12: 'payroll', 16: 'benefits', 6: 'leave', 13: 'leave', 14: 'leave', 15: 'leave', 5: 'relations', 28: 'relations', 8: 'records' }[section] || 'policy')
+const titleOf = (c) => c.q
+const ticketTypeFor = (section) => ({ 3: 'maintenance', 4: 'maintenance', 5: 'vendor', 6: 'access', 9: 'accounting', 11: 'fairhousing' }[section] || 'procedure')
 
 // ---------- alerts shown before any policy text ----------
 const ALERTS = {
   danger: {
-    tone: 'red', title: 'If you are in immediate danger, call 911 now.',
-    body: 'Move to a safe place first. When you are safe, tell your manager and People Operations (Morgan Ellis, (734) 555-0142). For a property emergency, also call Operations at (734) 555-0147.',
-    source: 'Employee Handbook §25 and §29',
+    tone: 'red', title: 'If anyone is in danger, call 911 now.',
+    body: 'Get to a safe place first. For fire, smoke, gas or a carbon monoxide alarm: evacuate, don\'t investigate. Once you are safe, call the emergency maintenance line at (734) 555-0199 and notify Riley Carter at (734) 555-0147.',
+    source: 'Ops Manual §3.2, §10.4, §12.3',
+  },
+  water: {
+    tone: 'red', title: 'Treat this as an emergency: call (734) 555-0199.',
+    body: 'Use the 24/7 emergency maintenance line. Don\'t just send an email. For a leak, shut off the water at the fixture or unit valve if it is safe to do so, and take photos.',
+    source: 'Ops Manual §3.1, §3.3, §3.4',
   },
   injury: {
-    tone: 'red', title: 'If you need emergency care, call 911.',
-    body: 'As soon as you are safe, notify your manager and People Operations at people@glpg-demo.example, and submit an incident report within 24 hours, even if the injury seems minor.',
-    source: 'Employee Handbook §17, p. 15',
+    tone: 'red', title: 'If someone needs emergency care, call 911.',
+    body: 'Don\'t move an injured person unless they are in danger. Don\'t admit fault or discuss insurance. Notify Operations at (734) 555-0147 right away and file an incident report within 24 hours.',
+    source: 'Ops Manual §13.1, §13.3, §13.4',
   },
   concern: {
     tone: 'amber', title: 'You can report this, and you don\'t need to explain it to me first.',
-    body: 'Contact Morgan Ellis at people@glpg-demo.example or (734) 555-0142. If Morgan or your manager is involved, contact Jordan Patel directly at jordan.patel@glpg-demo.example or (734) 555-0144. You can also report anonymously through the employee portal reporting form. Retaliation for reporting is prohibited. This chat is not a reporting channel and is not confidential.',
-    source: 'Employee Handbook §5, p. 7 · §3, p. 6',
+    body: 'Workplace concerns go to People Operations: Morgan Ellis, people@glpg-demo.example or (734) 555-0142. If Morgan or your manager is involved, contact Jordan Patel at jordan.patel@glpg-demo.example or (734) 555-0144. Concerns about how a resident or applicant was treated go to compliance@glpg-demo.example right away. This chat is not a reporting channel and is not confidential.',
+    source: 'Ops Manual §2.4, §11.1',
   },
   fraud: {
     tone: 'red', title: 'Don\'t act on it. Report it right away.',
-    body: 'Call the IT Help Desk at (734) 555-0145 and email security@glpg-demo.example from a safe device. For changed wire instructions, also call the Managing Broker at (734) 555-0146. Don\'t wait for a ticket response.',
-    source: 'Employee Handbook §21, pp. 17–18 · §33, p. 26',
+    body: 'Call the IT Help Desk at (734) 555-0145 and email security@glpg-demo.example from a safe device. For changed bank or wire details, also call Accounting at (734) 555-0148 and verify only through a phone number already on file. Don\'t wait for an email reply.',
+    source: 'Ops Manual §5.7, §15.1–15.3',
   },
 }
 
@@ -66,8 +72,8 @@ function Reply({ r, onAsk, onTicket }) {
   if (r.kind === 'welcome') {
     return (
       <div className="bubble bot">
-        <p><strong>Hi! I'm the HR help assistant.</strong> I'm an automated tool, not a person in HR.</p>
-        <p>Ask me about pay, time off, benefits, leave, or workplace rules. I answer only from the approved Employee Handbook and show where each answer comes from.</p>
+        <p><strong>Hi! I'm Ops Help.</strong> I'm an automated tool, not a person.</p>
+        <p>Ask me how to handle day-to-day operations: maintenance, emergencies, keys, vendors, leasing, rent, residents, and safety. I answer only from the approved Operations Manual and show the section each answer comes from.</p>
         <p className="muted">In an emergency, call <a href="tel:911">911</a> first.</p>
         <div className="chips">
           {SUGGESTED.map((s) => <button key={s} className="chip" onClick={() => onAsk(s, { fresh: true })}>{s}</button>)}
@@ -89,7 +95,7 @@ function Reply({ r, onAsk, onTicket }) {
   if (r.kind === 'smalltalk') {
     return (
       <div className="bubble bot">
-        <p>{r.thanks ? 'You\'re welcome! Anything else I can help you find?' : 'Hi! What HR question can I help you with?'}</p>
+        <p>{r.thanks ? 'You\'re welcome! Anything else I can help you find?' : 'Hi! What procedure can I help you find?'}</p>
       </div>
     )
   }
@@ -101,10 +107,10 @@ function Reply({ r, onAsk, onTicket }) {
       {r.notes.map((n, i) => <p key={i} className={`note note-${n.type}`}>{n.text}</p>)}
 
       {r.kind === 'alertonly' ? (
-        <button className="btn-secondary" onClick={() => onTicket(r.alerts.includes('concern') ? 'relations' : 'policy')}>Ask HR directly</button>
+        <button className="btn-secondary" onClick={() => onTicket(r.alerts.includes('water') ? 'maintenance' : 'procedure')}>Ask Operations</button>
       ) : r.kind === 'notfound' ? (
         <>
-          <p><strong>I couldn't find a clear answer to that in the handbook,</strong> so I can't confirm it. People Operations can help.</p>
+          <p><strong>I couldn't find a clear answer to that in the Operations Manual,</strong> so I can't confirm it. Your property manager or Operations can help.</p>
           {r.suggestions?.length > 0 && (
             <>
               <p className="muted">Did you mean one of these?</p>
@@ -113,16 +119,15 @@ function Reply({ r, onAsk, onTicket }) {
               </div>
             </>
           )}
-          <button className="btn-secondary" onClick={() => onTicket('policy')}>Ask HR directly</button>
+          <button className="btn-secondary" onClick={() => onTicket('procedure')}>Ask Operations</button>
         </>
       ) : (
         <>
-          {r.condolence && <p>I'm so sorry for your loss. Here's what the handbook says about bereavement leave.</p>}
           {r.timeSensitive && (
-            <p className="note note-time">⏱ This may be time-sensitive. If it's urgent, contact {r.contact.name} directly at <a href={`tel:${r.contact.phone.replace(/\D/g, '')}`}>{r.contact.phone}</a> instead of waiting.</p>
+            <p className="note note-time">⏱ This may be time-sensitive. If it's urgent, call <a href={`tel:${r.contact.phone.replace(/\D/g, '')}`}>{r.contact.phone}</a> ({r.contact.name}) instead of waiting.</p>
           )}
           {r.followUp && <p className="followup">↪ Following up on <strong>{r.followUp}</strong></p>}
-          {r.partial && <p className="muted small-text">I didn't find an exact match. This is the closest policy I found, so check that it fits your situation:</p>}
+          {r.partial && <p className="muted small-text">I didn't find an exact match. This is the closest procedure I found, so check that it fits your situation:</p>}
           <article className="answer">
             <h3>{titleOf(best)}</h3>
             <PolicyText text={best.text} />
@@ -131,13 +136,13 @@ function Reply({ r, onAsk, onTicket }) {
 
           {r.contact && (
             <p className="contact-line">
-              Questions about your own situation? <strong>{r.contact.name}</strong> ({r.contact.role}) · <a href={`mailto:${r.contact.email}`}>{r.contact.email}</a>
+              Need help with a specific case? <strong>{r.contact.name}</strong> ({r.contact.role}) · <a href={`mailto:${r.contact.email}`}>{r.contact.email}</a>
             </p>
           )}
 
           {r.results.length > 1 && (
             <details className="related">
-              <summary>Related policies ({r.results.length - 1})</summary>
+              <summary>Related procedures ({r.results.length - 1})</summary>
               {r.results.slice(1).map((c) => (
                 <article key={c.id} className="answer small">
                   <h4>{titleOf(c)}</h4>
@@ -149,7 +154,7 @@ function Reply({ r, onAsk, onTicket }) {
           )}
           <div className="reply-actions">
             <span className="muted">Not what you needed?</span>
-            <button className="link-btn" onClick={() => onTicket(ticketTypeFor(best.section))}>Ask HR directly</button>
+            <button className="link-btn" onClick={() => onTicket(ticketTypeFor(best.section))}>Ask Operations</button>
           </div>
         </>
       )}
@@ -159,7 +164,7 @@ function Reply({ r, onAsk, onTicket }) {
 
 // ---------- ticket sheet ----------
 function TicketSheet({ initialType, onClose }) {
-  const [type, setType] = useState(initialType || 'policy')
+  const [type, setType] = useState(initialType || 'procedure')
   const [subject, setSubject] = useState('')
   const [details, setDetails] = useState('')
   const [prepared, setPrepared] = useState(false)
@@ -167,20 +172,20 @@ function TicketSheet({ initialType, onClose }) {
   const t = TICKET_TYPES.find((x) => x.id === type)
   const to = CONTACTS[t.to]
   const risky = /\b\d{3}-?\d{2}-?\d{4}\b|\b\d{8,17}\b|password/i.test(subject + ' ' + details)
-  const body = `Category: ${t.label}\n\n${details}\n\n(Sent from the HR help assistant)`
+  const body = `Category: ${t.label}\n\n${details}\n\n(Sent from Ops Help)`
   const mailto = `mailto:${to.email}?subject=${encodeURIComponent(`${t.label} — ${subject}`)}&body=${encodeURIComponent(body)}`
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="ticket-title" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <h2 id="ticket-title">Ask HR directly</h2>
+          <h2 id="ticket-title">Ask Operations</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         {!prepared ? (
           <form onSubmit={(e) => { e.preventDefault(); setPrepared(true) }}>
-            <p className="muted small-text">For an emergency or threat, call 911 first. Don't use this form.</p>
+            <p className="muted small-text">For a life-safety emergency call 911. For an emergency repair call (734) 555-0199. Don't use this form.</p>
             <label>Topic
               <select value={type} onChange={(e) => setType(e.target.value)}>
                 {TICKET_TYPES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
@@ -188,13 +193,13 @@ function TicketSheet({ initialType, onClose }) {
             </label>
             <p className="hint">Goes to <strong>{to.name}</strong> ({to.email}). {t.target}.</p>
             <label>Short subject
-              <input value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={90} placeholder="e.g. Missing 4 hours on Oct 30 pay statement" />
+              <input value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={90} placeholder="e.g. Approval for $1,800 water heater replacement" />
             </label>
             <label>What do you need?
               <textarea value={details} onChange={(e) => setDetails(e.target.value)} required rows={5} placeholder={t.include} />
             </label>
             <p className="hint">Helpful to include: {t.include}</p>
-            {risky && <p className="note note-privacy">This looks like it may contain a password, Social Security number or account number. Please remove it. HR will never need these by email.</p>}
+            {risky && <p className="note note-privacy">This looks like it may contain a password, Social Security number or account number. Please remove it. No one needs these by email.</p>}
             <button className="btn-primary" type="submit" disabled={risky}>Review</button>
           </form>
         ) : (
@@ -222,12 +227,12 @@ function TicketSheet({ initialType, onClose }) {
 
 // ---------- contacts tab ----------
 function Contacts({ onTicket }) {
-  const list = ['people', 'payroll', 'benefits', 'leave', 'broker', 'ops', 'it', 'security', 'exec']
+  const list = ['ops', 'maint', 'emergency', 'accounting', 'broker', 'it', 'security', 'exec', 'people']
   return (
     <div className="contacts">
       <div className="alert alert-red">
         <strong>Emergency or immediate danger: call <a href="tel:911">911</a> first.</strong>
-        <p>Then tell your manager and People Operations when you are safe.</p>
+        <p>Emergency repairs (leaks, no heat, unsecured unit): call the 24/7 line at <a href="tel:7345550199">(734) 555-0199</a>.</p>
       </div>
       <h2>Who to contact</h2>
       <ul className="contact-list">
@@ -245,9 +250,39 @@ function Contacts({ onTicket }) {
           )
         })}
       </ul>
-      <p className="muted small-text">If your concern involves Morgan Ellis or your manager, contact Jordan Patel directly. Anonymous reports: employee portal, Report form.</p>
-      <p className="cite">📄 {DOC.short}, {DOC.version} · §3 Contacts, Service Standards, and Escalation · p. 5 · Appendix A, p. 29</p>
-      <button className="btn-primary" onClick={() => onTicket('policy')}>Ask HR directly</button>
+      <p className="muted small-text">No reply? Reply once and copy operations@glpg-demo.example. After one more business day, contact Jordan Patel.</p>
+      <p className="cite">📄 {DOC.short}, {DOC.version} · §2 Contacts and Escalation</p>
+      <button className="btn-primary" onClick={() => onTicket('procedure')}>Ask Operations</button>
+    </div>
+  )
+}
+
+// ---------- manual tab: browse the whole Operations Manual ----------
+function Manual() {
+  const [query, setQuery] = useState('')
+  const f = query.trim().toLowerCase()
+  const sections = SECTIONS.map((s) => ({
+    ...s,
+    items: s.items.map((it, i) => ({ ...it, ref: `${s.n}.${i + 1}` }))
+      .filter((it) => !f || `${s.title} ${it.q} ${it.a} ${it.k || ''}`.toLowerCase().includes(f)),
+  })).filter((s) => s.items.length)
+  return (
+    <div className="manual">
+      <h2>{DOC.title}</h2>
+      <p className="muted small-text">{DOC.version} · effective {DOC.effective} · owner: {DOC.owner}</p>
+      <input className="manual-filter" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter the manual, e.g. keys" aria-label="Filter the manual" />
+      {sections.length === 0 && <p className="muted">Nothing matches “{query}”.</p>}
+      {sections.map((s) => (
+        <details key={s.n} className="manual-section" open={Boolean(f)}>
+          <summary><span className="sec-num">§{s.n}</span> {s.title} <span className="muted small-text">({s.items.length})</span></summary>
+          {s.items.map((it) => (
+            <article key={it.ref} className="answer small">
+              <h4><span className="sec-num">{it.ref}</span> {it.q}</h4>
+              <PolicyText text={it.a} />
+            </article>
+          ))}
+        </details>
+      ))}
     </div>
   )
 }
@@ -262,7 +297,7 @@ export default function App() {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [messages])
 
-  // remembers the last question that got a real answer, so follow-ups like "is it paid?" make sense
+  // remembers the last question that got a real answer, so follow-ups like "is that an emergency?" make sense
   const lastTopic = useRef(null)
   const ask = (q, { fresh = false } = {}) => {
     const text = q.trim()
@@ -271,7 +306,7 @@ export default function App() {
     const r = answerInContext(text, fresh ? null : lastTopic.current)
     if (r.kind === 'answer') {
       const best = r.results[0]
-      // follow-ups keep the original topic plus the latest detail ("PTO" + "part-time")
+      // follow-ups keep the original topic plus the latest detail ("lockout" + "after hours")
       lastTopic.current = r.followUp
         ? { root: lastTopic.current.root, query: `${lastTopic.current.root} ${text}`, topic: titleOf(best) }
         : { root: text, query: text, topic: titleOf(best) }
@@ -284,18 +319,19 @@ export default function App() {
     <div className="app">
       <header className="top">
         <div className="brand">
-          <span className="logo" aria-hidden="true">HR</span>
+          <span className="logo" aria-hidden="true">OH</span>
           <div>
-            <h1>HR Help</h1>
+            <h1>Ops Help</h1>
             <p>Great Lakes Property Group</p>
           </div>
         </div>
         <nav className="tabs" aria-label="Sections">
           <button className={tab === 'ask' ? 'active' : ''} onClick={() => setTab('ask')}>Ask</button>
+          <button className={tab === 'manual' ? 'active' : ''} onClick={() => setTab('manual')}>Manual</button>
           <button className={tab === 'contacts' ? 'active' : ''} onClick={() => setTab('contacts')}>Contacts</button>
         </nav>
       </header>
-      <p className="demo-banner">Demo prototype for Beztak. Uses a <strong>fictional</strong> sample handbook ({DOC.version}, effective {DOC.effective}).</p>
+      <p className="demo-banner">Demo prototype for Beztak. Uses a <strong>fictional</strong> sample Operations Manual ({DOC.version}, effective {DOC.effective}).</p>
 
       <main className="main">
         {tab === 'ask' ? (
@@ -305,6 +341,8 @@ export default function App() {
               : <Reply key={i} r={m.r} onAsk={ask} onTicket={setTicket} />)}
             <div ref={endRef} />
           </div>
+        ) : tab === 'manual' ? (
+          <Manual />
         ) : (
           <Contacts onTicket={setTicket} />
         )}
@@ -315,7 +353,7 @@ export default function App() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask an HR question…"
+            placeholder="Ask how to handle something…"
             aria-label="Your question"
             maxLength={300}
           />

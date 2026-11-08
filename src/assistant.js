@@ -1,93 +1,68 @@
-// The HR assistant "brain": safety checks first, then a search of the approved handbook.
-// It never makes up policy: every answer is a passage from the handbook, with its citation.
-import handbook from './data/handbook.json'
-import { curated } from './data/curated.js'
+// The Ops Help "brain": safety checks first, then a search of the approved Operations Manual.
+// It never makes up procedures: every answer is a passage from the manual, with its section number.
+import { MANUAL, ENTRIES } from './data/opsManual.js'
 
-export const DOC = {
-  title: 'GLPG Employee Handbook & HR Self-Service Manual',
-  short: 'Employee Handbook',
-  version: handbook.version,
-  effective: handbook.effective,
-}
+export const DOC = MANUAL
 
 export const CONTACTS = {
-  people: { name: 'Morgan Ellis', role: 'Director of People Operations', email: 'people@glpg-demo.example', phone: '(734) 555-0142', handles: 'General HR, employee relations, personnel files' },
-  benefits: { name: 'Morgan Ellis', role: 'Benefits', email: 'benefits@glpg-demo.example', phone: '(734) 555-0142', handles: 'Enrollment, dependents, 401(k), life events' },
-  leave: { name: 'Morgan Ellis', role: 'Leave & accommodations', email: 'leave@glpg-demo.example', phone: '(734) 555-0142', handles: 'Leave, sick time, accommodations' },
-  payroll: { name: 'Dana Brooks', role: 'Payroll Administrator', email: 'payroll@glpg-demo.example', phone: '(734) 555-0143', handles: 'Pay, timekeeping, direct deposit, tax forms' },
-  broker: { name: 'Avery Chen', role: 'Managing Broker', email: 'compliance@glpg-demo.example', phone: '(734) 555-0146', handles: 'Commissions, licensing, Fair Housing, conflicts' },
-  ops: { name: 'Riley Carter', role: 'Property Operations Lead', email: 'operations@glpg-demo.example', phone: '(734) 555-0147', handles: 'Keys, property access, vendors, field safety' },
-  it: { name: 'IT Help Desk', role: 'Shared service', email: 'helpdesk@glpg-demo.example', phone: '(734) 555-0145', handles: 'Passwords, devices, MFA, software' },
-  security: { name: 'IT Security', role: 'Shared service', email: 'security@glpg-demo.example', phone: '(734) 555-0145', handles: 'Phishing, lost devices, wire fraud, data exposure' },
-  exec: { name: 'Jordan Patel', role: 'Managing Member', email: 'jordan.patel@glpg-demo.example', phone: '(734) 555-0144', handles: 'Escalations, or if HR or your manager is involved' },
+  ops: { name: 'Riley Carter', role: 'Property Operations Lead', email: 'operations@glpg-demo.example', phone: '(734) 555-0147', handles: 'Procedures, keys, vendors, residents, field safety' },
+  maint: { name: 'Sam Rivera', role: 'Maintenance Coordinator', email: 'maintenance@glpg-demo.example', phone: '(734) 555-0150', handles: 'Work orders, preventive maintenance, pests, snow' },
+  emergency: { name: 'Emergency maintenance line', role: '24/7 on-call technician', email: 'maintenance@glpg-demo.example', phone: '(734) 555-0199', handles: 'Leaks, no heat, gas or fire damage, lockouts after hours' },
+  accounting: { name: 'Taylor Nguyen', role: 'Accounting', email: 'accounting@glpg-demo.example', phone: '(734) 555-0148', handles: 'Rent, deposits, payment plans, vendor invoices' },
+  broker: { name: 'Avery Chen', role: 'Managing Broker', email: 'compliance@glpg-demo.example', phone: '(734) 555-0146', handles: 'Leasing compliance, Fair Housing, accommodations' },
+  it: { name: 'IT Help Desk', role: 'Shared service', email: 'helpdesk@glpg-demo.example', phone: '(734) 555-0145', handles: 'Passwords, PMS access, devices' },
+  security: { name: 'IT Security', role: 'Shared service', email: 'security@glpg-demo.example', phone: '(734) 555-0145', handles: 'Phishing, lost devices, wire or payment fraud' },
+  people: { name: 'Morgan Ellis', role: 'People Operations (HR)', email: 'people@glpg-demo.example', phone: '(734) 555-0142', handles: 'HR questions and workplace concerns' },
+  exec: { name: 'Jordan Patel', role: 'Managing Member', email: 'jordan.patel@glpg-demo.example', phone: '(734) 555-0144', handles: 'Escalations and spending over $2,500' },
 }
 
-// Ticket categories and routing (Handbook §33 and Cheat Sheet §4)
+// "Ask Ops" routing (Ops Manual §2)
 export const TICKET_TYPES = [
-  { id: 'payroll', label: 'Payroll / timekeeping', to: 'payroll', target: 'Acknowledged within 1 business day; target resolution 3 business days', include: 'Pay date, pay period, hours, expected vs. actual amount. Never include a full bank-account number.' },
-  { id: 'benefits', label: 'Benefits', to: 'benefits', target: 'Acknowledged within 1 business day; next update within 2 business days', include: 'Event date, eligibility date, plan name, any deadline.' },
-  { id: 'leave', label: 'Leave / accommodation', to: 'leave', target: 'Acknowledged within 1 business day; discussion within 3 business days', include: 'Requested start date, expected duration, work impact, best way to reach you. Keep medical details out.' },
-  { id: 'relations', label: 'Employee relations concern', to: 'people', target: 'Same-business-day triage during business hours', include: 'What happened, when, where, who was involved, witnesses. If HR is involved, contact Jordan Patel instead.' },
-  { id: 'records', label: 'Employment records / verification', to: 'people', target: 'Acknowledged within 3 business days; target 5 business days', include: 'The record or request, recipient, authorization, deadline.' },
-  { id: 'policy', label: 'Policy question', to: 'people', target: 'Acknowledged within 2 business days; target 5 business days', include: 'The policy section, your exact question, and what you are trying to do.' },
+  { id: 'procedure', label: 'Procedure question', to: 'ops', target: 'Acknowledged within 1 business day; answered within 3 business days', include: 'The manual section, your exact question, and what you are trying to do.' },
+  { id: 'maintenance', label: 'Maintenance / work order', to: 'maint', target: 'Acknowledged within 1 business day. For emergencies call (734) 555-0199 instead', include: 'Property and unit, the problem, priority, work order number if you have one.' },
+  { id: 'vendor', label: 'Vendor or spending approval', to: 'ops', target: 'Acknowledged within 1 business day', include: 'Vendor, work order number, amount, quotes attached.' },
+  { id: 'accounting', label: 'Rent, deposit, or invoice', to: 'accounting', target: 'Acknowledged within 1 business day', include: 'Property and unit or vendor, amount, dates. Never include full bank-account numbers.' },
+  { id: 'fairhousing', label: 'Fair Housing / accommodation', to: 'broker', target: 'Forward the same business day', include: 'What was requested and when. Keep medical details out.' },
+  { id: 'access', label: 'Keys or property access', to: 'ops', target: 'Lost keys: call (734) 555-0147 now', include: 'Property, which key or code, when it was last seen.' },
 ]
 
-const sectionContact = (s) => ({
-  6: 'leave', 7: 'payroll', 8: 'people', 10: 'payroll', 11: 'broker', 12: 'payroll', 13: 'leave', 14: 'leave', 15: 'leave',
-  16: 'benefits', 19: 'broker', 20: 'security', 21: 'security', 22: 'broker', 23: 'broker', 24: 'ops', 25: 'ops', 28: 'people',
-  29: 'people', 30: 'people',
-}[s] || 'people')
+const sectionContact = (s) => ({ 2: 'ops', 3: 'emergency', 4: 'maint', 5: 'ops', 6: 'ops', 7: 'broker', 8: 'ops', 9: 'accounting', 10: 'ops', 11: 'broker', 12: 'ops', 13: 'ops', 14: 'ops', 15: 'security' }[s] || 'ops')
 
 // ---------- search ----------
-const STOP = new Set('a an and are as at be by can do does for from get got have how i if in is it its me my of on or our should so that the this to was we what when where which who why will with you your am im any about there their them do take tomorrow today tonight next week need want help know please tell just much many happen happens policy policies job days rule rules really still also would off long could like question ask'.split(' '))
+const STOP = new Set('a an and are as at be by can do does for from get got have how i if in is it its me my of on or our should so that the this to was we what when where which who why will with you your am im any about there their them take tomorrow today tonight next week need want help know please tell just much many happen happens policy policies procedure procedures job rule rules really still also would off long could like question ask supposed someone something has had into new'.split(' '))
 const SYN = {
-  vacation: 'pto', holiday: 'holidays', 'dayoff': 'pto leave', timeoff: 'pto leave',
-  paycheck: 'pay payroll deposit',
-  grandma: 'grandparent bereavement', grandpa: 'grandparent bereavement', grandmother: 'grandparent bereavement', grandfather: 'grandparent bereavement',
-  mom: 'parent bereavement', dad: 'parent bereavement', mother: 'parent', father: 'parent', brother: 'sibling', sister: 'sibling',  salary: 'pay compensation', wage: 'pay', wages: 'pay', check: 'pay',
-  deposit: 'deposit pay', bank: 'deposit', money: 'pay',
-  sick: 'sick ill', ill: 'sick', doctor: 'sick medical appointments', flu: 'sick',
-  funeral: 'bereavement', died: 'bereavement', death: 'bereavement', passed: 'bereavement', bereavement: 'bereavement',
-  maternity: 'parental bonding', paternity: 'parental bonding', adoption: 'parental adoption',
-  insurance: 'medical dental vision benefits', health: 'medical benefits', dental: 'dental benefits', '401k': '401(k) retirement match', retirement: '401(k) retirement',
-  quit: 'resign resignation separation', resign: 'resignation separation', leaving: 'separation leaving',
-  wfh: 'remote hybrid', home: 'remote hybrid', remote: 'remote hybrid', hybrid: 'hybrid remote',
-  harass: 'harassment', harassed: 'harassment', bully: 'harassment bullying', bullying: 'harassment',
-  boss: 'manager', supervisor: 'manager',
-  overtime: 'overtime', clock: 'time timekeeping', punch: 'time missed punch',
-  reimburse: 'expense reimbursement', reimbursement: 'expense', receipts: 'receipt expense', mileage: 'mileage expense', travel: 'travel expense meals',
-  tuition: 'education reimbursement', school: 'education',
-  password: 'password forgot', login: 'password account', phishing: 'suspicious link security',
-  key: 'key keys', keys: 'key keys', review: 'performance review', raise: 'raise compensation review', promotion: 'promotion review',
-  pip: 'pip improvement plan', warning: 'warning corrective', discipline: 'corrective action',
-  voting: 'voting', military: 'military leave',
-  enroll: 'enrollment enroll', enrollment: 'enrollment', married: 'married life event', marriage: 'married life event',
-  injured: 'injured injury incident', hurt: 'injured injury', accident: 'accident injury incident',
-  w2: 'tax forms payroll', w4: 'tax withholding', tax: 'tax withholding forms payroll',
-  probation: 'introductory period', probationary: 'introductory period', introductory: 'introductory period',
-  second: 'outside', side: 'outside', moonlighting: 'outside employment',
-  fmla: 'medical leave', medical: 'medical leave', procedure: 'medical leave', surgery: 'medical leave',
-  uncomfortable: 'harassment inappropriate', creepy: 'harassment inappropriate', touched: 'harassment',
-  laptop: 'device lost', computer: 'device', email: 'email suspicious', weird: 'suspicious', scam: 'suspicious wire fraud',
-  training: 'training compliance', course: 'training', lunch: 'lunch meal', break: 'lunch meal breaks',
-  shorts: 'dress casual', wear: 'dress clothing', outfit: 'dress',
-  spouse: 'married dependent life event', husband: 'married dependent', wife: 'married dependent', dependent: 'dependent life event',
-  baby: 'parental bonding birth child', pregnant: 'pregnancy parental accommodation', pregnancy: 'pregnancy parental',
-  call: 'call notify', calling: 'notify', didn: 'missing deposit', paid: 'pay payday deposit',
-  letter: 'verification employment', apartment: 'verification employment', landlord: 'verification employment', mortgage: 'verification employment',
-  limit: 'approval cap', fire: 'termination separation', fired: 'termination separation corrective', complaining: 'retaliation complaint',
-  dress: 'dress clothing', hr: 'contact people operations', person: 'contact', bullied: 'harassment bullying', start: 'begin begins', begin: 'start', jeans: 'dress casual', office: 'office headquarters hours', yell: 'bullying harassment manager problem', yelled: 'bullying harassment manager problem',
-  complaint: 'complaint report concern', complain: 'complaint report', timesheet: 'time entry timekeeping', jury: 'jury', vote: 'voting', operation: 'medical leave', allowance: 'meals cap', per: 'per', diem: 'meals travel', clothes: 'dress', gift: 'gift', handbook: 'handbook',
+  tenant: 'resident', tenants: 'resident', renter: 'resident', occupant: 'resident', neighbor: 'resident neighbor', neighbors: 'resident neighbor',
+  apartment: 'unit', apt: 'unit', house: 'unit property', building: 'property building', site: 'property',
+  fix: 'repair work order', repair: 'repair work order', broken: 'repair work order', ticket: 'work order', maintenance: 'maintenance work order',
+  leak: 'leak water', leaking: 'leak water', flood: 'flooding water', flooded: 'flooding water', pipe: 'leak water', burst: 'leak water', toilet: 'toilet', clog: 'toilet repair',
+  furnace: 'heat', heater: 'heat', heating: 'heat', cold: 'heat', ac: 'ac', air: 'ac', hvac: 'hvac',
+  locked: 'lockout', lockout: 'lockout', 'let': 'lockout', lose: 'lost', lost: 'lost', fob: 'key fob', keys: 'key',
+  code: 'code access', gate: 'code access', lockbox: 'code access',
+  contractor: 'vendor', contractors: 'vendor', plumber: 'vendor', electrician: 'vendor', vendors: 'vendor',
+  quote: 'quotes', bid: 'quotes', bids: 'quotes', estimate: 'quotes', approve: 'approval limit', spend: 'spending approval limit', spending: 'approval limit', purchase: 'approval limit', buy: 'approval limit', cost: 'approval limit',
+  rent: 'rent', late: 'late fee', fee: 'fee', pay: 'pay payment', payment: 'payment', cash: 'cash payment', bounced: 'returned payment', nsf: 'returned payment',
+  deposit: 'security deposit', refund: 'security deposit refund', evict: 'eviction', evicted: 'eviction',
+  tour: 'showing', tours: 'showing', show: 'showing', prospect: 'prospect showing', applicant: 'application', apply: 'application', screening: 'application screening',
+  movein: 'move in', moveout: 'move out', vacate: 'move out notice', leaving: 'move out notice',
+  noise: 'noise', loud: 'noise', complain: 'complaint', complaining: 'complaint', upset: 'complaint', angry: 'complaint aggressive',
+  disability: 'accommodation', disabled: 'accommodation', wheelchair: 'accommodation modification', ramp: 'accommodation modification', esa: 'assistance animal', dog: 'animal', cat: 'animal', pet: 'animal', pets: 'animal',
+  discriminate: 'fair housing', discrimination: 'fair housing', steering: 'fair housing',
+  alone: 'lone worker', check: 'check in', safety: 'safety', unsafe: 'unsafe', scared: 'unsafe',
+  injured: 'injured injury incident', injury: 'injury incident', hurt: 'injured incident', fell: 'injured fell', slipped: 'injured slip', accident: 'accident incident', stolen: 'theft', robbed: 'theft', vandalism: 'break in',
+  report: 'incident report', paperwork: 'form',
+  phishing: 'suspicious link', scam: 'fraud', wire: 'wire', laptop: 'device lost', phone: 'phone', computer: 'device', password: 'password', login: 'password login', pms: 'pms',
+  bugs: 'pest', roaches: 'pest', mice: 'pest', rats: 'pest', bed: 'pest', roof: 'repair', roofing: 'repair', broke: 'break in theft', raise: 'renewal rate', increase: 'renewal rate', mold: 'mold', mildew: 'mold',
+  snow: 'snow', ice: 'snow ice', salt: 'snow',
+  hours: 'hours open', open: 'open', close: 'close', alarm: 'alarm', package: 'package', packages: 'package', mail: 'mail',
+  hr: 'hr people operations', pto: 'hr', vacation: 'hr', benefits: 'hr', paycheck: 'hr', sick: 'hr',
+  boss: 'manager', supervisor: 'manager', gift: 'gift', ai: 'ai', chatgpt: 'ai',
 }
 const stem = (w) => w.length > 4 ? w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, '') : w
-const words = (t) => (t || '').toLowerCase().replace(/401\s*\(?k\)?/g, '401k').replace(/day off/g, 'dayoff').replace(/time off/g, 'timeoff').replace(/[^a-z0-9$]+/g, ' ').split(' ').filter((w) => w.length > 1 && !STOP.has(w))
+const words = (t) => (t || '').toLowerCase().replace(/move[- ]in/g, 'movein').replace(/move[- ]out/g, 'moveout').replace(/locked out/g, 'lockout').replace(/time off/g, 'pto').replace(/[^a-z0-9$]+/g, ' ').split(' ').filter((w) => w.length > 1 && !STOP.has(w))
 const tokens = (t) => words(t).map(stem)
 
-const DOCS = [
-  ...handbook.chunks.map((c) => ({ ...c, doc: DOC.title })),
-  ...curated.map((c) => ({ doc: DOC.title, boost: 1.25, ...c })),
-].map((c, i) => {
-  const fields = [[c.q, 3], [`${c.sub || ''} ${c.sectionTitle}`, 1.2], [c.text, 1]]
+const DOCS = ENTRIES.map((c, i) => {
+  const fields = [[c.q, 3], [c.k, 2], [c.sectionTitle, 1.2], [c.text, 1]]
   const tf = {}
   let len = 0
   for (const [f, w] of fields) for (const t of tokens(f)) { tf[t] = (tf[t] || 0) + w; len += w }
@@ -114,7 +89,7 @@ function search(query, context = '') {
   // the words they typed count fully; synonyms we added count less
   const q = new Map()
   for (const g of groups) g.forEach((t, i) => q.set(t, Math.max(q.get(t) || 0, (i === 0 ? 1 : 0.6) * (gw.get(g) || 1))))
-  // words the handbook never uses count, but not more than a typical word
+  // words the manual never uses count, but not more than a typical word
   const wt = (g) => Math.min(idf(g[0]), avgIdf) * (gw.get(g) || 1)
   const totalWeight = groups.reduce((s, g) => s + wt(g), 0) || 1
   const k1 = 1.2, b = 0.6
@@ -134,18 +109,17 @@ function search(query, context = '') {
 
 // ---------- safety, privacy, scope ----------
 const CRISIS = /suicid|kill myself|end my life|hurt myself|harm myself|self[- ]?harm|want to die|don'?t want to live/i
-const DANGER = /weapon|\bgun\b|knife|threat|attack|assault|violen|stalk|in danger|unsafe|scared for my|fire\b|gas smell|smell gas|carbon monoxide/i
-const CONCERN = /harass|discriminat|retaliat|hostile|bull(y|ied)|yell(ed|ing)? at|sexual|inappropriate (comment|touch)|racis|sexis/i
-const INJURY = /injur|\bhurt\b|accident|fell|bleeding/i
-const FRAUD = /wire (instruction|transfer|fraud)|phish|suspicious (link|email)|hacked|data breach|lost (my )?(laptop|phone|device)/i
-const SENSITIVE = /\b\d{3}-?\d{2}-?\d{4}\b|\b\d{8,17}\b|password\s*(is|:)|\bssn\b|social security|routing number|account number/i
+const DANGER = /weapon|\bgun\b|knife|threat|attack|assault|violen|stalk|in danger|unsafe|scared for my|\bfire\b|smoke|gas smell|smell(s)? (gas|like gas)|gas leak|carbon monoxide|\bco alarm/i
+const WATER = /flood|leak|burst|water (everywhere|pouring|coming)|sewage|no heat|heat (is )?(out|off|not working)|furnace (is )?(out|broken|not working)/i
+const CONCERN = /harass|discriminat|retaliat|hostile work|bull(y|ied)|sexual|inappropriate (comment|touch)|racis|sexis/i
+const INJURY = /injur|\bhurt\b|accident|\bfell\b|slipped|bleeding/i
+const FRAUD = /wire (instruction|transfer|fraud)|new (bank|payment|wire) (details|info|instructions)|phish|suspicious (link|email)|hacked|data breach|lost (my |a )?(laptop|phone|device|tablet)/i
+const SENSITIVE = /\b\d{3}-?\d{2}-?\d{4}\b|\b\d{8,17}\b|password\s*(is|:)|\bssn\b|social security|routing number|account number|alarm code is|gate code is/i
 const OUT_OF_SCOPE = [
-  [/\b(sue|lawsuit|lawyer|attorney|legal advice|is it legal)\b/i, 'I can\'t give legal advice. I can share what the handbook says; for a legal question, please talk to a qualified attorney or contact HR.'],
-  [/\b(tax return|deduct on my taxes|how much tax|w-?4 allowances)\b/i, 'I can\'t give tax advice. For personal tax questions, please talk to a tax professional. Payroll can help with tax forms and withholding updates.'],
-  [/\b(diagnos|symptom|medication|dosage|treatment)\w*/i, 'I can\'t give medical advice. For health concerns, please see a medical professional. You never need to share a diagnosis with your manager.'],
-  [/\b(visa|green card|immigration|work permit)\b/i, 'I can\'t give immigration advice. Please contact HR or an immigration attorney.'],
+  [/\b(sue|lawsuit|lawyer|attorney|legal advice|is it legal)\b/i, 'I can\'t give legal advice. I can share what the manual says; legal questions go to Operations, which works with the company\'s attorney.'],
+  [/\b(diagnos|symptom|medication|dosage|treatment)\w*/i, 'I can\'t give medical advice. For health concerns, please see a medical professional.'],
 ]
-const TIME_SENSITIVE = /missing (pay|deposit|paycheck)|didn'?t get paid|not paid|no paycheck|deposit (is )?missing|died|passed away|funeral|bereave|deadline|open enrollment|last day/i
+const TIME_SENSITIVE = /emergency|urgent|right now|asap|leak|flood|no heat|locked out|lockout|lost (a |my )?key|break[- ]?in|stolen|deadline|tonight|after hours/i
 const SMALLTALK = /^\s*(hi|hello|hey|good (morning|afternoon|evening)|thanks|thank you|thx|ok|okay)\b[\s!.]*$/i
 
 /**
@@ -166,6 +140,7 @@ export function answer(message, context = '') {
     return { ...reply, kind: 'smalltalk', thanks: /thank|thx/i.test(text) }
   }
   if (DANGER.test(text)) reply.alerts.push('danger')
+  if (WATER.test(text)) reply.alerts.push('water')
   if (INJURY.test(text)) reply.alerts.push('injury')
   if (CONCERN.test(text)) reply.alerts.push('concern')
   if (FRAUD.test(text)) reply.alerts.push('fraud')
@@ -175,7 +150,7 @@ export function answer(message, context = '') {
   const top = hits[0]
   // need a reasonably strong match before we show a policy as "the answer"
   if (top && top.score >= 2.5 && top.coverage >= 0.45 && top.coverage < 0.6) reply.partial = true
-  if (!top || top.score < 2.5 || top.coverage < 0.45 || (reply.alerts.length && top.coverage < 0.6)) {
+  if (!top || top.score < 2.5 || top.coverage < 0.45) {
     if (reply.alerts.length) return { ...reply, kind: 'alertonly' }
     reply.kind = 'notfound'
     reply.suggestions = hits.slice(0, 3).filter((h) => h.score > 1.5 && h.d.q).map((h) => h.d.q)
@@ -192,26 +167,23 @@ export function answer(message, context = '') {
   }
   const best = reply.results[0]
   reply.contact = CONTACTS[sectionContact(best.section)]
-  reply.condolence = /died|passed away|funeral|death|lost my (mom|dad|mother|father|husband|wife|partner|son|daughter|brother|sister|grand)/i.test(text)
-  reply.timeSensitive = TIME_SENSITIVE.test(text) || Boolean(best.urgent)
+  reply.timeSensitive = TIME_SENSITIVE.test(text) || best.section === 3
   return reply
 }
 
-export const cite = (c) => c.doc !== DOC.title
-  ? `${c.doc} · p. ${c.page}`
-  : `${DOC.short}, ${DOC.version} · ${c.section >= 100 ? '' : `§${c.section} `}${c.sectionTitle} · p. ${c.page}`
+export const cite = (c) => `${DOC.short}, ${DOC.version} · §${c.ref} ${c.sectionTitle}`
 
 export const SUGGESTED = [
-  'How much PTO do I get?',
-  'My paycheck is missing',
-  'When is open enrollment?',
-  'How much bereavement leave is there?',
-  'Can I work from home?',
-  'How do I report harassment?',
+  'A resident is locked out',
+  'How do I submit a work order?',
+  'There\'s a water leak',
+  'How much can I approve for a repair?',
+  'When is rent late?',
+  'A tenant asked for an accommodation',
 ]
 
 // ---------- follow-up questions ----------
-// "what about part-time?", "is it paid?", "how do I request it?" only make sense with the previous question.
+// "what about part-time?", "is that an emergency?", "how much can I approve for it?" only make sense with the previous question.
 const EXPLICIT = /^(and|but|also|so|then|ok(ay)?,?|what about|how about|what if|what happens (after|next|then)|what('s| is) next|after that)\b/i
 const FOLLOW_START = /^(and|but|also|so|then|ok(ay)?,?|what about|how about|what if|what happens|what('s| is) next|after|is (that|it|there)|are (they|those|there)|does (that|it|this)|do (they|i|we)|can i|could i|should i|how (do|long|much|many|far|soon|often)|when|where|who|why|which|for)\b/i
 const PRONOUN = /\b(it|that|this|they|them|those|these|there|same|one)\b/i
@@ -224,7 +196,7 @@ export function answerInContext(message, prev) {
   const looksLikeFollowUp = n <= 5 && (FOLLOW_START.test(message.trim()) || PRONOUN.test(message))
   const weakAlone = alone.kind === 'notfound' || alone.partial
   if (!looksLikeFollowUp && !(weakAlone && n <= 5)) return alone
-  // a clear new question ("when is payday?") stands on its own
+  // a clear new question ("when is rent due?") stands on its own
   if (n >= 3 && alone.kind === 'answer' && !alone.partial && !PRONOUN.test(message) && !EXPLICIT.test(message.trim())) return alone
   const together = answer(message, prev.query)
   if (together.kind !== 'answer') return alone
