@@ -22,7 +22,7 @@
     org: 'Operations',
     goal: 65,
     minutesPerTicket: 12,
-    brand: '#1E6B52',
+    brand: '#1473E6',
     recipients: '',
     preparedBy: '',
     note: ''

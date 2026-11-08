@@ -1,7 +1,7 @@
 MONTHLY BOARD BRIEFING
 ======================
 
-Turns a month of chatbot questions into seven slides for your executive board,
+Turns a month of chatbot questions into eight slides for your executive board,
 ready to attach to an email. Nothing is installed and nothing leaves your computer.
 
 
@@ -25,21 +25,24 @@ THE MONTHLY ROUTINE  (about five minutes)
 Want to see it first? Click "Try it with sample data" (made-up questions).
 
 
-WHAT THE SEVEN SLIDES SAY
+WHAT THE EIGHT SLIDES SAY
 -------------------------
+Built to run a board meeting: a numbered tab on every slide that matches the agenda, a
+headline that states the takeaway, and a "For discussion" line at the bottom of each slide.
 1. Cover          One sentence that sums up the month.
-2. The number     The share of questions the bot answered, against your goal.
-3. The trend      Six months of answer rate, with manual updates marked.
-4. Why tickets    How many questions went to a person, and how many the manual could have answered.
-5. Next changes   The three best changes to the manual, and how many more questions each would answer.
-6. Return         Questions answered by your updates, fewer tickets, and staff hours saved.
-7. Next month     The target, the plan, and your note.
+2. Agenda         The six things the meeting covers.
+3. Where we stand The share of questions the bot answered, against your goal.
+4. The trend      Six months of answer rate, with manual updates marked.
+5. Why tickets    How many questions went to a person, and how many the manual could have answered.
+6. What to change The three best changes to the manual, and how many more questions each would answer.
+7. Return         Questions answered by your updates, fewer tickets, and staff hours saved.
+8. Decisions      The three decisions to close the meeting, the next target, and your note.
 
 Each slide has speaker notes that explain how the numbers were worked out.
 The PowerPoint is fully editable if you want to change a word or a color.
 
 
-THE HIDDEN APPENDIX  (after slide 7)
+THE HIDDEN APPENDIX  (after slide 8)
 ------------------------------------
 Hidden slides stay out of the slide show but travel inside the PowerPoint file, so you
 can open them if a board member asks "what are people actually asking?".

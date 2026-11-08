@@ -1,14 +1,14 @@
 :root {
-  --ink: #0b2545; --muted: #5b6678; --line: #e1e5ec; --paper: #ffffff; --bg: #f4f6f9;
-  --brand: #0f766e; --brand-ink: #0b5a54; --warn: #b45309; --bad: #b91c1c;
+  --ink: #22262b; --muted: #555d68; --line: #d9dde2; --paper: #ffffff; --bg: #f2f4f6;
+  --brand: #1473e6; --brand-ink: #0f5bb8; --warn: #b45309; --bad: #b91c1c;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 Arial, Helvetica, sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 Calibri, Carlito, 'Segoe UI', Helvetica, Arial, sans-serif; }
 .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
 .top { background: var(--ink); color: #fff; padding: 28px 0 26px; }
 .top h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.2; }
-.top p { margin: 0; color: #c9d2e3; max-width: 640px; }
+.top p { margin: 0; color: #c9cfd6; max-width: 640px; }
 main { padding-top: 20px; padding-bottom: 60px; }
 h2 { font-size: 18px; margin: 0 0 4px; }
 h3 { font-size: 15px; margin: 0 0 8px; }
@@ -21,7 +21,7 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 .step .body { flex: 1; min-width: 0; }
 
 .drop { position: relative; display: grid; place-items: center; min-height: 84px; border: 2px dashed #b8c1d1; border-radius: 10px; background: #fafbfd; color: var(--muted); text-align: center; padding: 10px; cursor: pointer; }
-.drop:hover, .drop.over, .drop:focus-within { border-color: var(--brand); background: #f1f8f7; color: var(--ink); }
+.drop:hover, .drop.over, .drop:focus-within { border-color: var(--brand); background: #eef5fe; color: var(--ink); }
 .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 .alt { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
 button.link { background: none; border: 0; padding: 0; font: inherit; color: var(--brand-ink); text-decoration: underline; cursor: pointer; }
@@ -34,7 +34,7 @@ button.link { background: none; border: 0; padding: 0; font: inherit; color: var
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 input[type=text], input[type=number], select, textarea { width: 100%; font: inherit; color: var(--ink); background: #fff; border: 1px solid #c4cbd8; border-radius: 8px; padding: 9px 10px; }
 input[type=color] { width: 56px; height: 40px; padding: 2px; border: 1px solid #c4cbd8; border-radius: 8px; background: #fff; }
-input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px solid #99d6cf; outline-offset: 1px; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px solid #9cc4f5; outline-offset: 1px; }
 .unit { display: flex; align-items: center; gap: 8px; }
 .unit input { max-width: 110px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 14px; margin-bottom: 12px; }

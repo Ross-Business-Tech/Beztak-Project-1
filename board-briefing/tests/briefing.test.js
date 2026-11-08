@@ -113,12 +113,12 @@ test('a manual update is credited with the questions answered after it was publi
   assert.equal(B.build(records(raws), '2026-09', {}).roi.count, 0);
 });
 
-test('every slide fits on the page; seven visible slides, then hidden appendix slides', () => {
+test('every slide fits on the page; eight visible slides, then hidden appendix slides', () => {
   const deck = S.build(B.build(fixture(), '2026-10', { org: 'Test Co', note: 'A short note.' }));
-  assert.equal(deck.visible, 7);
-  assert.equal(deck.slides.filter((s) => !s.hidden).length, 7);
-  assert.ok(deck.slides.length > 7, 'appendix slides exist');
-  deck.slides.forEach((s, i) => assert.equal(s.hidden, i >= 7, 'only the appendix is hidden (slide ' + (i + 1) + ')'));
+  assert.equal(deck.visible, 8);
+  assert.equal(deck.slides.filter((s) => !s.hidden).length, 8);
+  assert.ok(deck.slides.length > 8, 'appendix slides exist');
+  deck.slides.forEach((s, i) => assert.equal(s.hidden, i >= 8, 'only the appendix is hidden (slide ' + (i + 1) + ')'));
   deck.slides.forEach((s, i) => {
     s.items.forEach((it) => {
       if (it.t === 'table') {
@@ -145,6 +145,7 @@ test('appendix: a slide per category that needs work, and a working table for th
   const t = tables[0].items.find((it) => it.t === 'table');
   const headers = t.rows[0].map((c) => c.text);
   assert.deepEqual(headers, ['#', 'CHANGE', 'CONTEXT', 'DECISION', 'OWNER', 'DUE', 'STATUS']);
+  tables.forEach((sl) => sl.items.filter((it) => it.t === 'text').forEach((it) => assert.ok(!/@@|0 \/ 0/.test(it.text), 'no placeholder text left: ' + it.text)));
   assert.match(t.rows[1][3].text, /Action item[\s\S]*Dismiss/);
   assert.equal(t.rows[1][4].text, '', 'owner is left blank to fill in');
 });
@@ -155,7 +156,7 @@ test('slides still build with no fixes, no updates and a single month', () => {
   assert.equal(b.fixes.length, 0);
   assert.equal(b.roi.count, 0);
   const deck = S.build(b);
-  assert.equal(deck.slides.length, 7);
+  assert.equal(deck.slides.length, 8);
   assert.match(S.verdict(b), /100% of questions in October, above the 50% goal/);
 });
 

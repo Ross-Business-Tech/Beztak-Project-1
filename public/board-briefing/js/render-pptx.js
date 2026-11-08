@@ -37,10 +37,22 @@
             x: x, y: y, w: Math.abs(it.x2 - it.x1), h: Math.abs(it.y2 - it.y1), flipV: goesUp,
             line: { color: it.color, width: it.width, dashType: it.dash ? 'dash' : 'solid' }
           });
+        } else if (it.t === 'hex') {
+          slide.addShape(pres.ShapeType.hexagon, { x: it.x, y: it.y, w: it.w, h: it.h,
+            fill: it.fill ? { color: it.fill } : { color: 'FFFFFF', transparency: 100 }, line: it.line ? { color: it.line, width: it.lineWidth || 1 } : { type: 'none' } });
+        } else if (it.t === 'ring') {
+          // A grey track ring with a coloured arc over it, both drawn as thick outlines.
+          const inset = it.thick / 72 / 2;
+          const g = { x: it.x + inset, y: it.y + inset, w: it.w - 2 * inset, h: it.h - 2 * inset };
+          slide.addShape(pres.ShapeType.ellipse, Object.assign({}, g, { fill: { color: 'FFFFFF', transparency: 100 }, line: { color: it.track, width: it.thick } }));
+          if (it.pct > 0) {
+            const end = (270 + Math.min(it.pct, 99.9) * 3.6) % 360;
+            slide.addShape(pres.ShapeType.arc, Object.assign({}, g, { angleRange: [270, end], fill: { color: 'FFFFFF', transparency: 100 }, line: { color: it.color, width: it.thick } }));
+          }
         } else if (it.t === 'table') {
           const rows = it.rows.map(function (row) {
             return row.map(function (c) {
-              const o = { fontFace: c.font || 'Trebuchet MS', fontSize: c.size || 12, bold: !!c.bold, italic: !!c.italic, color: c.color || '1B2A24', align: c.align || 'left', valign: 'middle', fill: { color: c.fill || 'FFFFFF' }, border: c.border };
+              const o = { fontFace: c.font || 'Calibri', fontSize: c.size || 12, bold: !!c.bold, italic: !!c.italic, color: c.color || '1B2A24', align: c.align || 'left', valign: 'middle', fill: { color: c.fill || 'FFFFFF' }, border: c.border };
               if (c.runs) {
                 return { text: c.runs.map(function (r) {
                   return { text: r.text, options: { fontFace: r.font || o.fontFace, fontSize: r.size || o.fontSize, bold: r.bold != null ? r.bold : o.bold, italic: r.italic != null ? r.italic : o.italic, color: r.color || o.color, breakLine: !!r.br } };
