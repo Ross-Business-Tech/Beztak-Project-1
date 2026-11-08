@@ -100,11 +100,9 @@ select option{background:#111;color:#fff}
 .panel,.views,.stat,.modal{border-radius:6px}
 .panel-h h2,.panel h2{font-weight:600;font-size:17px}
 .avatar{border-radius:50%;background:#e4e7ec;color:#475467;font-weight:600}
-@media(prefers-color-scheme:dark){.avatar{background:#2a3340;color:#c5cdd8}}
 .badge{border-radius:4px;font-weight:500;padding:1px 7px}
 .badge.red{background:#fde8e6;color:#9b1c13}.badge.amber{background:#fdf0d5;color:#8a5200}.badge.violet{background:#e8ebf0;color:#344054}
 .st-Open{background:#e1ecf7;color:#1f4f82}.st-Inprogress{background:#fdf0d5;color:#8a5200}.st-Onhold{background:#eceef2;color:#475467}.st-Closed{background:#e3f1e6;color:#1e6a34}
-@media(prefers-color-scheme:dark){.badge.red{background:#4a1f1b;color:#f4b4ad}.badge.amber{background:#46350f;color:#f2cf8a}.badge.violet{background:#2a3340;color:#c5cdd8}.st-Open{background:#1d3550;color:#a9cdf0}.st-Inprogress{background:#46350f;color:#f2cf8a}.st-Onhold{background:#2a3340;color:#c5cdd8}.st-Closed{background:#18382300;color:#9bd3ab;background:#1a3a26}}
 .ai-box{background:var(--soft);border:1px solid var(--line);border-left:3px solid var(--prim);border-radius:4px}
 .ai-box b{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
 .adv{background:var(--soft);border:1px solid var(--line);border-radius:4px}
