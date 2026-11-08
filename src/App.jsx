@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { AGENTS, CANNED, SEED_DOCS, SEED_TICKETS } from './data'
-import { Canned, Compose, Dashboard, Documents, Setup } from './Pages'
+import { Canned, Compose, Dashboard, Documents, Profile, Setup } from './Pages'
 import { Detail, List } from './Tickets'
-import { agentName, canSee, dueIn } from './util'
+import { agentName, canSee, dueIn, initials } from './util'
 
 const store = (key, fallback) => {
   try { const v = JSON.parse(localStorage.getItem(key)); if (v) return v } catch { /* ignore */ }
@@ -22,11 +22,13 @@ export default function App() {
   const [canned, setCanned] = useState(() => store('hr-desk-canned-v1', CANNED))
   const [docs, setDocs] = useState(() => store('hr-desk-docs-v1', SEED_DOCS))
   const [me, setMe] = useState(() => store('hr-desk-me', 'dana'))
+  const [prefs, setPrefs] = useState(() => ({ theme: 'light', notify: true, ooo: false, ...store('hr-desk-prefs', {}) }))
   const [page, setPage] = useState('tickets')
   const [openId, setOpenId] = useState(null)
   const [composing, setComposing] = useState(false)
   const [toast, setToast] = useState('')
-  useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v4', JSON.stringify(tickets)); localStorage.setItem('hr-desk-canned-v1', JSON.stringify(canned)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v1', JSON.stringify(docs)) } catch { /* ignore */ } }, [tickets, canned, me, docs])
+  useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v4', JSON.stringify(tickets)); localStorage.setItem('hr-desk-canned-v1', JSON.stringify(canned)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v1', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)) } catch { /* ignore */ } }, [tickets, canned, me, docs, prefs])
+  useEffect(() => { document.documentElement.dataset.theme = prefs.theme }, [prefs.theme])
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 4500); return () => clearTimeout(id) }, [toast])
 
   const mine = tickets.filter((t) => canSee(t, me))
@@ -60,13 +62,14 @@ export default function App() {
   return (
     <div className="shell">
       <aside className="rail">
-        <div className="brand">HR</div>
+        <button className={`brand${page === 'profile' ? ' on' : ''}`} onClick={() => go('profile')} aria-label="My profile" title="My profile">{initials(agentName(me))}</button>
         {NAV.map(([k, d, label]) => (
           <button key={k} className={page === k ? 'on' : ''} onClick={() => go(k)} aria-label={label}><Ico d={d} /><small>{label}</small></button>
         ))}
       </aside>
       <div className="main">
         <header className="topbar">
+          <button className="profile-top" onClick={() => go('profile')} aria-label="My profile">{initials(agentName(me))}</button>
           <b className="title">HR <span className="hide-s">Service </span>Desk</b>
           <div className="row">
             <label className="me"><small>Signed in as</small>
@@ -82,6 +85,7 @@ export default function App() {
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
+          {page === 'profile' && <Profile me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
           {page === 'settings' && <Setup me={me} />}
         </div>
       </div>

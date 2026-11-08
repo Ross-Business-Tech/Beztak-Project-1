@@ -2,3 +2,5 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
+:root[data-theme="dark"]{--bg:#10151c;--card:#171e28;--ink:#e6eaf0;--mute:#98a2b3;--line:#2a3340;--brand:#5b92c8;--surface:#171e28;--soft:#1d2530;--prim:#3f78b3;--prim-d:#35669b;--rail:#0c1117}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--bg:#10151c;--card:#171e28;--ink:#e6eaf0;--mute:#98a2b3;--line:#2a3340;--brand:#5b92c8;--surface:#171e28;--soft:#1d2530;--prim:#3f78b3;--prim-d:#35669b;--rail:#0c1117}}
