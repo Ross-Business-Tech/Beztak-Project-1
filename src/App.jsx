@@ -1,193 +1,259 @@
 import { useEffect, useState } from 'react'
-import { AGENTS, HR_ADDRESS, SEED_TICKETS } from './data'
+import { AGENTS, HR_ADDRESS, KNOWLEDGE, SEED_TICKETS } from './data'
 import { ackText, topicLabel, triage } from './triage'
 
-const KEY = 'hr-helpdesk-tickets-v1'
+const KEY = 'hr-desk-tickets-v2'
 const load = () => {
   try { const v = JSON.parse(localStorage.getItem(KEY)); if (Array.isArray(v)) return v } catch { /* ignore */ }
   return SEED_TICKETS
 }
-const agentName = (id) => AGENTS.find((a) => a.id === id)?.name ?? 'Unassigned'
+const agent = (id) => AGENTS.find((a) => a.id === id)
+const agentName = (id) => agent(id)?.name ?? 'Unassigned'
+const initials = (n) => n.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 const ago = (iso) => {
   const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000))
   return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`
 }
+const STATUSES = ['Open', 'In progress', 'On hold', 'Closed']
+const PRIORITIES = ['Urgent', 'Normal']
+const DEPTS = Object.keys({ benefits: 1, payroll: 1, timeoff: 1, onboarding: 1, relations: 1, general: 1 })
+
+const NAV = [['tickets', '🎫', 'Tickets'], ['dashboard', '📊', 'Dashboard'], ['kb', '📚', 'Knowledge'], ['settings', '⚙️', 'Setup']]
 
 export default function App() {
   const [tickets, setTickets] = useState(load)
-  const [view, setView] = useState('customer')
+  const [page, setPage] = useState('tickets')
+  const [openId, setOpenId] = useState(null)
+  const [composing, setComposing] = useState(false)
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(tickets)) } catch { /* ignore */ } }, [tickets])
 
-  const add = (t) => setTickets((p) => [t, ...p])
   const update = (id, patch) => setTickets((p) => p.map((t) => (t.id === id ? { ...t, ...patch } : t)))
-  const reset = () => setTickets(SEED_TICKETS)
+  const addTicket = (t) => { setTickets((p) => [t, ...p]); setOpenId(t.id); setPage('tickets') }
+  const openCount = tickets.filter((t) => t.status !== 'Closed').length
 
   return (
-    <div className="app">
-      <header className="top">
-        <div className="logo">🎧 HR Desk <span>AI</span></div>
-        <nav>
-          <button className={view === 'customer' ? 'on' : ''} onClick={() => setView('customer')}>Send an email</button>
-          <button className={view === 'agent' ? 'on' : ''} onClick={() => setView('agent')}>
-            Agent desk{tickets.filter((t) => t.status === 'Open').length ? ` (${tickets.filter((t) => t.status === 'Open').length})` : ''}
+    <div className="shell">
+      <aside className="rail">
+        <div className="brand">HR</div>
+        {NAV.map(([k, icon, label]) => (
+          <button key={k} className={page === k ? 'on' : ''} onClick={() => { setPage(k); setOpenId(null) }} aria-label={label}>
+            <span>{icon}</span><small>{label}</small>
           </button>
-        </nav>
-      </header>
-      <main>
-        {view === 'customer'
-          ? <Customer tickets={tickets} add={add} goAgent={() => setView('agent')} />
-          : <Desk tickets={tickets} update={update} reset={reset} />}
-      </main>
+        ))}
+      </aside>
+      <div className="main">
+        <header className="topbar">
+          <b className="title">HR Desk <span className="ai-tag">AI</span></b>
+          <button className="btn primary" onClick={() => setComposing(true)}>＋ <span className="hide-s">Simulate incoming </span>email</button>
+        </header>
+        <div className="content">
+          {page === 'tickets' && (openId
+            ? <Detail ticket={tickets.find((t) => t.id === openId)} update={update} back={() => setOpenId(null)} />
+            : <List tickets={tickets} open={setOpenId} reset={() => setTickets(SEED_TICKETS)} />)}
+          {page === 'dashboard' && <Dashboard tickets={tickets} />}
+          {page === 'kb' && <Knowledge />}
+          {page === 'settings' && <Setup openCount={openCount} />}
+        </div>
+      </div>
+      {composing && <Compose tickets={tickets} onClose={() => setComposing(false)} onCreate={(t) => { addTicket(t); setComposing(false) }} />}
     </div>
   )
 }
 
-function Customer({ tickets, add, goAgent }) {
+const Prio = ({ urgent }) => <span className={`badge ${urgent ? 'red' : 'grey'}`}>{urgent ? '● Urgent' : 'Normal'}</span>
+const Status = ({ s }) => <span className={`badge st-${s.replace(' ', '')}`}>{s}</span>
+const Avatar = ({ name }) => <span className="avatar">{initials(name)}</span>
+
+function List({ tickets, open, reset }) {
+  const [view, setView] = useState('all')
+  const [q, setQ] = useState('')
+  const views = [
+    ['all', 'All tickets', tickets.length],
+    ['open', 'Open', tickets.filter((t) => t.status === 'Open').length],
+    ['urgent', 'Urgent', tickets.filter((t) => t.urgent && t.status !== 'Closed').length],
+    ['ai', 'Resolved by AI', tickets.filter((t) => t.resolvedByAI).length],
+    ['closed', 'Closed', tickets.filter((t) => t.status === 'Closed').length],
+    ...AGENTS.map((a) => [a.id, a.name, tickets.filter((t) => t.assignee === a.id && t.status !== 'Closed').length]),
+  ]
+  const match = (t) => view === 'all' ? true : view === 'open' ? t.status === 'Open' : view === 'urgent' ? t.urgent && t.status !== 'Closed' : view === 'ai' ? t.resolvedByAI : view === 'closed' ? t.status === 'Closed' : t.assignee === view
+  const text = q.trim().toLowerCase()
+  const rows = tickets.filter(match)
+    .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email}`.toLowerCase().includes(text))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const label = views.find((v) => v[0] === view)[1]
+
+  return (
+    <div className="split">
+      <nav className="views">
+        <div className="views-h">Views</div>
+        {views.slice(0, 5).map(([k, n, c]) => <button key={k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{c}</em></button>)}
+        <div className="views-h">Agents</div>
+        {views.slice(5).map(([k, n, c]) => <button key={k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{c}</em></button>)}
+        <button className="reset" onClick={reset}>Reset sample data</button>
+      </nav>
+      <section className="panel grow">
+        <div className="panel-h">
+          <h2>{label} <span className="count">{rows.length}</span></h2>
+          <input className="search" placeholder="Search tickets, people…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <div className="table">
+          <div className="tr th"><span>Ticket</span><span>Contact</span><span>Status</span><span>Priority</span><span>Owner</span><span>Created</span></div>
+          {rows.length === 0 && <p className="empty">No tickets in this view.</p>}
+          {rows.map((t) => (
+            <button key={t.id} className="tr" onClick={() => open(t.id)}>
+              <span className="subj"><b>{t.subject}</b><small>#{t.id} · {topicLabel(t.topic)}{t.resolvedByAI ? ' · 🤖 AI replied' : ''}</small></span>
+              <span className="contact"><Avatar name={t.customer} />{t.customer}</span>
+              <span><Status s={t.status} /></span>
+              <span><Prio urgent={t.urgent} /></span>
+              <span className="owner">{agentName(t.assignee)}</span>
+              <span className="when">{ago(t.createdAt)}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function Detail({ ticket: t, update, back }) {
+  const [text, setText] = useState('')
+  const [tab, setTab] = useState('reply')
+  if (!t) return <button className="btn" onClick={back}>← Back to tickets</button>
+  const thread = [{ from: t.customer, text: t.body, at: t.createdAt, inbound: true }, ...t.replies]
+
+  const send = (e) => {
+    e.preventDefault()
+    if (!text.trim()) return
+    const m = tab === 'note'
+      ? { from: agentName(t.assignee), text, at: new Date().toISOString(), note: true }
+      : { from: agentName(t.assignee), text, at: new Date().toISOString(), email: true }
+    update(t.id, { replies: [...t.replies, m], status: tab === 'reply' && t.status === 'Open' ? 'In progress' : t.status })
+    setText('')
+  }
+
+  return (
+    <div className="detail">
+      <div className="crumbs"><button className="link" onClick={back}>← All tickets</button> <span>#{t.id}</span></div>
+      <div className="detail-grid">
+        <section className="panel">
+          <div className="panel-h col">
+            <h2>{t.subject}</h2>
+            <div className="row"><Status s={t.status} /><Prio urgent={t.urgent} /><span className="badge grey">{topicLabel(t.topic)}</span>{t.resolvedByAI && <span className="badge violet">🤖 Resolved by AI</span>}</div>
+          </div>
+          <div className="ai-box"><b>🤖 AI agent</b><p>{t.note}</p></div>
+          <div className="thread">
+            {thread.map((m, i) => (
+              <article key={i} className={`msg ${m.inbound ? 'in' : m.note ? 'note' : 'out'}`}>
+                <Avatar name={m.from} />
+                <div>
+                  <div className="msg-h"><b>{m.from}</b>{m.inbound && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? '🔒 Private note' : m.inbound ? '✉️ Received by email' : m.ai ? '✉️ Sent by AI by email' : '✉️ Sent by email'} · {ago(m.at)}</small></div>
+                  <p>{m.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+          <form className="editor" onSubmit={send}>
+            <div className="tabs">
+              <button type="button" className={tab === 'reply' ? 'on' : ''} onClick={() => setTab('reply')}>Reply</button>
+              <button type="button" className={tab === 'note' ? 'on' : ''} onClick={() => setTab('note')}>Private note</button>
+            </div>
+            <textarea rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer} (sent by email)…` : 'Only your team can see this…'} />
+            <div className="row between">
+              <small className="mute">{tab === 'reply' ? `To: ${t.email}` : 'Not sent to the employee'}</small>
+              <button className="btn primary" type="submit">{tab === 'reply' ? 'Send' : 'Add note'}</button>
+            </div>
+          </form>
+        </section>
+
+        <aside className="panel props">
+          <h3>Ticket properties</h3>
+          <label>Status<select value={t.status} onChange={(e) => update(t.id, { status: e.target.value })}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select></label>
+          <label>Priority<select value={t.urgent ? 'Urgent' : 'Normal'} onChange={(e) => update(t.id, { urgent: e.target.value === 'Urgent' })}>{PRIORITIES.map((s) => <option key={s}>{s}</option>)}</select></label>
+          <label>Ticket owner<select value={t.assignee} onChange={(e) => update(t.id, { assignee: e.target.value })}>{AGENTS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+          <label>Department<select value={t.topic} onChange={(e) => update(t.id, { topic: e.target.value })}>{DEPTS.map((d) => <option key={d} value={d}>{topicLabel(d)}</option>)}</select></label>
+          <dl>
+            <dt>Contact</dt><dd>{t.customer}<br /><small>{t.email}</small></dd>
+            <dt>Channel</dt><dd>Email</dd>
+            <dt>Created</dt><dd>{ago(t.createdAt)}</dd>
+          </dl>
+        </aside>
+      </div>
+    </div>
+  )
+}
+
+function Compose({ tickets, onClose, onCreate }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
-  const [result, setResult] = useState(null)
   const examples = [
     ['How many vacation days do I get?', 'Hi, how many vacation days do I get per year?'],
     ['Missing overtime pay', 'I have not been paid for my overtime last week. Please fix this asap.'],
     ['Issue with my manager', 'My manager has been treating me unfairly and I would like to talk to someone confidentially.'],
   ]
-
   const submit = (e) => {
     e.preventDefault()
     const r = triage(subject, body)
-    const who = agentName(r.assignee)
-    const reply = r.resolved
-      ? { from: 'HR Assistant (AI)', text: r.answer, at: new Date().toISOString(), email: true }
-      : { from: 'HR Assistant (AI)', text: ackText(name, who, r.urgent, r.sensitive), at: new Date().toISOString(), email: true }
-    const t = {
-      id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body,
-      customer: name || 'Employee', email: email || 'employee@examplecompany.com',
-      status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent, topic: r.topic,
-      assignee: r.assignee, createdAt: new Date().toISOString(), by: 'AI', resolvedByAI: r.resolved,
-      note: r.note, replies: [reply],
-    }
-    add(t)
-    setResult({ ticket: t, reply, resolved: r.resolved })
+    const now = new Date().toISOString()
+    const text = r.resolved ? r.answer : ackText(name, agentName(r.assignee), r.urgent, r.sensitive)
+    onCreate({
+      id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body, customer: name || 'Employee',
+      email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,
+      topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note,
+      replies: [{ from: 'HR Assistant (AI)', text, at: now, email: true, ai: true }],
+    })
   }
-  const again = () => { setResult(null); setSubject(''); setBody('') }
-
-  if (result) {
-    const { ticket, reply, resolved } = result
-    return (
-      <section className="card narrow">
-        <h2>📤 Email sent to HR</h2>
-        <p className="mute">A ticket was created automatically (#{ticket.id}). Here is what the AI agent did:</p>
-        <div className="row">
-          <Pill urgent={ticket.urgent} /><span className="chip">{topicLabel(ticket.topic)}</span>
-          <span className="chip">{resolved ? 'Resolved by AI' : `Assigned to ${agentName(ticket.assignee)}`}</span>
-        </div>
-        <p className="ai-note">🤖 {ticket.note}</p>
-        <div className="mail">
-          <div className="mail-head"><b>From:</b> HR Assistant (AI) &lt;{HR_ADDRESS}&gt;<br /><b>To:</b> {ticket.email}<br /><b>Subject:</b> Re: {ticket.subject}</div>
-          <p>{reply.text}</p>
-        </div>
-        <button className="link" onClick={goAgent}>See it in the HR desk →</button>
-        <button className="primary" onClick={again}>Write another email</button>
-      </section>
-    )
-  }
-
   return (
-    <section className="card narrow">
-      <h2>✉️ Email HR</h2>
-      <p className="mute">This simulates an employee emailing {HR_ADDRESS}. Each email becomes a ticket. The AI replies by email if it can answer; otherwise it sends the ticket to the right HR person.</p>
-      <form onSubmit={submit}>
-        <label>Your name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex Kim" /></label>
-        <label>Your email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alex.kim@examplecompany.com" /></label>
+    <div className="overlay" onClick={onClose}>
+      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+        <h2>Simulate an incoming email</h2>
+        <p className="mute small">Stands in for a real email arriving at the HR inbox ({HR_ADDRESS}). The AI agent reads it, creates the ticket and replies when it can.</p>
+        <div className="row">{examples.map(([s, b]) => <button key={s} type="button" className="chip" onClick={() => { setSubject(s); setBody(b) }}>{s}</button>)}</div>
+        <label>From (name)<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Kim" /></label>
+        <label>From (email)<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alex.kim@examplecompany.com" /></label>
         <label>Subject<input required value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
-        <label>Message<textarea required rows={5} value={body} onChange={(e) => setBody(e.target.value)} /></label>
-        <button className="primary" type="submit">Send email</button>
+        <label>Message<textarea required rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></label>
+        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" type="submit">Create ticket</button></div>
       </form>
-      <p className="mute small">Try an example:</p>
-      <div className="row">
-        {examples.map(([s, b]) => <button key={s} className="chip btn" type="button" onClick={() => { setSubject(s); setBody(b) }}>{s}</button>)}
-      </div>
+    </div>
+  )
+}
+
+function Dashboard({ tickets }) {
+  const open = tickets.filter((t) => t.status !== 'Closed')
+  const ai = tickets.filter((t) => t.resolvedByAI).length
+  const byTopic = DEPTS.map((d) => [d, tickets.filter((t) => t.topic === d).length])
+  const max = Math.max(1, ...byTopic.map((x) => x[1]))
+  const stats = [['Open tickets', open.length], ['Urgent', open.filter((t) => t.urgent).length], ['Resolved by AI', ai], ['AI resolution rate', tickets.length ? `${Math.round((ai / tickets.length) * 100)}%` : '–']]
+  return (
+    <div className="dash">
+      <div className="stats">{stats.map(([k, v]) => <div key={k} className="stat"><small>{k}</small><b>{v}</b></div>)}</div>
+      <section className="panel pad"><h3>Tickets by department</h3>
+        {byTopic.map(([d, n]) => <div key={d} className="bar"><span>{topicLabel(d)}</span><i style={{ width: `${(n / max) * 100}%` }} /><em>{n}</em></div>)}
+      </section>
+      <section className="panel pad"><h3>Open tickets by owner</h3>
+        {AGENTS.map((a) => <div key={a.id} className="bar"><span>{a.name}</span><i style={{ width: `${(open.filter((t) => t.assignee === a.id).length / Math.max(1, open.length)) * 100}%` }} /><em>{open.filter((t) => t.assignee === a.id).length}</em></div>)}
+      </section>
+    </div>
+  )
+}
+
+function Knowledge() {
+  return (
+    <section className="panel pad"><h2>Knowledge base</h2>
+      <p className="mute">These are the answers the AI agent can send on its own. Anything else goes to a person.</p>
+      {KNOWLEDGE.map((k) => <div key={k.keys[0]} className="kb"><span className="badge grey">{topicLabel(k.topic)}</span><b>Triggers on: {k.keys.join(', ')}</b><p>{k.answer}</p></div>)}
     </section>
   )
 }
 
-const Pill = ({ urgent }) => <span className={`pill ${urgent ? 'urgent' : 'normal'}`}>{urgent ? '🔥 Urgent' : 'Normal'}</span>
-
-function Desk({ tickets, update, reset }) {
-  const [filter, setFilter] = useState('all')
-  const [who, setWho] = useState('all')
-  const [openId, setOpenId] = useState(null)
-  const [reply, setReply] = useState('')
-
-  const list = tickets
-    .filter((t) => (filter === 'all' ? true : filter === 'urgent' ? t.urgent && t.status !== 'Closed' : filter === 'ai' ? t.resolvedByAI : t.status === filter))
-    .filter((t) => who === 'all' || t.assignee === who)
-    .sort((a, b) => Number(b.urgent) - Number(a.urgent) || new Date(b.createdAt) - new Date(a.createdAt))
-  const sel = tickets.find((t) => t.id === openId)
-
-  const send = (e) => {
-    e.preventDefault()
-    if (!reply.trim()) return
-    update(sel.id, { status: sel.status === 'Open' ? 'In progress' : sel.status, replies: [...sel.replies, { from: agentName(sel.assignee), text: reply, at: new Date().toISOString(), email: true }] })
-    setReply('')
-  }
-
+function Setup({ openCount }) {
   return (
-    <div className="desk">
-      <section className={`card list ${sel ? 'hide-m' : ''}`}>
-        <div className="row between">
-          <h2>HR tickets</h2>
-          <button className="link" onClick={reset}>Reset sample data</button>
-        </div>
-        <div className="row">
-          {['all', 'urgent', 'Open', 'In progress', 'Closed', 'ai'].map((f) => (
-            <button key={f} className={`chip btn ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>{f === 'all' ? 'All' : f === 'urgent' ? '🔥 Urgent' : f === 'ai' ? '🤖 Resolved by AI' : f}</button>
-          ))}
-        </div>
-        <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Filter by agent">
-          <option value="all">All agents</option>
-          {AGENTS.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.skill}</option>)}
-        </select>
-        {list.length === 0 && <p className="mute">No tickets here.</p>}
-        {list.map((t) => (
-          <button key={t.id} className={`ticket ${t.id === openId ? 'sel' : ''}`} onClick={() => setOpenId(t.id)}>
-            <div className="row between"><b>#{t.id} {t.subject}</b><Pill urgent={t.urgent} /></div>
-            <div className="mute small">{t.customer} · {agentName(t.assignee)} · {t.status} · {ago(t.createdAt)}</div>
-          </button>
-        ))}
-      </section>
-
-      <section className={`card detail ${sel ? '' : 'hide-m'}`}>
-        {!sel ? <p className="mute">Pick a ticket to see it.</p> : (
-          <>
-            <button className="link back" onClick={() => setOpenId(null)}>← All tickets</button>
-            <h2>#{sel.id} {sel.subject}</h2>
-            <div className="row"><Pill urgent={sel.urgent} /><span className="chip">{topicLabel(sel.topic)}</span><span className="chip">{sel.status}</span></div>
-            <p className="ai-note">🤖 AI triage: {sel.note}</p>
-            <p className="msg"><b>{sel.customer}</b> &lt;{sel.email}&gt;<br />{sel.body}</p>
-            {sel.replies.map((r, i) => <p key={i} className="msg agent"><b>{r.from}</b> · {ago(r.at)}{r.email ? ' · ✉️ emailed to ' + sel.customer : ''}<br />{r.text}</p>)}
-            <div className="row">
-              <label className="inline">Assigned to
-                <select value={sel.assignee} onChange={(e) => update(sel.id, { assignee: e.target.value })}>
-                  {AGENTS.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.skill}</option>)}
-                </select>
-              </label>
-              <label className="inline">Status
-                <select value={sel.status} onChange={(e) => update(sel.id, { status: e.target.value })}>
-                  {['Open', 'In progress', 'Closed'].map((s) => <option key={s}>{s}</option>)}
-                </select>
-              </label>
-              <button className="chip btn" onClick={() => update(sel.id, { urgent: !sel.urgent })}>{sel.urgent ? 'Mark not urgent' : 'Mark urgent'}</button>
-            </div>
-            <form onSubmit={send}>
-              <textarea rows={3} placeholder="Write a reply (sent to the employee by email)…" value={reply} onChange={(e) => setReply(e.target.value)} />
-              <button className="primary" type="submit">Send reply</button>
-            </form>
-          </>
-        )}
-      </section>
-    </div>
+    <section className="panel pad"><h2>Email connection</h2>
+      <p><span className="badge red">Not connected</span></p>
+      <p>Right now tickets are created with the <b>Simulate incoming email</b> button. A real HR inbox (for example a Gmail test account) can't be read by the website itself: it needs a small helper that runs on Google's side and hands each new email to this app. That is a setup step for your instructor.</p>
+      <p className="mute small">{openCount} tickets are currently open. Sample data only.</p>
+    </section>
   )
 }
