@@ -1,122 +1,92 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react'
+import { AGENTS, CANNED, SEED_DOCS, SEED_TICKETS } from './data'
+import { Canned, Compose, Dashboard, Documents, Setup } from './Pages'
+import { Detail, List } from './Tickets'
+import { agentName, canSee, dueIn } from './util'
 
-function App() {
-  const [count, setCount] = useState(0)
+const store = (key, fallback) => {
+  try { const v = JSON.parse(localStorage.getItem(key)); if (v) return v } catch { /* ignore */ }
+  return fallback
+}
+const Ico = ({ d }) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
+const NAV = [
+  ['tickets', 'M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z', 'Tickets'],
+  ['dashboard', 'M4 20V10M10 20V4M16 20v-7M22 20H2', 'Reports'],
+  ['replies', 'M4 5h16v11H9l-5 4z', 'Replies'],
+  ['kb', 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7', 'Documents'],
+  ['settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z', 'Setup'],
+]
+
+export default function App() {
+  const [tickets, setTickets] = useState(() => store('hr-desk-tickets-v4', SEED_TICKETS))
+  const [canned, setCanned] = useState(() => store('hr-desk-canned-v1', CANNED))
+  const [docs, setDocs] = useState(() => store('hr-desk-docs-v1', SEED_DOCS))
+  const [me, setMe] = useState(() => store('hr-desk-me', 'dana'))
+  const [page, setPage] = useState('tickets')
+  const [openId, setOpenId] = useState(null)
+  const [composing, setComposing] = useState(false)
+  const [toast, setToast] = useState('')
+  useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v4', JSON.stringify(tickets)); localStorage.setItem('hr-desk-canned-v1', JSON.stringify(canned)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v1', JSON.stringify(docs)) } catch { /* ignore */ } }, [tickets, canned, me, docs])
+  useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 4500); return () => clearTimeout(id) }, [toast])
+
+  const mine = tickets.filter((t) => canSee(t, me))
+  const update = (id, patch) => setTickets((p) => p.map((t) => (t.id === id ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t)))
+  const event = (t, text) => ({ event: true, text, at: new Date().toISOString() })
+
+  const transfer = (t, to) => {
+    update(t.id, (x) => ({ assignee: to, replies: [...x.replies, event(x, `${agentName(me)} transferred this ticket to ${agentName(to)}`)] }))
+    setOpenId(null)
+    setToast(`Ticket #${t.id} transferred to ${agentName(to)}. It is now in their list.`)
+  }
+  const merge = (src, target) => {
+    setTickets((p) => p.map((t) => {
+      if (t.id === target.id) return { ...t, tags: [...new Set([...t.tags, ...src.tags])], replies: [...t.replies, event(t, `Ticket #${src.id} was merged into this ticket`), { inbound: true, from: src.customer, text: `(from #${src.id}: ${src.subject})\n${src.body}`, at: src.createdAt }, ...src.replies] }
+      if (t.id === src.id) return { ...t, status: 'Closed', mergedInto: target.id, replies: [...t.replies, event(t, `Merged into ticket #${target.id}`)] }
+      return t
+    }))
+    setOpenId(target.id)
+    setToast(`Ticket #${src.id} merged into #${target.id}.`)
+  }
+  const onCreate = (t) => {
+    const full = { ...t, tags: t.tags || [], advice: [], dueAt: dueIn(t.urgent) }
+    setTickets((p) => [full, ...p])
+    setComposing(false)
+    if (full.assignee === me) { setOpenId(full.id); setPage('tickets') }
+    else setToast(`Ticket #${full.id} was created and assigned to ${agentName(full.assignee)}. You only see your own tickets, so sign in as them to view it.`)
+  }
+  const go = (k) => { setPage(k); setOpenId(null) }
+  const switchUser = (id) => { setMe(id); setOpenId(null); setPage('tickets'); setToast(`Now signed in as ${agentName(id)} (demo).`) }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="shell">
+      <aside className="rail">
+        <div className="brand">HR</div>
+        {NAV.map(([k, d, label]) => (
+          <button key={k} className={page === k ? 'on' : ''} onClick={() => go(k)} aria-label={label}><Ico d={d} /><small>{label}</small></button>
+        ))}
+      </aside>
+      <div className="main">
+        <header className="topbar">
+          <b className="title">HR <span className="hide-s">Service </span>Desk</b>
+          <div className="row">
+            <label className="me"><small>Signed in as</small>
+              <select value={me} onChange={(e) => switchUser(e.target.value)}>{AGENTS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+            </label>
+            <button className="btn primary" onClick={() => setComposing(true)}>Simulate email</button>
+          </div>
+        </header>
+        <div className="content">
+          {page === 'tickets' && (openId
+            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
+            : <List tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
+          {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
+          {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
+          {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
+          {page === 'settings' && <Setup me={me} />}
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+      {composing && <Compose tickets={tickets} onClose={() => setComposing(false)} onCreate={onCreate} />}
+      {toast && <div className="toast" role="status" onClick={() => setToast('')}>{toast}</div>}
+    </div>
   )
 }
-
-export default App
