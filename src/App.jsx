@@ -70,7 +70,7 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <button className="profile-top" onClick={() => go('profile')} aria-label="My profile">{initials(agentName(me))}</button>
-          <b className="title">HR <span className="hide-s">Service </span>Desk</b>
+          <b className="title">Beztakets</b>
           <div className="row">
             <label className="me"><small>Signed in as</small>
               <select value={me} onChange={(e) => switchUser(e.target.value)}>{AGENTS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>

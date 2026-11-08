@@ -170,7 +170,7 @@ export function Profile({ me, tickets, prefs, setPrefs, switchUser, reset, toast
         </div>
         <dl className="kv">
           <dt>Email</dt><dd>{email}</dd>
-          <dt>Team</dt><dd>HR Service Desk</dd>
+          <dt>Team</dt><dd>Beztakets HR team</dd>
           <dt>Handles</dt><dd className="chips">{a.topics.map((t) => <span key={t} className="badge violet">{TOPIC_LABELS[t]}</span>)}</dd>
           <dt>Tickets</dt><dd>{open} open, {mineAll.length - open} closed</dd>
         </dl>
