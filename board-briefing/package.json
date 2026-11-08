@@ -1,0 +1,7 @@
+{
+  "name": "monthly-board-briefing",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "description": "Turns a month of chatbot questions into board slides. Opens in a browser with no install; tests run with node --test."
+}

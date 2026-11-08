@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monthly Board Briefing</title>
+<link rel="stylesheet" href="css/maker.css">
+</head>
+<body>
+<header class="top no-print">
+  <div class="wrap">
+    <h1>Monthly Board Briefing</h1>
+    <p>Turn a month of chatbot questions into seven slides for your executive board. Everything stays on this computer.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="steps no-print" aria-label="Set up this month's briefing">
+    <div class="step">
+      <span class="n">1</span>
+      <div class="body">
+        <h2>Add the questions file</h2>
+        <p class="hint">The CSV or JSON export of questions, with several months of history so the trend can be drawn.</p>
+        <div id="drop" class="drop" tabindex="0">
+          <input type="file" id="file" accept=".csv,.json,text/csv,application/json" aria-label="Choose the questions file">
+          <span><strong>Choose a file</strong> or drop it here</span>
+        </div>
+        <p class="alt">No file handy? <button type="button" class="link" id="sample">Try it with sample data</button></p>
+        <p id="status" class="status" role="status"></p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="n">2</span>
+      <div class="body">
+        <h2>Pick the month</h2>
+        <label class="field"><span class="sr">Month to report</span>
+          <select id="month" disabled><option>Add a file first</option></select></label>
+        <p class="hint" id="month-hint">The latest complete month is chosen for you.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="n">3</span>
+      <div class="body">
+        <h2>Make it yours <span class="opt">optional</span></h2>
+        <div class="grid">
+          <label class="field"><span>Company or team name</span><input id="org" type="text" maxlength="60" autocomplete="off"></label>
+          <label class="field"><span>Prepared by</span><input id="preparedBy" type="text" maxlength="60" placeholder="e.g. Operations Excellence team" autocomplete="off"></label>
+          <label class="field"><span>Goal: share answered by the bot</span><div class="unit"><input id="goal" type="number" min="1" max="100" step="1"><b>%</b></div></label>
+          <label class="field"><span>Minutes a person spends on a ticket</span><div class="unit"><input id="minutesPerTicket" type="number" min="1" max="600" step="1"><b>min</b></div></label>
+          <label class="field"><span>Accent color</span><input id="brand" type="color"></label>
+          <label class="field"><span>Board email addresses</span><input id="recipients" type="text" placeholder="name@company.com, name2@company.com" autocomplete="off"></label>
+        </div>
+        <label class="field wide"><span>A short note to the board (shown on the last slide and in the email)</span>
+          <textarea id="note" rows="3" maxlength="420" placeholder="One or two sentences in your own words. What went well, what you need."></textarea></label>
+      </div>
+    </div>
+  </section>
+
+  <div id="warnings" class="warnings no-print" hidden></div>
+
+  <section id="empty" class="empty no-print">
+    <h2>What the briefing covers</h2>
+    <ol>
+      <li><b>The number.</b> The share of questions the bot answered, against your goal.</li>
+      <li><b>The trend.</b> Six months, with the manual updates marked.</li>
+      <li><b>Why people were sent to a person.</b> What the manual can fix, and what is by design.</li>
+      <li><b>The three best next changes.</b> Ranked, with the extra questions each would answer.</li>
+      <li><b>Return on updates.</b> Questions answered, fewer tickets, and staff hours saved.</li>
+      <li><b>Next month.</b> The target, the plan, and your note.</li>
+    </ol>
+  </section>
+
+  <section id="result" hidden>
+    <div class="actions no-print" id="actions">
+      <button type="button" class="primary" id="dl-pptx">Download PowerPoint</button>
+      <button type="button" id="dl-pdf">Save as PDF</button>
+      <button type="button" id="dl-eml">Email draft with the deck attached</button>
+      <button type="button" id="copy-email">Copy email text</button>
+      <span id="action-msg" class="msg" role="status"></span>
+    </div>
+    <div id="email-box" class="email no-print" hidden>
+      <h3>Email text</h3>
+      <p class="subject"><b>Subject:</b> <span id="email-subject"></span></p>
+      <pre id="email-body"></pre>
+    </div>
+    <div id="slides" class="slides" aria-label="Slide preview"></div>
+  </section>
+</main>
+
+<script src="js/engine/data.js"></script>
+<script src="js/engine/analytics.js"></script>
+<script src="js/briefing.js"></script>
+<script src="js/slides.js"></script>
+<script src="js/render-html.js"></script>
+<script src="js/render-pptx.js"></script>
+<script src="js/email.js"></script>
+<script src="js/vendor/pptxgen.bundle.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

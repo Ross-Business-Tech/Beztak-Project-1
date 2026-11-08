@@ -1,0 +1,92 @@
+MONTHLY BOARD BRIEFING
+======================
+
+Turns a month of chatbot questions into seven slides for your executive board,
+ready to attach to an email. Nothing is installed and nothing leaves your computer.
+
+
+THE MONTHLY ROUTINE  (about five minutes)
+-----------------------------------------
+1. Double-click  index.html  in this folder. It opens in your web browser
+   (Chrome, Edge, Safari or Firefox). No internet connection is needed.
+2. Click "Choose a file" and pick this month's questions export (CSV or JSON).
+   The file should hold several months of history, so the trend can be drawn.
+   The latest complete month is chosen for you.
+3. Check the slides in the preview. Add your name, your goal, and a short note
+   to the board if you like. These are remembered for next month.
+4. Pick how to send it:
+     Download PowerPoint ................ the deck, to attach to any email
+     Email draft with the deck attached . a file that opens in Outlook or Apple Mail
+                                          with the board addresses filled in and
+                                          the deck already attached. Review, then send.
+     Save as PDF ........................ choose "Save as PDF" in the print window
+     Copy email text .................... the subject and message, to paste anywhere
+
+Want to see it first? Click "Try it with sample data" (made-up questions).
+
+
+WHAT THE SEVEN SLIDES SAY
+-------------------------
+1. Cover          One sentence that sums up the month.
+2. The number     The share of questions the bot answered, against your goal.
+3. The trend      Six months of answer rate, with manual updates marked.
+4. Why tickets    How many questions went to a person, and how many the manual could have answered.
+5. Next changes   The three best changes to the manual, and how many more questions each would answer.
+6. Return         Questions answered by your updates, fewer tickets, and staff hours saved.
+7. Next month     The target, the plan, and your note.
+
+Each slide has speaker notes that explain how the numbers were worked out.
+The PowerPoint is fully editable if you want to change a word or a color.
+
+
+THE QUESTIONS FILE
+------------------
+See sample/sample-questions.csv for the exact layout. One row per question.
+
+Required columns:
+  question_id         a unique ID
+  question_text       what the employee asked
+  submitted_at        date and time asked, e.g. 2026-10-14T09:30:00Z
+  resolution_status   Answered, Ticket Open or Ticket Closed
+
+Strongly recommended (the briefing is much richer with them):
+  escalation_reason   why it went to a person: no-match, unclear, policy or out-of-scope
+  theme               the topic the bot grouped the question under
+  manual_section      the manual section the bot used or cited
+  section_published_at  when that section was added to the manual (this is how
+                      "return on updates" is measured)
+  resolution_note     how the person resolved the ticket (becomes a starting point
+                      for new wording)
+  category            Safety & Compliance, Equipment & Maintenance, Quality & Audits,
+                      Shifts & Staffing, Procurement & Suppliers or Reporting & Records
+
+Rows that cannot be read are skipped, and the page tells you how many and why.
+
+
+HOW THE NUMBERS ARE WORKED OUT
+------------------------------
+Answer rate ........ questions answered from the manual / all questions asked that month.
+Fixable tickets .... tickets where the manual had nothing, or the section did not settle it.
+                     Tickets that go to a person by policy, or are outside the manual, are
+                     not counted as fixable.
+"More answered" .... each suggested change is assumed to let the bot answer the same share
+                     of repeat questions that your past updates did (a typical 80% if there
+                     is no history). It is an estimate, not a promise.
+Staff hours saved .. questions answered x minutes a person would have spent on a ticket
+                     (default 12, change it in step 3) / 60.
+
+
+PRIVACY
+-------
+The file you choose is read inside your browser and never uploaded. The page remembers only
+your settings (name, goal, note, addresses) on this computer. Avoid putting names or other
+personal details of employees into the questions file.
+
+
+FILES IN THIS FOLDER
+--------------------
+index.html ........ the page to open
+css/, js/ ......... the page's design and code (js/vendor holds the open-source PptxGenJS
+                    library, MIT licence, which writes the PowerPoint file)
+sample/ ........... made-up questions to try it with
+START-HERE.txt .... this guide
