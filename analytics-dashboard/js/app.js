@@ -1,5 +1,5 @@
 /*
- * App shell: storage, routing, the five pages and all user actions.
+ * App shell: storage, routing, the pages and all user actions.
  * Calculations live in analytics.js; parsing and validation live in data.js.
  */
 (function () {
@@ -14,11 +14,24 @@
   const COLORS = { answered: '#2e7d5b', open: '#d98a1b', closed: '#2f5d8c', total: '#1d2433' };
   const STATUS_CLASS = { 'Answered': 'answer', 'Ticket Open': 'ticket', 'Ticket Closed': 'closed' };
 
+  const REPORT_SECTIONS = [
+    { key: 'summary', label: 'Headline numbers', help: 'Totals and shares for Answered, Ticket Open and Ticket Closed.' },
+    { key: 'categories', label: 'Category performance', help: 'Volume and answer rate for each category.' },
+    { key: 'topTickets', label: 'Most ticketed questions', help: 'The questions that most often ended in a ticket.' },
+    { key: 'clarity', label: 'Manual clarity opportunities', help: 'Topics where the manual should be clearer, standardized or extended.' },
+    { key: 'trend', label: 'Weekly trend', help: 'How many questions came in each week, by status.' },
+    { key: 'records', label: 'Question list', help: 'Every question in the period (first 300).' }
+  ];
+
   const state = {
     range: { preset: '90d', from: '', to: '' },
     granularity: 'week',
-    ex: { q: '', status: '', category: '', from: '', to: '', sort: 'newest', page: 1, selected: null },
-    pendingImport: null
+    ex: { q: '', outcome: '', category: '', from: '', to: '', sort: 'newest', page: 1, selected: null },
+    pendingImport: null,
+    report: {
+      sections: { summary: true, categories: true, topTickets: true, clarity: true, trend: false, records: false },
+      html: ''
+    }
   };
   const charts = {};
   let store = null;
@@ -45,6 +58,7 @@
     return '<span class="badge ' + (STATUS_CLASS[status] || 'plain') + '">' + esc(status) + '</span>';
   }
   function nowIso() { return new Date().toISOString(); }
+  function isTicket(status) { return status === STATUS.OPEN || status === STATUS.CLOSED; }
 
   let toastTimer = null;
   function toast(msg, isError) {
@@ -146,9 +160,10 @@
   // Name of a suggested category, or '' when there is none.
   function suggestionLabel(r) {
     if (!r.suggested_category_id) return '';
-    const c = catMap().get(r.suggested_category_id);
+    const m = catMap();
+    const c = m.get(r.suggested_category_id);
     if (!c) return '';
-    const parent = c.parentId ? catMap().get(c.parentId) : null;
+    const parent = c.parentId ? m.get(c.parentId) : null;
     return (parent ? parent.name + ' › ' : '') + c.name;
   }
 
@@ -178,14 +193,80 @@
   const chartsMissingNotice =
     '<div class="notice warn">The chart library did not load (vendor/chart.umd.js is missing). Tables below still work.</div>';
 
-  // ---------- Overview ----------
-
   function kpi(label, value, sub, help, cls) {
     return '<div class="kpi ' + (cls || '') + '" title="' + esc(help) + '">' +
       '<div class="kpi-label">' + esc(label) + '</div>' +
       '<div class="kpi-value">' + value + '</div>' +
       '<div class="kpi-sub">' + sub + '</div></div>';
   }
+
+  // ---------- How to use ----------
+
+  function renderHelp() {
+    destroyCharts();
+    view().innerHTML =
+      '<div class="page-head"><h1>How to use this dashboard</h1>' +
+      '<p class="muted">Read this once, then follow the steps. Everything stays in this browser.</p></div>' +
+
+      '<section class="card"><h2>1. Start with the test data</h2>' +
+        '<p>The dashboard opens with about a year of made-up questions so you can explore every screen. ' +
+        'Your own data replaces it when you upload a file (step 2).</p></section>' +
+
+      '<section class="card"><h2>2. Upload a run</h2>' +
+        '<ol>' +
+          '<li>Open <strong>Data Management</strong>.</li>' +
+          '<li>Under <strong>Upload this run</strong>, choose the CSV file from the chatbot.</li>' +
+          '<li>Check the preview. It shows how many rows are ready, skipped or rejected, and why.</li>' +
+          '<li>Click <strong>Replace current data</strong>. Each run is its own dataset, so the numbers match the file.</li>' +
+        '</ol>' +
+        '<p class="muted small">The column names are listed on the <a href="#/integrations">Integrations</a> page. Each row needs a question ID, the question text, the time it was submitted and a status: Answered, Ticket Open or Ticket Closed.</p>' +
+      '</section>' +
+
+      '<section class="card"><h2>3. Read the Overview</h2>' +
+        '<p>Choose a reporting period at the top. The headline numbers, status mix, trend and category table all follow that period.</p>' +
+        '<ul>' +
+          '<li><strong>Answered</strong>: the chatbot answered the question.</li>' +
+          '<li><strong>Ticket Open</strong>: the chatbot could not answer, and the ticket is still open.</li>' +
+          '<li><strong>Ticket Closed</strong>: the chatbot could not answer, and a person has resolved the ticket.</li>' +
+        '</ul>' +
+        '<p class="muted small">"Needs a category" counts questions without a confirmed category. Accept the suggested one in Data Management.</p>' +
+      '</section>' +
+
+      '<section class="card"><h2>4. Search the Question Database</h2>' +
+        '<ul>' +
+          '<li>Type words in the search box to find a question, a response or an ID.</li>' +
+          '<li>Use <strong>Outcome</strong> to show only <em>Answered</em> or only <em>Sent to ticket</em>.</li>' +
+          '<li>Click a row to see its full record. You can add a resolution note and a flag, and accept a suggested category.</li>' +
+        '</ul></section>' +
+
+      '<section class="card"><h2>5. Find what to clarify in the manual</h2>' +
+        '<ul>' +
+          '<li><strong>Most ticketed questions</strong>: the questions that most often ended in a ticket. These are the best candidates for clearer answers.</li>' +
+          '<li><strong>Manual clarity opportunities</strong>: topics where agents flagged questions, resolved the same question differently, or where an answer was followed by a ticket.</li>' +
+          '<li>Click <strong>Accept</strong> on what you want to act on, then <strong>Download accepted list</strong> to share it.</li>' +
+        '</ul></section>' +
+
+      '<section class="card"><h2>6. Download a report</h2>' +
+        '<p>On the <strong>Report</strong> page, click the sections you want so they turn dark, then <strong>Build report</strong>. ' +
+        'Click <strong>Print or save as PDF</strong> and choose "Save as PDF" in the print dialog.</p></section>' +
+
+      '<section class="card"><h2>Words used in this dashboard</h2>' +
+        '<dl class="glossary">' +
+          '<dt>Suggested category</dt><dd>A category the chatbot or keyword rules propose. It stays a suggestion until someone accepts it.</dd>' +
+          '<dt>Resolution note</dt><dd>What the agent did to resolve a ticket.</dd>' +
+          '<dt>Flag</dt><dd>A short label an agent adds, such as "Standardize".</dd>' +
+          '<dt>Reporting period</dt><dd>Which questions count, based on when they were submitted.</dd>' +
+        '</dl></section>' +
+
+      '<section class="card"><h2>Troubleshooting</h2>' +
+        '<ul>' +
+          '<li><strong>The upload says a row was rejected:</strong> open the rejected rows list. Each one names the missing or invalid field.</li>' +
+          '<li><strong>I can\'t see my data on another computer:</strong> data is saved in one browser only. Download a backup from Data Management and open it there.</li>' +
+          '<li><strong>Charts are missing:</strong> the chart library did not load. The tables still work.</li>' +
+        '</ul></section>';
+  }
+
+  // ---------- Overview ----------
 
   function renderOverview() {
     destroyCharts();
@@ -200,7 +281,7 @@
     view().innerHTML =
       '<div class="page-head"><h1>Overview</h1>' +
       '<p class="muted">' + esc(range.label) + ' · ' + fmtNum(s.total) + ' questions</p></div>' +
-      (qs.length === 0 ? '<div class="notice">No questions in this period. Try a longer period, or load sample data in Data Management.</div>' : '') +
+      (qs.length === 0 ? '<div class="notice">No questions in this period. Try a longer period, or upload a run in Data Management.</div>' : '') +
       (chartsAvailable() ? '' : chartsMissingNotice) +
       '<section class="kpis">' +
         kpi('Total questions', fmtNum(s.total), 'Received in this period', 'Every question received in this period.', '') +
@@ -210,7 +291,7 @@
         kpi('Needs a category', fmtNum(uncatCount), 'Uncategorized or suggested only', 'Questions without a confirmed category. Accept or choose one in Data Management.', '') +
       '</section>' +
       '<div class="grid-2">' +
-        '<section class="card"><h2>Current status mix</h2>' +
+        '<section class="card"><h2>Status mix</h2>' +
           '<div class="chart-box donut"><canvas id="c-donut" aria-label="Status mix chart"></canvas></div>' +
           '<ul class="legend">' +
             legendItem(COLORS.answered, STATUS.ANSWERED, s.counts[STATUS.ANSWERED], s.pct.answered) +
@@ -310,14 +391,7 @@
     return '<button data-action="granularity" data-value="' + value + '" aria-pressed="' + on + '">' + label + '</button>';
   }
 
-  // ---------- Question Explorer ----------
-
-  function statusOptions(selected) {
-    const opts = [['', 'All statuses']].concat(D.ALL_STATUSES.map(function (s) { return [s, s]; }));
-    return opts.map(function (o) {
-      return '<option value="' + esc(o[0]) + '"' + (o[0] === selected ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
-    }).join('');
-  }
+  // ---------- Question Database ----------
 
   function filterCategoryOptions(selected) {
     let html = '<option value="">All categories</option>';
@@ -336,13 +410,16 @@
   function renderExplorer() {
     destroyCharts();
     const ex = state.ex;
+    const outcome = [['', 'All questions'], ['answered', 'Answered'], ['ticket', 'Sent to ticket']];
     view().innerHTML =
-      '<div class="page-head"><h1>Question Explorer</h1>' +
-      '<p class="muted">Search every stored question. These filters are separate from the reporting period in the top bar.</p></div>' +
+      '<div class="page-head"><h1>Question Database</h1>' +
+      '<p class="muted">Search every question in the loaded run. These filters are separate from the reporting period in the top bar.</p></div>' +
       '<section class="card filters" role="search">' +
         '<div class="field" style="flex:1 1 260px"><span>Search</span>' +
           '<input type="search" id="ex-q" placeholder="Words from a question, response or ID" value="' + esc(ex.q) + '"></div>' +
-        '<div class="field"><span>Status</span><select data-change="ex-filter" data-field="status">' + statusOptions(ex.status) + '</select></div>' +
+        '<div class="field"><span>Outcome</span><select data-change="ex-filter" data-field="outcome">' +
+          outcome.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === ex.outcome ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+        '</select></div>' +
         '<div class="field"><span>Category</span><select data-change="ex-filter" data-field="category">' + filterCategoryOptions(ex.category) + '</select></div>' +
         '<div class="field"><span>Submitted from</span><input type="date" data-change="ex-filter" data-field="from" value="' + esc(ex.from) + '"></div>' +
         '<div class="field"><span>to</span><input type="date" data-change="ex-filter" data-field="to" value="' + esc(ex.to) + '"></div>' +
@@ -365,7 +442,8 @@
     const toEnd = to ? A.localDay(to) : null;
     if (toEnd) toEnd.setDate(toEnd.getDate() + 1);
     const list = all().filter(function (r) {
-      if (ex.status && r.resolution_status !== ex.status) return false;
+      if (ex.outcome === 'answered' && r.resolution_status !== STATUS.ANSWERED) return false;
+      if (ex.outcome === 'ticket' && !isTicket(r.resolution_status)) return false;
       if (ex.category && r.category_id !== ex.category) return false;
       if (q) {
         const hay = (r.question_id + ' ' + r.question_text + ' ' + (r.response_text || '') + ' ' + (r.resolution_note || '')).toLowerCase();
@@ -487,112 +565,181 @@
       '<button data-action="decide" data-type="' + type + '" data-key="' + k + '" data-value="dismissed">Dismiss</button></div>';
   }
 
+  // All clarity opportunities in one list: standardize, add to manual, improve an answer.
+  function clarityItems(ms) {
+    const items = [];
+    ms.standardize.forEach(function (r) {
+      items.push({ type: 'standardize', typeLabel: 'Standardize', key: r.key, topic: r.topic, reason: r.reason, closed: r.closed,
+        details: r.notes.map(function (n) { return 'Note: ' + n; }).concat(r.examples.slice(0, 2).map(function (x) { return '“' + x + '”'; })) });
+    });
+    ms.addToManual.forEach(function (r) {
+      items.push({ type: 'manual', typeLabel: 'Add to manual', key: r.key, topic: r.topic, reason: r.reason, closed: r.closed,
+        details: r.examples.map(function (x) { return '“' + x + '”'; }) });
+    });
+    ms.improveAnswers.forEach(function (f) {
+      items.push({ type: 'improve', typeLabel: 'Clarify an answer', key: f.source, topic: f.source + ' (' + f.topic + ')',
+        reason: fmtNum(f.count) + ' follow-up ticket' + (f.count === 1 ? '' : 's') + ' after this answer', closed: f.count,
+        details: ['“' + f.example + '”'] });
+    });
+    return items;
+  }
+
   function renderGaps() {
     destroyCharts();
     const range = currentRange();
     const qs = A.filterRange(all(), range);
-    const g = A.gaps(qs, store.categories, { minSample: 5 });
+    const ticketed = qs.filter(function (q) { return isTicket(q.resolution_status); });
+    const s = A.summarize(qs);
+    const top = A.groupRepeats(ticketed, 1).slice(0, 25);
     const ms = A.manualSuggestions(qs, store.categories, { minTickets: 3, minFollowUps: 2 });
-    const uncat = qs.filter(function (q) { return q.category_id === UNCAT; });
-    const terms = A.suggestTerms(uncat, 14);
-
-    const rankList = function (list, key) {
-      if (!list.length) return '<p class="muted">Not enough questions yet. A category needs at least ' + g.minSample + ' questions.</p>';
-      return '<ol>' + list.map(function (c) {
-        return '<li style="margin-bottom:8px"><strong>' + esc(c.name) + '</strong> · ' + fmtPct(c[key]) +
-          ' <span class="muted small">(' + fmtNum(c.total) + ' questions)</span></li>';
-      }).join('') + '</ol>';
-    };
-
-    const suggestionTable = function (type, rows, columns, emptyText) {
-      if (!rows.length) return '<div class="empty">' + esc(emptyText) + '</div>';
-      return '<div class="table-wrap"><table><thead><tr><th>Topic</th><th>Why</th><th class="num">Closed tickets</th>' +
-        '<th>Examples and notes</th><th>Decision</th></tr></thead><tbody>' +
-        rows.map(function (r) {
-          const detail = (columns === 'manual')
-            ? r.examples.map(function (x) { return '<div>“' + esc(x) + '”</div>'; }).join('')
-            : (r.notes && r.notes.length ? r.notes.map(function (n) { return '<div>Note: ' + esc(n) + '</div>'; }).join('') : '') +
-              (r.examples && r.examples.length ? r.examples.slice(0, 2).map(function (x) { return '<div class="muted">“' + esc(x) + '”</div>'; }).join('') : '');
-          return '<tr><td><strong>' + esc(r.topic) + '</strong></td><td>' + esc(r.reason) + '</td>' +
-            '<td class="num">' + fmtNum(r.closed) + '</td><td class="small">' + detail + '</td>' +
-            '<td>' + decisionBadge(type, r.key) + '<div style="margin-top:6px">' + decisionButtons(type, r.key) + '</div></td></tr>';
-        }).join('') + '</tbody></table></div>';
-    };
-
-    const improveRows = ms.improveAnswers;
-    const improveHtml = improveRows.length === 0
-      ? '<div class="empty">No answer has been followed by a ticket in the same conversation more than once.</div>'
-      : '<div class="table-wrap"><table><thead><tr><th>Answer source</th><th>Topic</th><th class="num">Follow-up tickets</th><th>Example question</th><th>Decision</th></tr></thead><tbody>' +
-        improveRows.map(function (f) {
-          return '<tr><td><strong>' + esc(f.source) + '</strong></td><td>' + esc(f.topic) + '</td><td class="num">' + fmtNum(f.count) +
-            '</td><td class="small">“' + esc(f.example) + '”</td><td>' + decisionBadge('improve', f.source) + '<div style="margin-top:6px">' +
-            decisionButtons('improve', f.source) + '</div></td></tr>';
-        }).join('') + '</tbody></table></div>';
-
+    const clarity = clarityItems(ms);
     const acceptedCount = Object.keys(store.manual).filter(function (k) { return store.manual[k].state === 'accepted'; }).length;
 
     view().innerHTML =
       '<div class="page-head"><h1>Knowledge Gaps</h1>' +
-      '<p class="muted">' + esc(range.label) + ' · Questions the chatbot could not answer, and what to add or standardize.</p></div>' +
+      '<p class="muted">' + esc(range.label) + ' · Where the chatbot sends people to a ticket, and what to make clearer in the manual.</p></div>' +
       '<section class="kpis">' +
-        kpi('Ticketed questions', fmtNum(g.ticketedCount), fmtPct(g.ticketedPct) + ' of questions', 'Ticket Open plus Ticket Closed.', 'ticket') +
-        kpi('Ticket Open', fmtNum(g.open), 'Still waiting on a person', 'Tickets that are not yet resolved.', 'ticket') +
-        kpi('Ticket Closed', fmtNum(g.closed), 'Resolved by a person', 'Tickets that were resolved or closed. These drive manual suggestions.', 'closed') +
-        kpi('Repeated questions', fmtNum(g.repeats.length), 'Same wording, asked 2+ times', 'Groups of ticketed questions with the same wording.', '') +
-      '</section>' +
-      '<section class="card"><h2>Ticketed questions by category</h2>' +
-        '<div class="table-wrap"><table><thead><tr><th>Category</th><th class="num">Questions</th><th class="num">Ticketed</th>' +
-        '<th class="num">Ticket Open</th><th class="num">Ticket Closed</th><th class="num">Ticket rate</th></tr></thead><tbody>' +
-        g.byCategory.map(function (c) {
-          const small = c.total < g.minSample ? ' <span class="muted small">(small sample)</span>' : '';
-          return '<tr><td>' + esc(c.name) + '</td><td class="num">' + fmtNum(c.total) + '</td><td class="num">' + fmtNum(c.ticketed) +
-            '</td><td class="num">' + fmtNum(c.open) + '</td><td class="num">' + fmtNum(c.closed) + '</td><td class="num">' + fmtPct(c.ticketRate) + small + '</td></tr>';
-        }).join('') +
-        '</tbody></table></div></section>' +
-      '<div class="grid-2">' +
-        '<section class="card"><h2>Highest ticket rates</h2>' + rankList(g.highestTicketRate, 'ticketRate') + '</section>' +
-        '<section class="card"><h2>Possible new categories</h2>' +
-          '<p class="muted small">Frequent words in questions that are still uncategorized (' + fmtNum(uncat.length) + ').</p>' +
-          (terms.length ? '<div class="btn-row">' + terms.map(function (t) {
-            return '<span class="badge plain">' + esc(t.term) + ' · ' + fmtNum(t.count) + '</span>';
-          }).join('') + '</div>' : '<p class="muted">Nothing to suggest yet.</p>') +
-        '</section>' +
-      '</div>' +
-
-      '<section class="card"><div class="card-head"><h2>Manual suggestions</h2>' +
-        '<button data-action="export-decisions">Download accepted suggestions (CSV)</button></div>' +
-        '<p class="muted">Built from closed tickets: questions a person resolved. Accept what you want to add to the manual, then download the list for whoever maintains it. ' +
-        fmtNum(acceptedCount) + ' accepted so far.</p></section>' +
-
-      '<section class="card"><h2>Add to the manual</h2>' +
-        '<p class="muted small">Topics with several closed tickets where the chatbot rarely answers. Threshold: ' + ms.minTickets + ' closed tickets.</p>' +
-        suggestionTable('manual', ms.addToManual, 'manual', 'No topic has enough closed tickets with few chatbot answers yet.') +
+        kpi('Sent to ticket', fmtNum(ticketed.length), fmtPct(s.pct.ticketed) + ' of questions', 'Ticket Open plus Ticket Closed.', 'ticket') +
+        kpi('Ticket Open', fmtNum(s.counts[STATUS.OPEN]), 'Still waiting on a person', 'Tickets that are not yet resolved.', 'ticket') +
+        kpi('Ticket Closed', fmtNum(s.counts[STATUS.CLOSED]), 'Resolved by a person', 'Tickets that were resolved or closed.', 'closed') +
+        kpi('Clarity opportunities', fmtNum(clarity.length), fmtNum(acceptedCount) + ' accepted so far', 'Places in the manual that could be clearer.', '') +
       '</section>' +
 
-      '<section class="card"><h2>Standardize</h2>' +
-        '<p class="muted small">Topics where agents flagged questions, or wrote different resolution notes for the same kind of question.</p>' +
-        suggestionTable('standardize', ms.standardize, 'standardize', 'No standardization issues found. Flags and resolution notes appear here once they are imported.') +
-      '</section>' +
-
-      '<section class="card"><h2>Improve an answer</h2>' +
-        '<p class="muted small">Answers that were followed by a ticket later in the same conversation. The answer may not have resolved the question.</p>' +
-        improveHtml +
-      '</section>' +
-
-      '<section class="card"><h2>Most repeated ticketed questions</h2>' +
-        (g.repeats.length === 0
-          ? '<div class="empty">No ticketed question has been asked more than once in this period.</div>'
-          : '<div class="table-wrap"><table><thead><tr><th>Question</th><th class="num">Times asked</th><th class="num">Ticket Open</th>' +
-            '<th class="num">Ticket Closed</th><th>Category</th><th>Last asked</th><th></th></tr></thead><tbody>' +
-            g.repeats.slice(0, 20).map(function (x) {
+      '<section class="card"><h2>Most ticketed questions</h2>' +
+        '<p class="muted small">The questions that most often ended in a ticket, most frequent first.</p>' +
+        (top.length === 0
+          ? '<div class="empty">No questions were sent to a ticket in this period.</div>'
+          : '<div class="table-wrap"><table><thead><tr><th>Question</th><th class="num">Times asked</th>' +
+            '<th class="num">Ticket Open</th><th class="num">Ticket Closed</th><th>Category</th><th>Last asked</th><th></th></tr></thead><tbody>' +
+            top.map(function (x) {
               return '<tr><td class="q-cell">' + esc(x.sampleText) + '</td><td class="num">' + fmtNum(x.count) + '</td>' +
                 '<td class="num">' + fmtNum(x.open) + '</td><td class="num">' + fmtNum(x.closed) + '</td>' +
                 '<td>' + esc(catLabel(x.categoryId)) + '</td><td style="white-space:nowrap">' + esc(fmtDate(x.lastSeen)) + '</td>' +
-                '<td><button class="link" data-action="gap-search" data-text="' + esc(x.sampleText) + '">Open in explorer</button></td></tr>';
+                '<td><button class="link" data-action="gap-search" data-text="' + esc(x.sampleText) + '">Open in database</button></td></tr>';
             }).join('') +
             '</tbody></table></div>') +
-        '<p class="muted small">"Repeated" means the same wording after ignoring capitals, punctuation and a leading greeting.</p>' +
+      '</section>' +
+
+      '<section class="card"><div class="card-head"><h2>Opportunities to make the manual clearer</h2>' +
+        '<button data-action="export-decisions">Download accepted list (CSV)</button></div>' +
+        '<p class="muted small">Based on what agents resolved and flagged. Accept what you plan to act on, then download the list for whoever maintains the manual.</p>' +
+        (clarity.length === 0
+          ? '<div class="empty">No clarity opportunities yet. They appear here once tickets are closed, flagged or followed up.</div>'
+          : '<div class="table-wrap"><table><thead><tr><th>Opportunity</th><th>Topic</th><th>Why</th><th class="num">Tickets</th><th>Examples and notes</th><th>Decision</th></tr></thead><tbody>' +
+            clarity.map(function (c) {
+              return '<tr><td><strong>' + esc(c.typeLabel) + '</strong></td><td>' + esc(c.topic) + '</td><td>' + esc(c.reason) + '</td>' +
+                '<td class="num">' + fmtNum(c.closed) + '</td><td class="small">' +
+                c.details.map(function (d) { return '<div>' + esc(d) + '</div>'; }).join('') + '</td>' +
+                '<td>' + decisionBadge(c.type, c.key) + '<div style="margin-top:6px">' + decisionButtons(c.type, c.key) + '</div></td></tr>';
+            }).join('') + '</tbody></table></div>') +
       '</section>';
+  }
+
+  // ---------- Report ----------
+
+  function renderReport() {
+    destroyCharts();
+    const r = state.report;
+    const range = currentRange();
+    view().innerHTML =
+      '<div class="page-head"><h1>Report</h1>' +
+      '<p class="muted">Choose what to include, then build the report. Period: ' + esc(range.label) + ' (change it in the top bar).</p></div>' +
+      '<section class="card no-print"><h2>1. Choose what to include</h2>' +
+        '<div class="toggle-grid">' +
+        REPORT_SECTIONS.map(function (s) {
+          const on = !!r.sections[s.key];
+          return '<button class="toggle" data-action="report-toggle" data-value="' + s.key + '" aria-pressed="' + on + '">' +
+            '<strong>' + esc(s.label) + '</strong><span class="small">' + esc(s.help) + '</span></button>';
+        }).join('') +
+        '</div>' +
+        '<div class="btn-row" style="margin-top:14px">' +
+          '<button class="primary" data-action="report-build">Build report</button>' +
+          (r.html ? '<button data-action="report-print">Print or save as PDF</button>' : '') +
+        '</div></section>' +
+      (r.html ? '<section class="card report-doc" id="report-doc">' + r.html + '</section>'
+        : '<div class="empty no-print">Choose sections above, then click Build report.</div>');
+  }
+
+  function reportTable(headers, rows) {
+    return '<div class="table-wrap"><table><thead><tr>' + headers.map(function (h, i) {
+      return '<th' + (i > 0 && h.num ? ' class="num"' : '') + '>' + esc(h.label || h) + '</th>';
+    }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (row) {
+        return '<tr>' + row.map(function (c, i) {
+          const isNum = headers[i] && headers[i].num;
+          return '<td' + (isNum ? ' class="num"' : '') + '>' + c + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function buildReportHtml() {
+    const sel = state.report.sections;
+    const range = currentRange();
+    const qs = A.filterRange(all(), range);
+    const s = A.summarize(qs);
+    const parts = [];
+    parts.push('<h2>Question analytics report</h2>' +
+      '<p class="muted">Period: ' + esc(range.label) + ' · ' + fmtNum(s.total) + ' questions · Created ' + esc(fmtDate(nowIso())) + '</p>');
+
+    if (sel.summary) {
+      parts.push('<h3>Headline numbers</h3>' + reportTable(
+        [{ label: 'Measure' }, { label: 'Count', num: true }, { label: 'Share', num: true }],
+        [
+          ['Total questions', fmtNum(s.total), '100%'],
+          ['Answered', fmtNum(s.counts[STATUS.ANSWERED]), fmtPct(s.pct.answered)],
+          ['Ticket Open', fmtNum(s.counts[STATUS.OPEN]), fmtPct(s.pct.open)],
+          ['Ticket Closed', fmtNum(s.counts[STATUS.CLOSED]), fmtPct(s.pct.closed)],
+          ['Sent to ticket (open + closed)', fmtNum(s.ticketed), fmtPct(s.pct.ticketed)]
+        ]));
+    }
+    if (sel.categories) {
+      const cats = A.categoryStats(qs, store.categories).sort(function (a, b) { return b.total - a.total; });
+      parts.push('<h3>Category performance</h3>' + reportTable(
+        [{ label: 'Category' }, { label: 'Questions', num: true }, { label: 'Volume', num: true }, { label: 'Answered', num: true },
+          { label: 'Ticket Open', num: true }, { label: 'Ticket Closed', num: true }, { label: 'Answer rate', num: true }],
+        cats.map(function (c) {
+          return [esc(c.name), fmtNum(c.total), fmtPct(c.volumePct), fmtNum(c.answered), fmtNum(c.open), fmtNum(c.closed), fmtPct(c.answerRate)];
+        })));
+    }
+    if (sel.topTickets) {
+      const ticketed = qs.filter(function (q) { return isTicket(q.resolution_status); });
+      const top = A.groupRepeats(ticketed, 1).slice(0, 15);
+      parts.push('<h3>Most ticketed questions</h3>' + (top.length ? reportTable(
+        [{ label: 'Question' }, { label: 'Times asked', num: true }, { label: 'Open', num: true }, { label: 'Closed', num: true }, { label: 'Category' }],
+        top.map(function (x) {
+          return [esc(x.sampleText), fmtNum(x.count), fmtNum(x.open), fmtNum(x.closed), esc(catLabel(x.categoryId))];
+        })) : '<p class="muted">No questions were sent to a ticket in this period.</p>'));
+    }
+    if (sel.clarity) {
+      const ms = A.manualSuggestions(qs, store.categories, { minTickets: 3, minFollowUps: 2 });
+      const items = clarityItems(ms).slice(0, 20);
+      parts.push('<h3>Manual clarity opportunities</h3>' + (items.length ? reportTable(
+        [{ label: 'Opportunity' }, { label: 'Topic' }, { label: 'Why' }, { label: 'Decision' }],
+        items.map(function (c) {
+          const d = store.manual[decisionKey(c.type, c.key)];
+          const decision = d ? (d.state === 'accepted' ? 'Accepted' : 'Dismissed') : 'Open';
+          return [esc(c.typeLabel), esc(c.topic), esc(c.reason), decision];
+        })) : '<p class="muted">No clarity opportunities in this period.</p>'));
+    }
+    if (sel.trend) {
+      const rows = A.trend(qs, 'week');
+      parts.push('<h3>Weekly trend</h3>' + (rows.length ? reportTable(
+        [{ label: 'Week of' }, { label: 'Total', num: true }, { label: 'Answered', num: true }, { label: 'Ticket Open', num: true }, { label: 'Ticket Closed', num: true }],
+        rows.map(function (r) {
+          return [esc(r.label.replace(/^Week of /, '')), fmtNum(r.total), fmtNum(r.answered), fmtNum(r.open), fmtNum(r.closed)];
+        })) : '<p class="muted">No questions in this period.</p>'));
+    }
+    if (sel.records) {
+      const list = qs.slice().sort(function (a, b) { return a.submitted_at < b.submitted_at ? 1 : -1; }).slice(0, 300);
+      parts.push('<h3>Question list</h3>' + (list.length ? reportTable(
+        [{ label: 'Submitted' }, { label: 'Question' }, { label: 'Status' }, { label: 'Category' }],
+        list.map(function (r) {
+          return [esc(fmtDate(r.submitted_at)), esc(r.question_text), esc(r.resolution_status), esc(catLabel(r.category_id, r.subcategory_id))];
+        })) : '<p class="muted">No questions in this period.</p>') +
+        (qs.length > 300 ? '<p class="muted small">Showing the newest 300 of ' + fmtNum(qs.length) + ' questions.</p>' : ''));
+    }
+    if (parts.length === 1) parts.push('<p class="muted">No sections are selected.</p>');
+    return parts.join('');
   }
 
   // ---------- Data Management ----------
@@ -608,20 +755,22 @@
   function importPreview(p) {
     const r = p.result;
     const more = function (arr) { return arr.length > 25 ? 'Showing the first 25 of ' + fmtNum(arr.length) + '.' : ''; };
+    const current = Object.keys(store.questions).length;
     return '<div class="notice' + (r.rejected.length ? ' warn' : '') + '">' +
       '<strong>Preview of ' + esc(p.filename) + '</strong> (' + fmtNum(p.total) + ' rows)' +
-      '<ul><li><strong>' + fmtNum(r.accepted.length) + '</strong> ready to add</li>' +
-      '<li>' + fmtNum(r.duplicates.length) + ' skipped as duplicates</li>' +
+      '<ul><li><strong>' + fmtNum(r.accepted.length) + '</strong> ready to load</li>' +
+      '<li>' + fmtNum(r.duplicates.length) + ' skipped as duplicates within the file</li>' +
       '<li>' + fmtNum(r.rejected.length) + ' rejected (missing or invalid fields, including a missing status)</li>' +
-      '<li>' + fmtNum(r.warnings.length) + ' added with warnings</li></ul>' +
+      '<li>' + fmtNum(r.warnings.length) + ' loaded with warnings</li></ul>' +
       '<div class="btn-row" style="margin-top:10px">' +
-        (r.accepted.length ? '<button class="primary" data-action="import-commit">Add ' + fmtNum(r.accepted.length) + ' records</button>' : '') +
+        (r.accepted.length ? '<button class="primary" data-action="import-commit" data-value="replace">Replace current data (' + fmtNum(current) + ') with this file</button>' : '') +
+        (r.accepted.length && current ? '<button data-action="import-commit" data-value="add">Add these to current data instead</button>' : '') +
         '<button data-action="import-cancel">Cancel</button></div></div>' +
       (r.rejected.length ? issueTable('Rejected rows', ['Row', 'question_id', 'Problems'],
         r.rejected.slice(0, 25).map(function (x) { return [x.row, x.id || '—', x.errors.join('; ')]; }), more(r.rejected)) : '') +
       (r.duplicates.length ? issueTable('Skipped duplicates', ['Row', 'question_id', 'Matches'],
         r.duplicates.slice(0, 25).map(function (x) { return [x.row, x.id, x.where]; }), more(r.duplicates)) : '') +
-      (r.warnings.length ? issueTable('Added with warnings', ['Row', 'question_id', 'Notes'],
+      (r.warnings.length ? issueTable('Loaded with warnings', ['Row', 'question_id', 'Notes'],
         r.warnings.slice(0, 25).map(function (x) { return [x.row, x.id, x.messages.join('; ')]; }), more(r.warnings)) : '');
   }
 
@@ -655,21 +804,21 @@
 
     view().innerHTML =
       '<div class="page-head"><h1>Data Management</h1>' +
-      '<p class="muted">' + fmtNum(count) + ' questions are stored in this browser.</p></div>' +
+      '<p class="muted">' + fmtNum(count) + ' questions are loaded in this browser.</p></div>' +
 
-      '<section class="card"><h2>Sample data</h2>' +
-        '<p class="muted">Made-up questions for trying the dashboard. Currently stored: ' + fmtNum(sampleCount) + '.</p>' +
-        '<div class="btn-row">' +
-          '<button class="primary" data-action="load-sample">Load sample data</button>' +
-          '<button data-action="remove-sample"' + (sampleCount ? '' : ' disabled') + '>Remove sample data</button>' +
-        '</div></section>' +
-
-      '<section class="card"><h2>Import questions</h2>' +
-        '<p class="muted">Choose a CSV or JSON file. Every row is checked first, and nothing is added until you confirm. ' +
-        'Records whose question_id is already stored are skipped. <a href="#/integrations">See the expected columns</a>.</p>' +
+      '<section class="card"><h2>Upload this run</h2>' +
+        '<p class="muted">Choose the CSV exported for this run. Each row is checked first, and nothing changes until you confirm. ' +
+        'By default the file <strong>replaces</strong> the questions currently loaded. <a href="#/integrations">See the expected columns</a>.</p>' +
         '<input type="file" id="import-file" accept=".csv,.json,text/csv,application/json" data-change="import-file">' +
         '<div id="import-preview">' + (state.pendingImport ? importPreview(state.pendingImport) : '') + '</div>' +
       '</section>' +
+
+      '<section class="card"><h2>Sample data</h2>' +
+        '<p class="muted">Made-up questions for trying the dashboard. Currently loaded: ' + fmtNum(sampleCount) + '.</p>' +
+        '<div class="btn-row">' +
+          '<button data-action="load-sample">Add sample data</button>' +
+          '<button data-action="remove-sample"' + (sampleCount ? '' : ' disabled') + '>Remove sample data</button>' +
+        '</div></section>' +
 
       '<section class="card"><h2>Export</h2>' +
         '<div class="btn-row">' +
@@ -715,7 +864,7 @@
       '</section>' +
 
       '<section class="card"><h2>Activity</h2>' +
-        (activity.length === 0 ? '<p class="muted">No imports, deletions or sample loads yet.</p>' :
+        (activity.length === 0 ? '<p class="muted">No uploads, deletions or sample loads yet.</p>' :
           '<div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Details</th></tr></thead><tbody>' +
           activity.map(function (a) {
             return '<tr><td style="white-space:nowrap">' + esc(fmtDate(a.at)) + '</td><td>' + esc(a.type) + '</td><td>' + esc(a.text) + '</td></tr>';
@@ -731,7 +880,7 @@
 
   function renderIntegrations() {
     destroyCharts();
-    const last = store.activity.find(function (a) { return a.type === 'import' || a.type === 'sample'; });
+    const last = store.activity.find(function (a) { return a.type === 'import' || a.type === 'replace' || a.type === 'sample'; });
     const row = function (name, type, status, detail) {
       return '<tr><td>' + esc(name) + '</td><td>' + esc(type) + '</td><td>' + status + '</td><td>' + esc(detail) + '</td></tr>';
     };
@@ -743,13 +892,13 @@
       '<p class="muted">Simulated for now. This app does not connect to the chatbot, and no credentials are needed.</p></div>' +
       '<section class="card"><h2>Data sources</h2><div class="table-wrap"><table>' +
         '<thead><tr><th>Source</th><th>Type</th><th>Status</th><th>Last activity</th></tr></thead><tbody>' +
-        row('Sample data generator', 'Built in', active, 'Creates made-up questions') +
-        row('CSV and JSON file import', 'Manual', avail, last ? fmtDate(last.at) : 'No imports yet') +
-        row('Chatbot live connection', 'API or database', planned, 'Planned. Will replace file import as the source.') +
+        row('Sample data', 'Built in', active, 'Creates made-up questions') +
+        row('CSV or JSON upload (one per run)', 'Manual', avail, last ? fmtDate(last.at) : 'No uploads yet') +
+        row('Chatbot live connection', 'API or database', planned, 'Planned. Will replace file upload as the source.') +
         row('Webhook from chatbot', 'Push', planned, 'Planned') +
       '</tbody></table></div></section>' +
-      '<section class="card"><h2>Expected record format</h2>' +
-        '<p class="muted">Every source sends one row per question. Column names are case-insensitive and may use spaces or underscores.</p>' +
+      '<section class="card"><h2>Expected columns in an upload</h2>' +
+        '<p class="muted">One row per question. Column names are case-insensitive and may use spaces or underscores.</p>' +
         '<div class="table-wrap"><table><thead><tr><th>Field</th><th>Required</th><th>What it holds</th></tr></thead><tbody>' +
         [
           ['question_id', 'Yes', 'Unique ID for the question. Duplicates are skipped.'],
@@ -763,7 +912,7 @@
           ['ticket_id', 'If a ticket', 'Support ticket ID.'],
           ['ticket_status', 'No', 'Open, In Progress, Resolved or Closed. Resolved or Closed means Ticket Closed.'],
           ['resolution_timestamp', 'No', 'When the ticket was resolved.'],
-          ['resolution_note', 'No', 'What the agent did to resolve the ticket. Used for standardization.'],
+          ['resolution_note', 'No', 'What the agent did to resolve the ticket. Used for clarity opportunities.'],
           ['flag', 'No', 'Free-text flag from the agent, such as Standardize.'],
           ['category', 'No', 'Confirmed category name. Leave blank to have it suggested.'],
           ['subcategory', 'No', 'Confirmed subcategory name under the category.'],
@@ -777,9 +926,11 @@
   // ---------- routing ----------
 
   const PAGES = {
+    help: renderHelp,
     overview: renderOverview,
     explorer: renderExplorer,
     gaps: renderGaps,
+    report: renderReport,
     data: renderData,
     integrations: renderIntegrations
   };
@@ -789,7 +940,7 @@
     const page = PAGES[name] ? name : 'overview';
     if (page !== 'data') state.pendingImport = null;
     // The reporting period applies only to pages that report on trends and totals.
-    const usesPeriod = page === 'overview' || page === 'gaps';
+    const usesPeriod = page === 'overview' || page === 'gaps' || page === 'report';
     document.querySelector('.range').hidden = !usesPeriod;
     document.querySelectorAll('[data-nav]').forEach(function (a) {
       a.classList.toggle('active', a.dataset.nav === page);
@@ -824,11 +975,11 @@
     return all().sort(function (a, b) { return a.submitted_at < b.submitted_at ? -1 : 1; });
   }
 
-  // ---------- import and sample data ----------
+  // ---------- uploads and sample data ----------
 
-  function addRecords(result, filename, type) {
+  function addRecords(result, filename, type, replaced) {
     result.accepted.forEach(function (r) { store.questions[r.question_id] = r; });
-    logActivity(type, 'Added ' + fmtNum(result.accepted.length) + ' from ' + filename +
+    logActivity(type, (replaced ? 'Replaced data with ' : 'Added ') + fmtNum(result.accepted.length) + ' from ' + filename +
       (result.duplicates.length ? ', skipped ' + fmtNum(result.duplicates.length) + ' duplicates' : '') +
       (result.rejected.length ? ', rejected ' + fmtNum(result.rejected.length) : ''));
     return saveStore();
@@ -837,10 +988,10 @@
   function loadSample(silent) {
     const rows = D.generateSampleRows(1500, new Date());
     const result = D.prepareImport(rows, { categories: store.categories, now: new Date(), existingIds: new Set(Object.keys(store.questions)) });
-    addRecords(result, 'sample data', 'sample');
+    addRecords(result, 'sample data', 'sample', false);
     if (!silent) {
       toast('Sample data added: ' + fmtNum(result.accepted.length) + ' questions' +
-        (result.duplicates.length ? ' (' + fmtNum(result.duplicates.length) + ' already stored)' : '') + '.');
+        (result.duplicates.length ? ' (' + fmtNum(result.duplicates.length) + ' already loaded)' : '') + '.');
     }
   }
 
@@ -850,16 +1001,31 @@
       const parsed = isJson ? D.parseJSONImport(text) : D.parseCSV(text);
       if (parsed.error) { toast(parsed.error, true); return; }
       if (!parsed.records.length) { toast('No records were found in that file.', true); return; }
-      const result = D.prepareImport(parsed.records, {
-        categories: store.categories,
-        now: new Date(),
-        existingIds: new Set(Object.keys(store.questions))
-      });
-      state.pendingImport = { filename: file.name, total: parsed.records.length, result: result };
+      // Replacing the data means nothing already loaded counts as a duplicate.
+      const result = D.prepareImport(parsed.records, { categories: store.categories, now: new Date(), existingIds: new Set() });
+      state.pendingImport = { filename: file.name, total: parsed.records.length, records: parsed.records, result: result };
       renderData();
     }).catch(function () {
       toast('That file could not be read.', true);
     });
+  }
+
+  function commitImport(mode) {
+    const p = state.pendingImport;
+    if (!p) return;
+    const current = Object.keys(store.questions).length;
+    if (mode === 'replace') {
+      if (!confirm('Replace the ' + fmtNum(current) + ' questions now loaded with the ' + fmtNum(p.result.accepted.length) + ' in this file?')) return;
+      store.questions = {};
+    }
+    const existing = new Set(Object.keys(store.questions));
+    const result = D.prepareImport(p.records, { categories: store.categories, now: new Date(), existingIds: existing });
+    const n = result.accepted.length;
+    if (addRecords(result, p.filename, mode === 'replace' ? 'replace' : 'import', mode === 'replace')) {
+      toast((mode === 'replace' ? 'Replaced data. ' : 'Added ') + fmtNum(n) + ' questions.');
+    }
+    state.pendingImport = null;
+    renderData();
   }
 
   function acceptSuggestionFor(r) {
@@ -884,7 +1050,7 @@
       renderExResults();
     },
     'ex-clear': function () {
-      state.ex = { q: '', status: '', category: '', from: '', to: '', sort: 'newest', page: 1, selected: null };
+      state.ex = { q: '', outcome: '', category: '', from: '', to: '', sort: 'newest', page: 1, selected: null };
       renderExplorer();
     },
     'save-category': function (el) {
@@ -916,10 +1082,8 @@
     'save-notes': function (el) {
       const r = store.questions[el.dataset.id];
       if (!r) return;
-      const note = $('#d-note').value.trim().slice(0, 2000);
-      const flag = $('#d-flag').value.trim().slice(0, 100);
-      r.resolution_note = note;
-      r.flag = flag;
+      r.resolution_note = $('#d-note').value.trim().slice(0, 2000);
+      r.flag = $('#d-flag').value.trim().slice(0, 100);
       if (saveStore()) toast('Note and flag saved.');
       renderExResults();
       renderDetail();
@@ -936,12 +1100,12 @@
       toast('Record deleted.');
     },
     'gap-search': function (el) {
-      state.ex = { q: el.dataset.text, status: '', category: '', from: '', to: '', sort: 'newest', page: 1, selected: null };
+      state.ex = { q: el.dataset.text, outcome: '', category: '', from: '', to: '', sort: 'newest', page: 1, selected: null };
       go('explorer');
     },
 
     decide: function (el) {
-      const id = el.dataset.type + ':' + el.dataset.key;
+      const id = decisionKey(el.dataset.type, el.dataset.key);
       store.manual[id] = { state: el.dataset.value, at: nowIso(), type: el.dataset.type, key: el.dataset.key };
       saveStore();
       renderGaps();
@@ -949,12 +1113,24 @@
     'export-decisions': function () {
       const rows = Object.keys(store.manual).map(function (k) { return store.manual[k]; })
         .filter(function (d) { return d.state === 'accepted'; })
-        .map(function (d) {
-          return { type: d.type, topic_or_source: d.key, decided_at: d.at };
-        });
-      if (!rows.length) { toast('Accept at least one suggestion first.', true); return; }
-      download('manual-suggestions-' + stamp() + '.csv', D.toCSV(rows, ['type', 'topic_or_source', 'decided_at']), 'text/csv;charset=utf-8');
+        .map(function (d) { return { type: d.type, topic_or_source: d.key, decided_at: d.at }; });
+      if (!rows.length) { toast('Accept at least one item first.', true); return; }
+      download('clarity-opportunities-' + stamp() + '.csv', D.toCSV(rows, ['type', 'topic_or_source', 'decided_at']), 'text/csv;charset=utf-8');
     },
+
+    'report-toggle': function (el) {
+      const k = el.dataset.value;
+      state.report.sections[k] = !state.report.sections[k];
+      state.report.html = '';
+      renderReport();
+    },
+    'report-build': function () {
+      state.report.html = buildReportHtml();
+      renderReport();
+      const doc = document.getElementById('report-doc');
+      if (doc) doc.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    },
+    'report-print': function () { window.print(); },
 
     'load-sample': function () { loadSample(false); renderData(); },
     'remove-sample': function () {
@@ -967,14 +1143,7 @@
       toast('Sample data removed.');
       renderData();
     },
-    'import-commit': function () {
-      const p = state.pendingImport;
-      if (!p) return;
-      const n = p.result.accepted.length;
-      if (addRecords(p.result, p.filename, 'import')) toast('Added ' + fmtNum(n) + ' records.');
-      state.pendingImport = null;
-      renderData();
-    },
+    'import-commit': function (el) { commitImport(el.dataset.value === 'add' ? 'add' : 'replace'); },
     'import-cancel': function () { state.pendingImport = null; renderData(); },
 
     'export-csv': function () {
@@ -1158,7 +1327,8 @@
   store = loadStore();
   if (firstVisit) {
     loadSample(true);
-    toast('Sample data loaded so you can try the dashboard. Remove it in Data Management when you are ready.');
+    if (!location.hash) location.hash = '#/help';
+    toast('Sample data loaded. Read "How to use" first, then upload your run in Data Management.');
   }
   $('#range-preset').value = state.range.preset;
   syncCustomInputs();

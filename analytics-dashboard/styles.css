@@ -214,6 +214,40 @@ textarea { border: 1px solid #c6cdd9; border-radius: 6px; padding: 6px 8px; back
 .pre { white-space: pre-wrap; background: #f7f9fc; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
 .history { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
 
+/* ---------- help, report and toggles ---------- */
+.card ol, .card ul { padding-left: 20px; }
+.card li { margin-bottom: 4px; }
+.glossary dt { font-weight: 600; margin-top: 8px; }
+.glossary dd { margin: 0 0 4px; color: var(--muted); }
+
+.toggle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.toggle {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: #fff;
+}
+.toggle span { color: var(--muted); }
+.toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toggle[aria-pressed="true"] span { color: #dfe9f5; }
+
+.report-doc h2 { font-size: 20px; margin-top: 0; }
+.report-doc h3 { margin-top: 22px; }
+
+/* ---------- print: only the report ---------- */
+@media print {
+  body { display: block; background: #fff; }
+  .sidebar, .topbar, .no-print, .toast, .btn-row, .range { display: none !important; }
+  .main, .view { padding: 0; max-width: none; }
+  .card { border: none; box-shadow: none; padding: 0; margin: 0 0 12px; }
+  .report-doc th, .report-doc td { font-size: 11px; padding: 5px 6px; }
+  .report-doc table { page-break-inside: auto; }
+  .report-doc tr { page-break-inside: avoid; }
+  h3 { page-break-after: avoid; }
+}
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed;

@@ -310,3 +310,9 @@ test('answered and ticketed records never overlap', () => {
   const ticketed = qs.filter(q => A.summarize([q]).ticketed === 1).map(q => q.question_id);
   assert.equal(answered.filter(id => ticketed.includes(id)).length, 0);
 });
+
+test('most ticketed questions include questions asked only once when the minimum is 1', () => {
+  const qs = dataset().filter(q => A.summarize([q]).ticketed === 1);
+  assert.equal(A.groupRepeats(qs, 1).length, qs.length);
+  assert.equal(A.groupRepeats(qs).length, 0);
+});

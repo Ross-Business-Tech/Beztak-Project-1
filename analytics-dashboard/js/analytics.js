@@ -215,7 +215,8 @@
   // ---------- knowledge gaps ----------
 
   /** Ticketed questions with the same normalized text (the same question asked more than once). */
-  function groupRepeats(list) {
+  function groupRepeats(list, minCount) {
+    const min = minCount == null ? 2 : minCount;
     const groups = new Map();
     list.forEach(function (q) {
       const key = q.normalized_text;
@@ -231,7 +232,7 @@
       g.catCounts.set(q.category_id, (g.catCounts.get(q.category_id) || 0) + 1);
     });
     return Array.from(groups.values())
-      .filter(function (g) { return g.count >= 2; })
+      .filter(function (g) { return g.count >= min; })
       .map(function (g) {
         let best = null;
         let bestN = -1;
