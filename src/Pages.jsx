@@ -25,14 +25,14 @@ export function Compose({ tickets, onClose, onCreate }) {
       email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,
       topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note,
       tags: [...(r.resolved ? ['ai-resolved'] : []), ...(r.sensitive ? ['sensitive'] : [])],
-      replies: [{ from: 'HR Assistant (AI)', text, at: now, email: true, ai: true }],
+      replies: [{ from: 'HR Assistant (automated)', text, at: now, email: true, ai: true }],
     })
   }
   return (
     <div className="overlay" onClick={onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2>Simulate an incoming email</h2>
-        <p className="mute small">Stands in for a real email arriving at the HR inbox ({HR_ADDRESS}). The AI agent reads it, creates the ticket, replies when it can, and assigns it to the right person.</p>
+        <p className="mute small">Stands in for a real email arriving at the HR inbox ({HR_ADDRESS}). The automated assistant reads it, creates the ticket, replies when it can, and assigns it to the right person.</p>
         <div className="row">{examples.map(([s, b]) => <button key={s} type="button" className="chip" onClick={() => { setSubject(s); setBody(b) }}>{s}</button>)}</div>
         <label>From (name)<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Kim" /></label>
         <label>From (email)<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alex.kim@examplecompany.com" /></label>
@@ -51,7 +51,7 @@ export function Dashboard({ tickets, me }) {
   const overdue = open.filter((t) => dueInfo(t)?.cls === 'red').length
   const byTopic = DEPTS.map((d) => [d, owned.filter((t) => t.topic === d).length])
   const max = Math.max(1, ...byTopic.map((x) => x[1]))
-  const stats = [['My open tickets', open.length], ['Urgent', open.filter((t) => t.urgent).length], ['Overdue', overdue], ['Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length).length], ['Resolved by AI', ai], ['Closed', owned.filter((t) => t.status === 'Closed').length]]
+  const stats = [['My open tickets', open.length], ['Urgent', open.filter((t) => t.urgent).length], ['Overdue', overdue], ['Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length).length], ['Resolved automatically', ai], ['Closed', owned.filter((t) => t.status === 'Closed').length]]
   return (
     <div className="dash">
       <p className="mute">Showing only {agentName(me)}'s tickets.</p>
@@ -63,12 +63,44 @@ export function Dashboard({ tickets, me }) {
   )
 }
 
-export function Knowledge() {
+export function Documents({ docs, setDocs }) {
+  const [msg, setMsg] = useState('')
+  const [viewing, setViewing] = useState(null)
+  const upload = (e) => {
+    const files = [...e.target.files]
+    e.target.value = ''
+    files.forEach((f) => {
+      if (!/\.(txt|md|csv)$/i.test(f.name)) { setMsg(`"${f.name}" was not added. For now only .txt, .md and .csv files can be read here. PDF and Word files need the full connection.`); return }
+      if (f.size > 200000) { setMsg(`"${f.name}" is too large (limit 200 KB).`); return }
+      const r = new FileReader()
+      r.onload = () => { setDocs((p) => [{ id: Date.now() + Math.random(), name: f.name, size: f.size, addedAt: new Date().toISOString(), source: 'Uploaded', text: String(r.result) }, ...p]); setMsg(`Added "${f.name}".`) }
+      r.readAsText(f)
+    })
+  }
+  const open = docs.find((d) => d.id === viewing)
   return (
-    <section className="panel pad"><h2>Knowledge base</h2>
-      <p className="mute">These are the answers the AI agent can send on its own. Anything else goes to a person.</p>
-      {KNOWLEDGE.map((k) => <div key={k.keys[0]} className="kb"><span className="badge grey">{topicLabel(k.topic)}</span><b>Triggers on: {k.keys.join(', ')}</b><p>{k.answer}</p></div>)}
-    </section>
+    <>
+      <section className="panel pad"><div className="row between"><h2>Documents</h2>
+        <label className="btn primary upload">Upload document<input type="file" multiple accept=".txt,.md,.csv" onChange={upload} hidden /></label></div>
+        <p className="mute">Policy documents the HR team keeps for reference. Use sample text only.</p>
+        {msg && <p className="note-line">{msg}</p>}
+        <div className="table docs">
+          <div className="tr th"><span>Name</span><span>Source</span><span>Added</span><span>Size</span><span /></div>
+          {docs.length === 0 && <p className="empty">No documents yet.</p>}
+          {docs.map((d) => (
+            <div key={d.id} className="tr"><button className="linkish" onClick={() => setViewing(d.id)}>{d.name}</button><span>{d.source}</span><span>{new Date(d.addedAt).toLocaleDateString()}</span><span>{Math.max(1, Math.round(d.size / 1024))} KB</span><button className="link" onClick={() => { setDocs(docs.filter((x) => x.id !== d.id)); if (viewing === d.id) setViewing(null) }}>Delete</button></div>
+          ))}
+        </div>
+        {open && <div className="docview"><div className="row between"><b>{open.name}</b><button className="link" onClick={() => setViewing(null)}>Close</button></div><pre>{open.text}</pre></div>}
+      </section>
+      <section className="panel pad"><h3>Egnyte</h3>
+        <p><span className="badge red">Not connected</span></p>
+        <p className="mute">Documents stored in Egnyte will be listed here once the connection is set up. Until then the assistant does not read uploaded documents: its replies come from the fixed answers below.</p>
+      </section>
+      <section className="panel pad"><h3>Fixed answers used for automatic replies</h3>
+        {KNOWLEDGE.map((k) => <div key={k.keys[0]} className="kb"><span className="badge grey">{topicLabel(k.topic)}</span><b>Triggers on: {k.keys.join(', ')}</b><p>{k.answer}</p></div>)}
+      </section>
+    </>
   )
 }
 

@@ -6,10 +6,10 @@ import { agentName, ago, dueInfo, fill, initials, pendingAdviceFor, toLocalInput
 const STATUSES = ['Open', 'In progress', 'On hold', 'Closed']
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
 
-export const Prio = ({ urgent }) => <span className={`badge ${urgent ? 'red' : 'grey'}`}>{urgent ? '● Urgent' : 'Normal'}</span>
+export const Prio = ({ urgent }) => <span className={`badge ${urgent ? 'red' : 'grey'}`}>{urgent ? 'Urgent' : 'Normal'}</span>
 export const Status = ({ s }) => <span className={`badge st-${s.replace(' ', '')}`}>{s}</span>
 export const Avatar = ({ name }) => <span className="avatar">{initials(name)}</span>
-const Due = ({ t }) => { const d = dueInfo(t); return d ? <span className={`badge ${d.cls}`}>⏱ {d.text}</span> : <span className="mute">–</span> }
+const Due = ({ t }) => { const d = dueInfo(t); return d ? <span className={`badge ${d.cls}`}>{d.text}</span> : <span className="mute">–</span> }
 
 export function List({ tickets, me, open, reset }) {
   const [view, setView] = useState('mine')
@@ -22,7 +22,7 @@ export function List({ tickets, me, open, reset }) {
     ['advice', 'Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length)],
     ['due', 'Due soon / overdue', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls))],
     ['urgent', 'Urgent', owned.filter((t) => live(t) && t.urgent)],
-    ['ai', 'Resolved by AI', owned.filter((t) => t.resolvedByAI)],
+    ['ai', 'Resolved automatically', owned.filter((t) => t.resolvedByAI)],
     ['closed', 'Closed', owned.filter((t) => !live(t))],
     ['all', 'All my tickets', tickets],
   ]
@@ -56,7 +56,7 @@ export function List({ tickets, me, open, reset }) {
             return (
               <button key={t.id} className="tr" onClick={() => open(t.id)}>
                 <span className="subj"><b>{t.subject}</b>
-                  <small>#{t.id} · {topicLabel(t.topic)}{t.resolvedByAI ? ' · 🤖 AI replied' : ''}{adv ? ' · 💡 advice requested' : ''}{(t.tags || []).map((g) => ` #${g}`).join('')}</small></span>
+                  <small>#{t.id} · {topicLabel(t.topic)}{t.resolvedByAI ? ' · Auto-replied' : ''}{adv ? ' · Advice requested' : ''}{(t.tags || []).map((g) => ` #${g}`).join('')}</small></span>
                 <span className="contact"><Avatar name={t.customer} />{t.customer}</span>
                 <span><Status s={t.status} /></span>
                 <span><Prio urgent={t.urgent} /></span>
@@ -123,9 +123,9 @@ export function Detail({ ticket: t, all, me, canned, update, transfer, merge, to
         <section className="panel">
           <div className="panel-h col">
             <h2>{t.subject}</h2>
-            <div className="row"><Status s={t.status} /><Prio urgent={t.urgent} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">🤖 Resolved by AI</span>}</div>
+            <div className="row"><Status s={t.status} /><Prio urgent={t.urgent} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">Resolved automatically</span>}</div>
           </div>
-          <div className="ai-box"><b>🤖 AI agent</b><p>{t.note}</p></div>
+          <div className="ai-box"><b>Automated triage</b><p>{t.note}</p></div>
           <div className="thread">
             {thread.map((m, i) => m.event
               ? <div key={i} className="event">{m.text} · {ago(m.at)}</div>
@@ -133,7 +133,7 @@ export function Detail({ ticket: t, all, me, canned, update, transfer, merge, to
                 <article key={i} className={`msg ${m.inbound ? 'in' : m.note ? 'note' : 'out'}`}>
                   <Avatar name={m.from} />
                   <div>
-                    <div className="msg-h"><b>{m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? '🔒 Private note' : m.inbound ? '✉️ Received by email' : m.ai ? '✉️ Sent by AI by email' : '✉️ Sent by email'} · {ago(m.at)}</small></div>
+                    <div className="msg-h"><b>{m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? 'Received by email' : m.ai ? 'Sent automatically by email' : 'Sent by email'} · {ago(m.at)}</small></div>
                     <p>{m.text}</p>
                   </div>
                 </article>
@@ -142,7 +142,7 @@ export function Detail({ ticket: t, all, me, canned, update, transfer, merge, to
 
           {t.advice.length > 0 && (
             <div className="advice">
-              <h3>🤝 Team advice</h3>
+              <h3>Team advice</h3>
               {t.advice.map((a) => (
                 <div key={a.id} className="adv">
                   <div><b>{agentName(a.from)}</b> asked <b>{a.to === me ? 'you' : agentName(a.to)}</b> · {ago(a.at)}</div>
@@ -151,7 +151,7 @@ export function Detail({ ticket: t, all, me, canned, update, transfer, merge, to
                     ? <p className="a"><b>{agentName(a.to)}:</b> {a.answer}</p>
                     : a.to === me
                       ? <div className="row grow"><textarea rows={2} placeholder="Your advice…" value={answers[a.id] || ''} onChange={(e) => setAnswers({ ...answers, [a.id]: e.target.value })} /><button className="btn primary" onClick={() => answer(a)}>Send advice</button></div>
-                      : <small className="mute">⏳ Waiting for {agentName(a.to)}</small>}
+                      : <small className="mute">Waiting for {agentName(a.to)}</small>}
                 </div>
               ))}
             </div>
@@ -165,7 +165,7 @@ export function Detail({ ticket: t, all, me, canned, update, transfer, merge, to
                   <button type="button" className={tab === 'note' ? 'on' : ''} onClick={() => setTab('note')}>Private note</button>
                 </div>
                 <select className="canned" value="" onChange={(e) => { const c = canned.find((x) => String(x.id) === e.target.value); if (c) { setTab('reply'); setText(fill(c.text, t.customer, me)) } }}>
-                  <option value="">💬 Insert canned reply…</option>
+                  <option value="">Insert canned reply…</option>
                   {canned.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>

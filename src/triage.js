@@ -13,7 +13,7 @@ export function triage(subject, body) {
   const hit = !sensitive && KNOWLEDGE.find((k) => k.keys.some((w) => text.includes(w)))
   if (hit) {
     return { resolved: true, topic: hit.topic, urgent: false, answer: hit.answer, assignee: AGENTS.find((a) => a.topics.includes(hit.topic)).id,
-      note: 'Answered by AI from the HR knowledge base. No person needed.' }
+      note: 'Answered automatically from the HR answers list. No person needed.' }
   }
 
   let topic = sensitive ? 'relations' : 'general'
@@ -26,7 +26,7 @@ export function triage(subject, body) {
   }
   const agent = AGENTS.find((a) => a.topics.includes(topic))
   const note = (sensitive
-    ? `Sensitive subject ("${sensitive}"): the AI never answers these, a person handles it. `
+    ? `Sensitive subject ("${sensitive}"): the assistant never answers these, a person handles it. `
     : `No ready answer. `) +
     `Routed to ${agent.skill}${best || sensitive ? '' : ' (no clear topic)'}. ` +
     (urgent ? `Marked urgent: "${urgentHits[0]}".` : 'Not urgent.')
