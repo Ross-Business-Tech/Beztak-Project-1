@@ -7,8 +7,7 @@
   --accent: #2f5d8c;
   --answer: #2e7d5b;
   --ticket: #d98a1b;
-  --unresolved: #b3413a;
-  --unknown: #8a8f98;
+  --closed: #2f5d8c;
   --danger: #a32a22;
   --sidebar: #1f2a3c;
   --radius: 10px;
@@ -148,7 +147,7 @@ button.link {
 .kpi-sub { color: var(--muted); font-size: 13px; }
 .kpi.answer .kpi-value { color: var(--answer); }
 .kpi.ticket .kpi-value { color: #a86a10; }
-.kpi.unresolved .kpi-value { color: var(--unresolved); }
+.kpi.closed .kpi-value { color: var(--closed); }
 
 .chart-box { position: relative; height: 300px; }
 .chart-box.tall { height: 340px; }
@@ -198,9 +197,9 @@ tr.highlight td { background: #fff8e6; }
 }
 .badge.answer { background: var(--answer); }
 .badge.ticket { background: var(--ticket); }
-.badge.unresolved { background: var(--unresolved); }
-.badge.unknown { background: var(--unknown); }
+.badge.closed { background: var(--closed); }
 .badge.plain { background: #e8ecf2; color: var(--ink); }
+textarea { border: 1px solid #c6cdd9; border-radius: 6px; padding: 6px 8px; background: #fff; resize: vertical; }
 
 .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 10px; flex-wrap: wrap; }
 

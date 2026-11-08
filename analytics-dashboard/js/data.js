@@ -1,6 +1,6 @@
 /*
  * Data layer: record model, validation, file parsing, export formatting,
- * retention rules and made-up sample data.
+ * category suggestions, retention rules and made-up sample data.
  * Plain browser JavaScript with no dependencies. It also loads in Node for tests.
  */
 (function (root, factory) {
@@ -10,19 +10,20 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
+  // Every question has exactly one of these three current statuses.
   const STATUS = Object.freeze({
-    ANSWER: 'Answer Found',
-    TICKET: 'Ticket Created',
-    UNRESOLVED: 'Unresolved',
-    UNKNOWN: 'Unknown'
+    ANSWERED: 'Answered',
+    OPEN: 'Ticket Open',
+    CLOSED: 'Ticket Closed'
   });
-  const KNOWN_STATUSES = [STATUS.ANSWER, STATUS.TICKET, STATUS.UNRESOLVED];
+  const ALL_STATUSES = [STATUS.ANSWERED, STATUS.OPEN, STATUS.CLOSED];
   const TICKET_STATUSES = ['Open', 'In Progress', 'Resolved', 'Closed'];
   const CLOSED_TICKET_STATUSES = ['Resolved', 'Closed'];
   const UNCATEGORIZED_ID = 'uncategorized';
   const SAMPLE_SOURCE = 'Sample generator';
   const MAX_QUESTION = 2000;
   const MAX_RESPONSE = 5000;
+  const MAX_NOTE = 2000;
   const MAX_SHORT = 100;
   const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
 
@@ -45,11 +46,25 @@
     { id: UNCATEGORIZED_ID, name: 'Other / Uncategorized', parentId: null }
   ];
 
+  // Words that suggest a subcategory when the chatbot did not send one.
+  const KEYWORDS = {
+    'prod-features': ['offline', 'users', 'export', 'excel', 'dark mode', 'dashboard', 'feature'],
+    'prod-compat': ['browser', 'tablet', 'ipad', 'android', 'sheets', 'teams', 'windows', 'integrate'],
+    'tech-errors': ['error', 'code', 'expired', 'blank', 'greyed', 'crash', 'won t load'],
+    'tech-setup': ['install', 'installer', 'download', 'setup', 'set up', 'extension', 'sso', 'time zone'],
+    'acc-login': ['password', 'login', 'log in', 'locked', 'verification', 'two factor', 'reset'],
+    'acc-roles': ['admin', 'role', 'viewer', 'editor', 'permission', 'access', 'remove'],
+    'proc-returns': ['return', 'refund', 'receipt', 'loan', 'licence', 'license'],
+    'proc-onboarding': ['onboarding', 'laptop', 'badge', 'access card', 'benefits', 'training', 'first day'],
+    'bill-invoice': ['invoice', 'charged', 'payment', 'billing address', 'purchase order', 'card'],
+    'bill-pricing': ['price', 'cost', 'plan', 'discount', 'trial', 'annual', 'monthly']
+  };
+
   // Lookup tables keyed by normalizeKey() output. Maps avoid prototype surprises.
   const STATUS_ALIASES = new Map([
-    ['answer found', STATUS.ANSWER], ['answered', STATUS.ANSWER], ['answer', STATUS.ANSWER], ['found', STATUS.ANSWER],
-    ['ticket created', STATUS.TICKET], ['ticket', STATUS.TICKET], ['escalated', STATUS.TICKET],
-    ['unresolved', STATUS.UNRESOLVED], ['not resolved', STATUS.UNRESOLVED], ['no answer', STATUS.UNRESOLVED]
+    ['answered', STATUS.ANSWERED], ['answer found', STATUS.ANSWERED], ['answer', STATUS.ANSWERED], ['found', STATUS.ANSWERED],
+    ['ticket open', STATUS.OPEN], ['open ticket', STATUS.OPEN], ['ticket', STATUS.OPEN], ['ticket created', STATUS.OPEN],
+    ['ticket closed', STATUS.CLOSED], ['closed ticket', STATUS.CLOSED], ['closed', STATUS.CLOSED]
   ]);
   const TICKET_ALIASES = new Map([
     ['open', 'Open'], ['in progress', 'In Progress'], ['resolved', 'Resolved'], ['done', 'Resolved'], ['closed', 'Closed']
@@ -58,7 +73,7 @@
   const EXPORT_COLUMNS = [
     'question_id', 'conversation_id', 'submitted_at', 'source_system', 'question_text', 'response_text',
     'resolution_status', 'answer_source', 'ticket_id', 'ticket_status', 'resolution_timestamp',
-    'category', 'subcategory'
+    'resolution_note', 'flag', 'category', 'subcategory', 'suggested_category'
   ];
 
   // ---------- small helpers ----------
@@ -88,13 +103,28 @@
     return isNaN(d) ? null : d;
   }
 
+  // Finds a category by id or name. parentId: null for top level, a string for subcategories,
+  // undefined to search every category.
   function findCategory(categories, raw, parentId) {
     const key = normalizeKey(raw);
     if (!key) return null;
     return categories.find(function (c) {
-      return (c.parentId || null) === parentId &&
-        (normalizeKey(c.id) === key || normalizeKey(c.name) === key);
+      const parentOk = parentId === undefined || (c.parentId || null) === parentId;
+      return parentOk && (normalizeKey(c.id) === key || normalizeKey(c.name) === key);
     }) || null;
+  }
+
+  // Suggests a subcategory id from the wording, or null when nothing matches.
+  function suggestCategoryFromText(text) {
+    const padded = ' ' + normalizeText(text) + ' ';
+    let best = null;
+    let bestScore = 0;
+    Object.keys(KEYWORDS).forEach(function (id) {
+      let score = 0;
+      KEYWORDS[id].forEach(function (w) { if (padded.indexOf(' ' + w + ' ') !== -1) score++; });
+      if (score > bestScore) { best = id; bestScore = score; }
+    });
+    return best;
   }
 
   // ---------- normalization and validation ----------
@@ -128,47 +158,77 @@
     if (!submitted) errors.push('submitted_at is missing or not a valid date');
     else if (submitted.getTime() > now.getTime() + MAX_FUTURE_MS) errors.push('submitted_at is in the future');
 
-    const statusKey = normalizeKey(raw.resolution_status);
-    let status = STATUS_ALIASES.get(statusKey);
-    if (!status) {
-      status = STATUS.UNKNOWN;
-      if (statusKey === '') warnings.push('resolution_status is missing; stored as Unknown');
-      else if (statusKey !== 'unknown') warnings.push('resolution_status "' + clean(raw.resolution_status) + '" was not recognized; stored as Unknown');
-    }
+    // Status is required: every question must be Answered, Ticket Open or Ticket Closed.
+    const statusRaw = clean(raw.resolution_status);
+    let status = STATUS_ALIASES.get(normalizeKey(statusRaw)) || null;
+    if (!statusRaw) errors.push('resolution_status is missing (use Answered, Ticket Open or Ticket Closed)');
+    else if (!status) errors.push('resolution_status "' + statusRaw + '" must be Answered, Ticket Open or Ticket Closed');
 
     let source = clean(raw.source_system);
     if (!source) { source = 'Imported'; warnings.push('source_system is missing; set to "Imported"'); }
     else if (source.length > MAX_SHORT) errors.push('source_system is longer than ' + MAX_SHORT + ' characters');
 
-    // Category: match by name or id; anything unknown goes to Other / Uncategorized.
+    const note = clean(raw.resolution_note != null && raw.resolution_note !== '' ? raw.resolution_note : raw.note);
+    if (note.length > MAX_NOTE) errors.push('resolution_note is longer than ' + MAX_NOTE + ' characters');
+    const flag = clean(raw.flag).slice(0, MAX_SHORT);
+
+    // Confirmed category: matched by name or id. Anything unmatched stays uncategorized.
     const catRaw = raw.category != null && raw.category !== '' ? raw.category : raw.category_id;
     let cat = findCategory(categories, catRaw, null);
     let subId = null;
-    if (!cat) {
-      if (clean(catRaw)) warnings.push('category "' + clean(catRaw) + '" is not in your category list; moved to Other / Uncategorized');
-      cat = categories.find(function (c) { return c.id === UNCATEGORIZED_ID; });
-    } else {
+    if (cat && cat.id !== UNCATEGORIZED_ID) {
       const subRaw = raw.subcategory != null && raw.subcategory !== '' ? raw.subcategory : raw.subcategory_id;
       if (clean(subRaw)) {
         const sub = findCategory(categories, subRaw, cat.id);
         if (sub) subId = sub.id;
         else warnings.push('subcategory "' + clean(subRaw) + '" is not under ' + cat.name + '; left blank');
       }
+    } else {
+      if (clean(catRaw) && (!cat || cat.id !== UNCATEGORIZED_ID)) {
+        warnings.push('category "' + clean(catRaw) + '" is not in your category list; kept as Other / Uncategorized');
+      }
+      cat = categories.find(function (c) { return c.id === UNCATEGORIZED_ID; });
     }
 
-    // Ticket fields apply only when a ticket exists or the status says one was created.
-    const ticketId = clean(raw.ticket_id);
-    if (status === STATUS.ANSWER && (ticketId || clean(raw.ticket_status))) {
-      warnings.push('Ticket fields ignored because an answer was found');
+    // Suggested category: from the chatbot if it sent one, otherwise from keyword rules.
+    // Suggestions are only shown until an admin accepts them. Confirmed categories have none.
+    let suggestedId = '';
+    let suggestionSource = '';
+    const sugRaw = clean(raw.suggested_category != null && raw.suggested_category !== '' ? raw.suggested_category : raw.suggested_category_id);
+    const isUncategorized = cat.id === UNCATEGORIZED_ID;
+    if (isUncategorized) {
+      if (sugRaw) {
+        const s = findCategory(categories, sugRaw, undefined);
+        if (s) { suggestedId = s.id; suggestionSource = 'chatbot'; }
+        else warnings.push('suggested_category "' + sugRaw + '" is not in your category list; ignored');
+      }
+      if (!suggestedId) {
+        const kw = suggestCategoryFromText(text);
+        if (kw) { suggestedId = kw; suggestionSource = 'keywords'; }
+      }
     }
-    const hasTicket = status !== STATUS.ANSWER && (ticketId !== '' || status === STATUS.TICKET);
+
+    // Ticket fields. ticket_status, when given, decides between Ticket Open and Ticket Closed.
+    const ticketId = clean(raw.ticket_id);
+    const tsRaw = clean(raw.ticket_status);
+    const tsNorm = TICKET_ALIASES.get(normalizeKey(tsRaw)) || '';
+    if (status === STATUS.ANSWERED && (ticketId || tsRaw)) {
+      warnings.push('Ticket fields ignored because the question was answered');
+    }
+    if (tsRaw && !tsNorm && status !== STATUS.ANSWERED) {
+      warnings.push('ticket_status "' + tsRaw + '" was not recognized; status kept as given');
+    }
     let ticketStatus = '';
-    if (hasTicket) {
-      const tsRaw = clean(raw.ticket_status);
-      ticketStatus = TICKET_ALIASES.get(normalizeKey(tsRaw)) || '';
-      if (tsRaw && !ticketStatus) warnings.push('ticket_status "' + tsRaw + '" was not recognized; set to Open');
-      if (!ticketStatus) ticketStatus = 'Open';
-      if (status === STATUS.TICKET && !ticketId) warnings.push('Ticket Created but no ticket_id given');
+    if (status === STATUS.OPEN || status === STATUS.CLOSED) {
+      if (tsNorm) {
+        const derived = CLOSED_TICKET_STATUSES.indexOf(tsNorm) !== -1 ? STATUS.CLOSED : STATUS.OPEN;
+        if (derived !== status) warnings.push('ticket_status "' + tsRaw + '" does not match resolution_status "' + status + '"; set to ' + derived);
+        status = derived;
+        ticketStatus = tsNorm;
+      } else {
+        ticketStatus = status === STATUS.CLOSED ? 'Closed' : 'Open';
+      }
+      if (!ticketId) warnings.push('No ticket_id given');
     }
 
     let resolvedAt = '';
@@ -180,6 +240,7 @@
 
     if (errors.length) return { ok: false, errors: errors, warnings: warnings };
 
+    const hasTicket = status === STATUS.OPEN || status === STATUS.CLOSED;
     const nowIso = now.toISOString();
     const events = [];
     if (hasTicket) {
@@ -203,8 +264,12 @@
         ticket_status: ticketStatus,
         ticket_events: events,
         resolution_timestamp: resolvedAt,
+        resolution_note: note,
+        flag: flag,
         category_id: cat.id,
         subcategory_id: subId,
+        suggested_category_id: suggestedId,
+        suggestion_source: suggestionSource,
         normalized_text: normalizeText(text),
         ingested_at: nowIso,
         category_history: []
@@ -299,6 +364,7 @@
     const byId = new Map(categories.map(function (c) { return [c.id, c]; }));
     const cat = byId.get(q.category_id);
     const sub = q.subcategory_id ? byId.get(q.subcategory_id) : null;
+    const sug = q.suggested_category_id ? byId.get(q.suggested_category_id) : null;
     return {
       question_id: q.question_id,
       conversation_id: q.conversation_id || '',
@@ -311,8 +377,11 @@
       ticket_id: q.ticket_id || '',
       ticket_status: q.ticket_status || '',
       resolution_timestamp: q.resolution_timestamp || '',
-      category: cat ? cat.name : '',
-      subcategory: sub ? sub.name : ''
+      resolution_note: q.resolution_note || '',
+      flag: q.flag || '',
+      category: cat && cat.id !== UNCATEGORIZED_ID ? cat.name : '',
+      subcategory: sub ? sub.name : '',
+      suggested_category: sug ? sug.name : ''
     };
   }
 
@@ -355,6 +424,7 @@
   }
 
   // Made-up questions and answers. Nothing here is real company information.
+  // a = the chatbot answer, which doubles as the agent's note when a ticket is closed.
   const SAMPLE_TEMPLATES = {
     product: [
       { sub: 'prod-features', q: 'Does the app work offline?', a: 'Saved reports can be viewed offline. Creating new reports needs an internet connection.', src: 'Product FAQ' },
@@ -431,6 +501,8 @@
   /**
    * Generates made-up raw records in the same shape an import file uses.
    * The same seed always gives the same records, so tests can rely on it.
+   * About 15% have no confirmed category, only a chatbot suggestion, so the
+   * admin's accept step has something to do.
    */
   function generateSampleRows(count, now, seed) {
     const rng = mulberry32(seed == null ? 20260108 : seed);
@@ -439,13 +511,11 @@
       ['product', 0.2], ['tech', 0.25], ['account', 0.15],
       ['process', 0.15], ['billing', 0.15], [UNCATEGORIZED_ID, 0.1]
     ];
-    // Probability of [answer found, ticket created]; the rest are unresolved.
-    const profile = {
-      product: [0.85, 0.10], tech: [0.55, 0.35], account: [0.40, 0.45],
-      process: [0.90, 0.08], billing: [0.70, 0.20], [UNCATEGORIZED_ID]: [0.30, 0.25]
+    // Probability that the chatbot answered. The rest are tickets (open or closed by age).
+    const answerRate = {
+      product: 0.85, tech: 0.55, account: 0.40, process: 0.90, billing: 0.70, [UNCATEGORIZED_ID]: 0.30
     };
-    const catNames = new Map(DEFAULT_CATEGORIES.map(function (c) { return [c.id, c.name]; }));
-    const subNames = new Map(DEFAULT_CATEGORIES.map(function (c) { return [c.id, c.name]; }));
+    const names = new Map(DEFAULT_CATEGORIES.map(function (c) { return [c.id, c.name]; }));
     const DAY = 24 * 60 * 60 * 1000;
     const rows = [];
 
@@ -457,15 +527,11 @@
         if (roll < 0) { catId = weights[w][0]; break; }
       }
       const tpl = pick(SAMPLE_TEMPLATES[catId]);
-      const p = profile[catId];
-      const r = rng();
-      let status;
-      if (rng() < 0.02) status = 'Unknown';
-      else if (r < p[0]) status = STATUS.ANSWER;
-      else if (r < p[0] + p[1]) status = STATUS.TICKET;
-      else status = STATUS.UNRESOLVED;
-
       const submitted = new Date(now.getTime() - rng() * 365 * DAY);
+      const ageDays = (now.getTime() - submitted.getTime()) / DAY;
+      const answered = rng() < answerRate[catId];
+      const unconfirmed = rng() < 0.15;
+
       let text = tpl.q;
       if (rng() < 0.3) text = pick(SAMPLE_PREFIXES) + text.charAt(0).toLowerCase() + text.slice(1);
 
@@ -475,22 +541,27 @@
         question_text: text,
         submitted_at: submitted.toISOString(),
         source_system: SAMPLE_SOURCE,
-        resolution_status: status,
-        category: catNames.get(catId),
-        subcategory: tpl.sub ? subNames.get(tpl.sub) : '',
-        response_text: status === STATUS.ANSWER ? tpl.a : '',
-        answer_source: status === STATUS.ANSWER ? tpl.src : '',
+        resolution_status: answered ? 'Answered' : 'Ticket Open',
+        category: unconfirmed ? '' : names.get(catId),
+        subcategory: unconfirmed || !tpl.sub ? '' : names.get(tpl.sub),
+        suggested_category: unconfirmed ? (tpl.sub || catId) : '',
+        response_text: answered ? tpl.a : '',
+        answer_source: answered ? tpl.src : '',
         ticket_id: '',
         ticket_status: '',
-        resolution_timestamp: ''
+        resolution_timestamp: '',
+        resolution_note: '',
+        flag: ''
       };
-      if (status === STATUS.TICKET) {
+      if (!answered) {
         raw.ticket_id = 'TCK-' + String(10001 + i);
-        const ageDays = (now.getTime() - submitted.getTime()) / DAY;
         if (ageDays > 14) {
+          raw.resolution_status = 'Ticket Closed';
           raw.ticket_status = rng() < 0.8 ? 'Resolved' : 'Closed';
           const resolved = Math.min(now.getTime(), submitted.getTime() + (1 + rng() * 9) * DAY);
           raw.resolution_timestamp = new Date(resolved).toISOString();
+          raw.resolution_note = tpl.a;
+          if (rng() < 0.04) raw.flag = 'Standardize';
         } else {
           raw.ticket_status = rng() < 0.5 ? 'Open' : 'In Progress';
         }
@@ -502,17 +573,19 @@
 
   return {
     STATUS: STATUS,
-    KNOWN_STATUSES: KNOWN_STATUSES,
+    ALL_STATUSES: ALL_STATUSES,
     TICKET_STATUSES: TICKET_STATUSES,
     CLOSED_TICKET_STATUSES: CLOSED_TICKET_STATUSES,
     UNCATEGORIZED_ID: UNCATEGORIZED_ID,
     SAMPLE_SOURCE: SAMPLE_SOURCE,
     DEFAULT_CATEGORIES: DEFAULT_CATEGORIES,
+    KEYWORDS: KEYWORDS,
     EXPORT_COLUMNS: EXPORT_COLUMNS,
     normalizeKey: normalizeKey,
     normalizeText: normalizeText,
     parseDate: parseDate,
     findCategory: findCategory,
+    suggestCategoryFromText: suggestCategoryFromText,
     validateRecord: validateRecord,
     prepareImport: prepareImport,
     parseCSV: parseCSV,
