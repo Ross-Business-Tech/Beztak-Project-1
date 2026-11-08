@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Question Analytics</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">Question Analytics</div>
+    <nav class="nav" aria-label="Main">
+      <a href="#/overview" data-nav="overview">Overview</a>
+      <a href="#/explorer" data-nav="explorer">Question Explorer</a>
+      <a href="#/gaps" data-nav="gaps">Knowledge Gaps</a>
+      <a href="#/data" data-nav="data">Data Management</a>
+      <a href="#/integrations" data-nav="integrations">Integrations</a>
+    </nav>
+    <div class="sidebar-foot">
+      Data is saved in this browser only. Use Data Management to export a backup.
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="range">
+        <label for="range-preset">Reporting period</label>
+        <select id="range-preset">
+          <option value="7d">Past 7 days</option>
+          <option value="30d">Past 30 days</option>
+          <option value="90d" selected>Past 90 days</option>
+          <option value="12m">Past 12 months</option>
+          <option value="all">All time</option>
+          <option value="custom">Custom range</option>
+        </select>
+        <span id="custom-range" class="custom-range" hidden>
+          <input type="date" id="range-from" aria-label="From date">
+          <span class="muted">to</span>
+          <input type="date" id="range-to" aria-label="To date">
+        </span>
+      </div>
+    </header>
+    <main id="view" class="view" tabindex="-1"></main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="vendor/chart.umd.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/analytics.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
