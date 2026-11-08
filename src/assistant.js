@@ -29,7 +29,7 @@ export const TICKET_TYPES = [
 const sectionContact = (s) => ({ 2: 'ops', 3: 'emergency', 4: 'maint', 5: 'ops', 6: 'ops', 7: 'broker', 8: 'ops', 9: 'accounting', 10: 'ops', 11: 'broker', 12: 'ops', 13: 'ops', 14: 'ops', 15: 'security' }[s] || 'ops')
 
 // ---------- search ----------
-const STOP = new Set('a an and are as at be by can do does for from get got have how i if in is it its me my of on or our should so that the this to was we what when where which who why will with you your am im any about there their them take tomorrow today tonight next week need want help know please tell just much many happen happens policy policies procedure procedures job rule rules really still also would off long could like question ask supposed someone something has had into new'.split(' '))
+const STOP = new Set('a an and are as at be by can do does for from get got have how i if in is it its me my of on or our should so that the this to was we what when where which who why will with you your am im any about there their them take tomorrow today tonight next week need want help know please tell just much many happen happens policy policies procedure procedures job rule rules really still also would off long could like question ask supposed someone something has had into new month'.split(' '))
 const SYN = {
   tenant: 'resident', tenants: 'resident', renter: 'resident', occupant: 'resident', neighbor: 'resident neighbor', neighbors: 'resident neighbor',
   apartment: 'unit', apt: 'unit', house: 'unit property', building: 'property building', site: 'property',
@@ -43,7 +43,7 @@ const SYN = {
   rent: 'rent', late: 'late fee', fee: 'fee', pay: 'pay payment', payment: 'payment', cash: 'cash payment', bounced: 'returned payment', nsf: 'returned payment',
   deposit: 'security deposit', refund: 'security deposit refund', evict: 'eviction', evicted: 'eviction',
   tour: 'showing', tours: 'showing', show: 'showing', prospect: 'prospect showing', applicant: 'application', apply: 'application', screening: 'application screening',
-  movein: 'move in', moveout: 'move out', vacate: 'move out notice', leaving: 'move out notice',
+  movein: 'movein', moveout: 'moveout vacate', unhappy: 'complaint', dissatisfied: 'complaint', write: 'document report', writeup: 'document report', vacate: 'move out notice', leaving: 'move out notice',
   noise: 'noise', loud: 'noise', complain: 'complaint', complaining: 'complaint', upset: 'complaint', angry: 'complaint aggressive',
   disability: 'accommodation', disabled: 'accommodation', wheelchair: 'accommodation modification', ramp: 'accommodation modification', esa: 'assistance animal', dog: 'animal', cat: 'animal', pet: 'animal', pets: 'animal',
   discriminate: 'fair housing', discrimination: 'fair housing', steering: 'fair housing',
@@ -51,14 +51,14 @@ const SYN = {
   injured: 'injured injury incident', injury: 'injury incident', hurt: 'injured incident', fell: 'injured fell', slipped: 'injured slip', accident: 'accident incident', stolen: 'theft', robbed: 'theft', vandalism: 'break in',
   report: 'incident report', paperwork: 'form',
   phishing: 'suspicious link', scam: 'fraud', wire: 'wire', laptop: 'device lost', phone: 'phone', computer: 'device', password: 'password', login: 'password login', pms: 'pms',
-  bugs: 'pest', roaches: 'pest', mice: 'pest', rats: 'pest', bed: 'pest', roof: 'repair', roofing: 'repair', broke: 'break in theft', raise: 'renewal rate', increase: 'renewal rate', mold: 'mold', mildew: 'mold',
+  bugs: 'pest', roaches: 'pest', mice: 'pest', rats: 'pest', bed: 'pest', roof: 'repair', roofing: 'repair', broke: 'break in theft', raise: 'renewal rate', quickly: 'response time', fast: 'response time', soon: 'response time', addressed: 'response', respond: 'response', increase: 'renewal rate', mold: 'mold', mildew: 'mold',
   snow: 'snow', ice: 'snow ice', salt: 'snow',
   hours: 'hours open', open: 'open', close: 'close', alarm: 'alarm', package: 'package', packages: 'package', mail: 'mail',
   hr: 'hr people operations', pto: 'hr', vacation: 'hr', benefits: 'hr', paycheck: 'hr', sick: 'hr',
   boss: 'manager', supervisor: 'manager', gift: 'gift', ai: 'ai', chatgpt: 'ai',
 }
 const stem = (w) => w.length > 4 ? w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, '') : w
-const words = (t) => (t || '').toLowerCase().replace(/move[- ]in/g, 'movein').replace(/move[- ]out/g, 'moveout').replace(/locked out/g, 'lockout').replace(/time off/g, 'pto').replace(/[^a-z0-9$]+/g, ' ').split(' ').filter((w) => w.length > 1 && !STOP.has(w))
+const words = (t) => (t || '').toLowerCase().replace(/\b(mov(e|es|ed|ing)) ?-?in\b/g, 'movein').replace(/\b(mov(e|es|ed|ing)) ?-?out\b/g, 'moveout').replace(/locked out/g, 'lockout').replace(/time off/g, 'pto').replace(/[^a-z0-9$]+/g, ' ').split(' ').filter((w) => w.length > 1 && !STOP.has(w))
 const tokens = (t) => words(t).map(stem)
 
 const DOCS = ENTRIES.map((c, i) => {
