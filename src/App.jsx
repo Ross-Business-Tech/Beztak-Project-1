@@ -100,7 +100,9 @@ function Reply({ r, onAsk, onTicket }) {
       {r.alerts.map((a) => <Alert key={a} kind={a} />)}
       {r.notes.map((n, i) => <p key={i} className={`note note-${n.type}`}>{n.text}</p>)}
 
-      {r.kind === 'notfound' ? (
+      {r.kind === 'alertonly' ? (
+        <button className="btn-secondary" onClick={() => onTicket(r.alerts.includes('concern') ? 'relations' : 'policy')}>Ask HR directly</button>
+      ) : r.kind === 'notfound' ? (
         <>
           <p><strong>I couldn't find a clear answer to that in the handbook,</strong> so I can't confirm it. People Operations can help.</p>
           {r.suggestions?.length > 0 && (
@@ -119,6 +121,7 @@ function Reply({ r, onAsk, onTicket }) {
           {r.timeSensitive && (
             <p className="note note-time">⏱ This may be time-sensitive. If it's urgent, contact {r.contact.name} directly at <a href={`tel:${r.contact.phone.replace(/\D/g, '')}`}>{r.contact.phone}</a> instead of waiting.</p>
           )}
+          {r.partial && <p className="muted small-text">I didn't find an exact match. This is the closest policy I found, so check that it fits your situation:</p>}
           <article className="answer">
             <h3>{titleOf(best)}</h3>
             <PolicyText text={best.text} />

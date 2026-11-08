@@ -39,18 +39,18 @@ const sectionContact = (s) => ({
 }[s] || 'people')
 
 // ---------- search ----------
-const STOP = new Set('a an and are as at be by can do does for from get got have how i if in is it its me my of on or our should so that the this to was we what when where which who why will with you your am im any about there their them do take tomorrow today tonight next week need want help know please tell just much many happen happens policy policies job days rule rules really still also would could like question ask'.split(' '))
+const STOP = new Set('a an and are as at be by can do does for from get got have how i if in is it its me my of on or our should so that the this to was we what when where which who why will with you your am im any about there their them do take tomorrow today tonight next week need want help know please tell just much many happen happens policy policies job days rule rules really still also would off long could like question ask'.split(' '))
 const SYN = {
-  vacation: 'pto', holiday: 'holidays', 'dayoff': 'pto leave', off: 'pto', timeoff: 'pto leave',
+  vacation: 'pto', holiday: 'holidays', 'dayoff': 'pto leave', timeoff: 'pto leave',
   paycheck: 'pay payroll deposit',
   grandma: 'grandparent bereavement', grandpa: 'grandparent bereavement', grandmother: 'grandparent bereavement', grandfather: 'grandparent bereavement',
-  mom: 'parent bereavement', dad: 'parent bereavement', mother: 'parent', father: 'parent', brother: 'sibling', sister: 'sibling', husband: 'spouse', wife: 'spouse', paid: 'pay payday', salary: 'pay compensation', wage: 'pay', wages: 'pay', check: 'pay',
+  mom: 'parent bereavement', dad: 'parent bereavement', mother: 'parent', father: 'parent', brother: 'sibling', sister: 'sibling',  salary: 'pay compensation', wage: 'pay', wages: 'pay', check: 'pay',
   deposit: 'deposit pay', bank: 'deposit', money: 'pay',
   sick: 'sick ill', ill: 'sick', doctor: 'sick medical appointments', flu: 'sick',
   funeral: 'bereavement', died: 'bereavement', death: 'bereavement', passed: 'bereavement', bereavement: 'bereavement',
-  baby: 'parental bonding birth', maternity: 'parental bonding', paternity: 'parental bonding', pregnant: 'pregnancy parental accommodation', adoption: 'parental adoption',
+  maternity: 'parental bonding', paternity: 'parental bonding', adoption: 'parental adoption',
   insurance: 'medical dental vision benefits', health: 'medical benefits', dental: 'dental benefits', '401k': '401(k) retirement match', retirement: '401(k) retirement',
-  quit: 'resign resignation separation', resign: 'resignation separation', fired: 'separation termination corrective', leaving: 'separation leaving',
+  quit: 'resign resignation separation', resign: 'resignation separation', leaving: 'separation leaving',
   wfh: 'remote hybrid', home: 'remote hybrid', remote: 'remote hybrid', hybrid: 'hybrid remote',
   harass: 'harassment', harassed: 'harassment', bully: 'harassment bullying', bullying: 'harassment',
   boss: 'manager', supervisor: 'manager',
@@ -63,11 +63,24 @@ const SYN = {
   voting: 'voting', military: 'military leave',
   enroll: 'enrollment enroll', enrollment: 'enrollment', married: 'married life event', marriage: 'married life event',
   injured: 'injured injury incident', hurt: 'injured injury', accident: 'accident injury incident',
-  dress: 'dress code', jeans: 'dress casual', office: 'office headquarters hours', yell: 'bullying harassment manager problem', yelled: 'bullying harassment manager problem',
-  complaint: 'complaint report concern', complain: 'complaint report', timesheet: 'time entry timekeeping', jury: 'jury duty', vote: 'voting', surgery: 'medical leave', operation: 'medical leave', allowance: 'meals cap', per: 'per', diem: 'meals travel', clothes: 'dress', gift: 'gift', handbook: 'handbook',
+  w2: 'tax forms payroll', w4: 'tax withholding', tax: 'tax withholding forms payroll',
+  probation: 'introductory period', probationary: 'introductory period', introductory: 'introductory period',
+  second: 'outside', side: 'outside', moonlighting: 'outside employment',
+  fmla: 'medical leave', medical: 'medical leave', procedure: 'medical leave', surgery: 'medical leave',
+  uncomfortable: 'harassment inappropriate', creepy: 'harassment inappropriate', touched: 'harassment',
+  laptop: 'device lost', computer: 'device', email: 'email suspicious', weird: 'suspicious', scam: 'suspicious wire fraud',
+  training: 'training compliance', course: 'training', lunch: 'lunch meal', break: 'lunch meal breaks',
+  shorts: 'dress casual', wear: 'dress clothing', outfit: 'dress',
+  spouse: 'married dependent life event', husband: 'married dependent', wife: 'married dependent', dependent: 'dependent life event',
+  baby: 'parental bonding birth child', pregnant: 'pregnancy parental accommodation', pregnancy: 'pregnancy parental',
+  call: 'call notify', calling: 'notify', didn: 'missing deposit', paid: 'pay payday deposit',
+  letter: 'verification employment', apartment: 'verification employment', landlord: 'verification employment', mortgage: 'verification employment',
+  limit: 'approval cap', fire: 'termination separation', fired: 'termination separation corrective', complaining: 'retaliation complaint',
+  dress: 'dress clothing', hr: 'contact people operations', person: 'contact', bullied: 'harassment bullying', start: 'begin begins', begin: 'start', jeans: 'dress casual', office: 'office headquarters hours', yell: 'bullying harassment manager problem', yelled: 'bullying harassment manager problem',
+  complaint: 'complaint report concern', complain: 'complaint report', timesheet: 'time entry timekeeping', jury: 'jury', vote: 'voting', operation: 'medical leave', allowance: 'meals cap', per: 'per', diem: 'meals travel', clothes: 'dress', gift: 'gift', handbook: 'handbook',
 }
 const stem = (w) => w.length > 4 ? w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, '') : w
-const words = (t) => (t || '').toLowerCase().replace(/401\s*\(?k\)?/g, '401k').replace(/day off/g, 'dayoff').replace(/time off/g, 'timeoff').replace(/[^a-z0-9$]+/g, ' ').split(' ').filter((w) => w && !STOP.has(w))
+const words = (t) => (t || '').toLowerCase().replace(/401\s*\(?k\)?/g, '401k').replace(/day off/g, 'dayoff').replace(/time off/g, 'timeoff').replace(/[^a-z0-9$]+/g, ' ').split(' ').filter((w) => w.length > 1 && !STOP.has(w))
 const tokens = (t) => words(t).map(stem)
 
 const DOCS = [
@@ -93,20 +106,22 @@ function search(query) {
   const base = [...new Set(words(query))]
   // each word the employee typed, plus its synonyms
   const groups = base.map((w) => [stem(w), ...(SYN[w] || SYN[stem(w)] || '').split(' ').filter(Boolean).map((s) => stem(s.replace(/[()]/g, '')))])
-  const q = new Set(groups.flat())
+  // the words they typed count fully; synonyms we added count less
+  const q = new Map()
+  for (const g of groups) g.forEach((t, i) => q.set(t, Math.max(q.get(t) || 0, i === 0 ? 1 : 0.6)))
   // words the handbook never uses count, but not more than a typical word
   const wt = (g) => Math.min(idf(g[0]), avgIdf)
   const totalWeight = groups.reduce((s, g) => s + wt(g), 0) || 1
   const k1 = 1.2, b = 0.6
   return DOCS.map((d) => {
     let score = 0
-    for (const t of q) {
+    for (const [t, w] of q) {
       const f = d.tf[t]
       if (!f) continue
-      score += idf(t) * (f * (k1 + 1)) / (f + k1 * (1 - b + b * d.len / avgLen))
+      score += w * idf(t) * (f * (k1 + 1)) / (f + k1 * (1 - b + b * d.len / avgLen))
     }
     // how much of what they asked is actually covered by this passage
-    const coverage = groups.reduce((s, g) => s + (g.some((t) => d.tf[t]) ? wt(g) : 0), 0) / totalWeight
+    const coverage = groups.reduce((s, g) => s + (d.tf[g[0]] ? wt(g) : g.some((t) => d.tf[t]) ? 0.75 * wt(g) : 0), 0) / totalWeight
     score *= d.boost || 1
     return { d, score, coverage }
   }).filter((r) => r.score > 0).sort((a, b) => b.score * b.coverage - a.score * a.coverage)
@@ -154,7 +169,9 @@ export function answer(message) {
   const hits = search(text)
   const top = hits[0]
   // need a reasonably strong match before we show a policy as "the answer"
-  if (!top || top.score < 3.2 || top.coverage < 0.6) {
+  if (top && top.score >= 2.5 && top.coverage >= 0.45 && top.coverage < 0.6) reply.partial = true
+  if (!top || top.score < 2.5 || top.coverage < 0.45 || (reply.alerts.length && top.coverage < 0.6)) {
+    if (reply.alerts.length) return { ...reply, kind: 'alertonly' }
     reply.kind = 'notfound'
     reply.suggestions = hits.slice(0, 3).filter((h) => h.score > 1.5 && h.d.q).map((h) => h.d.q)
     return reply
@@ -164,7 +181,7 @@ export function answer(message) {
     const key = h.d.q || h.d.text.slice(0, 60)
     if (seen.has(key)) continue
     seen.add(key)
-    if (reply.results.length && (h.score * h.coverage < top.score * top.coverage * 0.55 || h.coverage < 0.6)) break
+    if (reply.results.length && (h.score * h.coverage < top.score * top.coverage * 0.55 || h.coverage < (reply.partial ? 0.45 : 0.6))) break
     reply.results.push(h.d)
     if (reply.results.length === 3) break
   }
@@ -175,7 +192,9 @@ export function answer(message) {
   return reply
 }
 
-export const cite = (c) => `${c.doc === DOC.title ? DOC.short : c.doc}, ${DOC.version} · ${c.section >= 100 ? '' : `§${c.section} `}${c.sectionTitle} · p. ${c.page}`
+export const cite = (c) => c.doc !== DOC.title
+  ? `${c.doc} · p. ${c.page}`
+  : `${DOC.short}, ${DOC.version} · ${c.section >= 100 ? '' : `§${c.section} `}${c.sectionTitle} · p. ${c.page}`
 
 export const SUGGESTED = [
   'How much PTO do I get?',
