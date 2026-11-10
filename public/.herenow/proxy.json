@@ -1,0 +1,22 @@
+{
+  "proxies": {
+    "/api/ai/anthropic": {
+      "upstream": "https://api.anthropic.com/v1/messages",
+      "method": "POST",
+      "headers": {
+        "x-api-key": "${ANTHROPIC_API_KEY}",
+        "anthropic-version": "2026-10-21",
+        "anthropic-beta": "server-side-fallback-2026-07-01",
+        "content-type": "application/json"
+      }
+    },
+    "/api/ai/openrouter": {
+      "upstream": "https://openrouter.ai/api/v1/chat/completions",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer ${OPENROUTER_API_KEY}",
+        "content-type": "application/json"
+      }
+    }
+  }
+}

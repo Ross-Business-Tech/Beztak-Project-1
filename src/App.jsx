@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { answerInContext, cite, CONTACTS, DOC, SUGGESTED, TICKET_TYPES } from './assistant.js'
 import { SECTIONS } from './data/opsManual.js'
+import { askAI, AIUnavailable } from './ai.js'
 import './App.css'
 
 // ---------- small helpers ----------
@@ -67,6 +68,31 @@ function Alert({ kind }) {
   )
 }
 
+// Renders the AI's answer: paragraphs, "- " bullets, **bold**, links, and [§x.y] citations as small tags.
+function Inline({ text }) {
+  return text.split(/(\*\*[^*]+\*\*|\[§\s?\d+\.\d+(?:,\s?§?\s?\d+\.\d+)*\])/g).map((part, i) => {
+    if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={i}><Linkify text={part.slice(2, -2)} /></strong>
+    if (/^\[§/.test(part)) return <span key={i} className="ref-tag">{part.slice(1, -1)}</span>
+    return <Linkify key={i} text={part} />
+  })
+}
+function AIText({ text }) {
+  const blocks = []
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    const bullet = line.match(/^(?:[-•*]|\d+[.)])\s+(.*)$/)
+    if (bullet) {
+      const last = blocks[blocks.length - 1]
+      if (last?.type === 'ul') last.items.push(bullet[1])
+      else blocks.push({ type: 'ul', items: [bullet[1]] })
+    } else blocks.push({ type: 'p', text: line.replace(/^#+\s*/, '') })
+  }
+  return blocks.map((b, i) => b.type === 'ul'
+    ? <ul key={i} className="policy-list">{b.items.map((it, j) => <li key={j}><Inline text={it} /></li>)}</ul>
+    : <p key={i}><Inline text={b.text} /></p>)
+}
+
 // ---------- one assistant reply ----------
 function Reply({ r, onAsk, onTicket }) {
   if (r.kind === 'welcome') {
@@ -100,11 +126,42 @@ function Reply({ r, onAsk, onTicket }) {
     )
   }
 
+  if (r.kind === 'pending') {
+    return <div className="bubble bot pending" aria-label="Ops Help is answering"><span className="dots"><i /><i /><i /></span> Checking the manual…</div>
+  }
+  if (r.kind === 'ai') {
+    return (
+      <div className="bubble bot">
+        {r.alerts.map((a) => <Alert key={a} kind={a} />)}
+        {r.notes.map((n, i) => <p key={i} className={`note note-${n.type}`}>{n.text}</p>)}
+        <div className="ai-answer"><AIText text={r.text} /></div>
+        <p className="ai-label">✨ AI-generated answer based on the {DOC.short}. Check the cited sections before acting.</p>
+        {r.cited.length > 0 && (
+          <details className="related">
+            <summary>Cited sections ({r.cited.length})</summary>
+            {r.cited.map((c) => (
+              <article key={c.ref} className="answer small">
+                <h4><span className="sec-num">§{c.ref}</span> {c.q}</h4>
+                <PolicyText text={c.text} />
+                <p className="cite">📄 {cite(c)}</p>
+              </article>
+            ))}
+          </details>
+        )}
+        <div className="reply-actions">
+          <span className="muted">Not what you needed?</span>
+          <button className="link-btn" onClick={() => onTicket(ticketTypeFor(r.cited[0]?.section))}>Ask Operations</button>
+        </div>
+      </div>
+    )
+  }
+
   const best = r.results[0]
   return (
     <div className="bubble bot">
       {r.alerts.map((a) => <Alert key={a} kind={a} />)}
       {r.notes.map((n, i) => <p key={i} className={`note note-${n.type}`}>{n.text}</p>)}
+      {r.aiError && <p className="muted small-text">AI answers aren't available right now ({r.aiError}), so this comes from the manual search.</p>}
 
       {r.kind === 'alertonly' ? (
         <button className="btn-secondary" onClick={() => onTicket(r.alerts.includes('water') ? 'maintenance' : 'procedure')}>Ask Operations</button>
@@ -299,10 +356,16 @@ export default function App() {
 
   // remembers the last question that got a real answer, so follow-ups like "is that an emergency?" make sense
   const lastTopic = useRef(null)
-  const ask = (q, { fresh = false } = {}) => {
+  // AI status for this visit: 'unknown' until the first try, then 'on' or 'off' (falls back to search)
+  const [aiMode, setAiMode] = useState('unknown')
+  const aiHistory = useRef([]) // the conversation sent to the AI, so follow-ups make sense
+  const ask = async (q, { fresh = false } = {}) => {
     const text = q.trim()
     if (!text) return
     setTab('ask')
+    setInput('')
+    if (fresh) aiHistory.current = []
+    // the built-in search always runs: it supplies safety alerts and the fallback answer
     const r = answerInContext(text, fresh ? null : lastTopic.current)
     if (r.kind === 'answer') {
       const best = r.results[0]
@@ -311,8 +374,27 @@ export default function App() {
         ? { root: lastTopic.current.root, query: `${lastTopic.current.root} ${text}`, topic: titleOf(best) }
         : { root: text, query: text, topic: titleOf(best) }
     }
-    setMessages((m) => [...m, { from: 'me', text }, { from: 'bot', r }])
-    setInput('')
+    // crisis messages, greetings, and visits where the AI is off are answered locally
+    if (['crisis', 'smalltalk'].includes(r.kind) || aiMode === 'off') {
+      setMessages((m) => [...m, { from: 'me', text }, { from: 'bot', r }])
+      return
+    }
+    const id = Date.now()
+    setMessages((m) => [...m, { from: 'me', text }, { from: 'bot', id, r: { kind: 'pending' } }])
+    const history = [...aiHistory.current, { role: 'user', content: text }]
+    let reply
+    try {
+      const { text: answerText, cited } = await askAI(history)
+      aiHistory.current = [...history, { role: 'assistant', content: answerText }]
+      setAiMode('on')
+      reply = { kind: 'ai', text: answerText, cited, alerts: r.alerts, notes: r.notes }
+    } catch (e) {
+      if (!(e instanceof AIUnavailable)) console.error(e)
+      // a missing route or key won't fix itself during this visit, so stop trying
+      if (/set up|key/.test(e.message)) setAiMode('off')
+      reply = { ...r, aiError: e.message }
+    }
+    setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, r: reply } : msg)))
   }
 
   return (
@@ -331,7 +413,7 @@ export default function App() {
           <button className={tab === 'contacts' ? 'active' : ''} onClick={() => setTab('contacts')}>Contacts</button>
         </nav>
       </header>
-      <p className="demo-banner">Demo prototype for Beztak. Uses a <strong>fictional</strong> sample Operations Manual ({DOC.version}, effective {DOC.effective}).</p>
+      <p className="demo-banner">Demo prototype for Beztak. Uses a <strong>fictional</strong> sample Operations Manual ({DOC.version}, effective {DOC.effective}). <span className={`ai-status ai-${aiMode}`}>{aiMode === 'on' ? 'AI answers on' : aiMode === 'off' ? 'Search mode (AI not connected)' : ''}</span></p>
 
       <main className="main">
         {tab === 'ask' ? (
