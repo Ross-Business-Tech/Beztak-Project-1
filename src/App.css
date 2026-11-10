@@ -136,7 +136,7 @@ button.brand:hover,button.brand.on{outline:2px solid rgba(255,255,255,.55);outli
 .profile-sq{width:72px;height:72px;border-radius:10px;background:var(--prim);color:#fff;display:grid;place-items:center;font-size:26px;font-weight:700}
 .profile-head h2{margin:0}.profile-head p{margin:2px 0 0}
 .kv{display:grid;grid-template-columns:140px 1fr;gap:8px 14px;margin:14px 0 0}.kv dt{color:var(--mute)}.kv dd{margin:0}
-.seg{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.seg button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer;font-weight:500}.seg button.on{background:var(--prim);border-color:var(--prim);color:#fff}
+.choice{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.choice button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer;font-weight:500}.choice button.on{background:var(--prim);border-color:var(--prim);color:#fff}
 .setrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}.setrow:first-of-type{border-top:0}.setrow p{margin:0}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 @media(max-width:820px){.kv{grid-template-columns:110px 1fr}}
@@ -152,3 +152,12 @@ textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px
 .bigtabs em{font-style:normal;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:0 8px;font-size:12px;color:var(--mute)}
 .tabnote{margin:0 0 10px}
 .split.one{grid-template-columns:1fr}
+/* Manual gaps page (embeds the Manual Gap Tracker) */
+.gaps{display:flex;flex-direction:column;gap:10px;margin:-16px -20px -40px}
+.gaps-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 20px 0}
+.gaps-bar .small{display:block}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:var(--surface);border:0;padding:7px 12px;cursor:pointer;font:inherit;font-size:13px;color:inherit}
+.seg button.on{background:var(--rail);color:#fff}
+.gaps-frame{width:100%;height:calc(100vh - 118px);min-height:560px;border:0;display:block;background:var(--surface)}
+@media(max-width:820px){.gaps{margin:-12px -12px -80px}.gaps-bar{padding:8px 12px 0}.gaps-frame{height:calc(100dvh - 58px - 49px - 112px);min-height:420px}}

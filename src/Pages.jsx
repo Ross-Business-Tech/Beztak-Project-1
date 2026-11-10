@@ -177,7 +177,7 @@ export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switc
       </section>
       <section className="panel pad"><h2>Settings</h2>
         <div className="setrow"><div><b>Appearance</b><p className="mute small">Light is the default.</p></div>
-          <div className="seg" role="group" aria-label="Appearance">{THEMES.map(([k, l]) => <button key={k} className={prefs.theme === k ? 'on' : ''} aria-pressed={prefs.theme === k} onClick={() => set({ theme: k })}>{l}</button>)}</div></div>
+          <div className="choice" role="group" aria-label="Appearance">{THEMES.map(([k, l]) => <button key={k} className={prefs.theme === k ? 'on' : ''} aria-pressed={prefs.theme === k} onClick={() => set({ theme: k })}>{l}</button>)}</div></div>
         <div className="setrow"><div><b>Email notifications</b><p className="mute small">Get an email when a ticket is assigned to you.</p></div>
           <label><input type="checkbox" checked={prefs.notify} onChange={(e) => set({ notify: e.target.checked })} /> On</label></div>
         <div className="setrow"><div><b>Out of office</b><p className="mute small">Lets teammates know you are away.</p></div>
@@ -192,7 +192,7 @@ export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switc
       </section>
       <section className="panel pad"><h2>Account</h2>
         <p className="mute small">Switch to another team member to see the desk from their point of view (demo).</p>
-        <div className="seg">{AGENTS.filter((x) => x.id !== me).map((x) => <button key={x.id} onClick={() => switchUser(x.id)}>{x.name}</button>)}</div>
+        <div className="choice">{AGENTS.filter((x) => x.id !== me).map((x) => <button key={x.id} onClick={() => switchUser(x.id)}>{x.name}</button>)}</div>
         <div className="setrow"><div><b>Reset sample data</b><p className="mute small">Puts tickets, replies and documents back to the starting examples.</p></div><button className="btn" onClick={reset}>Reset</button></div>
       </section>
     </>
