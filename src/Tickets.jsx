@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
+import { helperCall } from './helper'
 import { agentName, ago, dueInfo, fill, initials, pendingAdviceFor, toLocalInput } from './util'
 
 const STATUSES = ['Open', 'In progress', 'On hold', 'Closed']
@@ -12,66 +13,81 @@ export const Avatar = ({ name }) => <span className="avatar">{initials(name)}</s
 const Due = ({ t }) => { const d = dueInfo(t); return d ? <span className={`badge ${d.cls}`}>{d.text}</span> : <span className="mute">–</span> }
 
 export function List({ tickets, me, open, reset }) {
+  const [tab, setTab] = useState('human')
   const [view, setView] = useState('mine')
   const [q, setQ] = useState('')
-  const owned = tickets.filter((t) => t.assignee === me)
   const live = (t) => t.status !== 'Closed'
-  const tags = [...new Set(tickets.flatMap((t) => t.tags || []))].sort()
+  const human = tickets.filter((t) => !t.resolvedByAI)
+  const aiDone = tickets.filter((t) => t.resolvedByAI)
+  const owned = human.filter((t) => t.assignee === me)
+  const tags = [...new Set(human.flatMap((t) => t.tags || []))].sort()
   const views = [
-    ['mine', 'My open tickets', owned.filter(live), true],
-    ['advice', 'Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length)],
+    ['mine', 'My open tickets', owned.filter(live)],
+    ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length)],
     ['due', 'Due soon / overdue', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls))],
     ['urgent', 'Urgent', owned.filter((t) => live(t) && t.urgent)],
-    ['ai', 'Resolved automatically', owned.filter((t) => t.resolvedByAI)],
     ['closed', 'Closed', owned.filter((t) => !live(t))],
-    ['all', 'All my tickets', tickets],
+    ['all', 'All my tickets', human],
   ]
   const tagView = view.startsWith('tag:') ? view.slice(4) : null
-  const current = tagView ? tickets.filter((t) => (t.tags || []).includes(tagView)) : views.find((v) => v[0] === view)[2]
-  const label = tagView ? `Tag: ${tagView}` : views.find((v) => v[0] === view)[1]
+  const found = views.find((v) => v[0] === view)
+  const current = tab === 'ai' ? aiDone : tab === 'all' ? tickets : tagView ? human.filter((t) => (t.tags || []).includes(tagView)) : (found || views[0])[2]
+  const label = tab === 'ai' ? 'AI answered tickets' : tab === 'all' ? 'All tickets' : tagView ? `Tag: ${tagView}` : (found || views[0])[1]
   const text = q.trim().toLowerCase()
+  const byNewest = (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   const rows = current.filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt) || b.id - a.id)
-    .sort((a, b) => Number(live(b)) - Number(live(a)))
+    .sort(tab === 'human' ? (a, b) => new Date(a.dueAt) - new Date(b.dueAt) || b.id - a.id : byNewest)
+    .sort(tab === 'human' ? (a, b) => Number(live(b)) - Number(live(a)) : () => 0)
+  const TABS = [['human', 'Tickets', human.filter(live).length], ['ai', 'AI answered', aiDone.length], ['all', 'All tickets', tickets.length]]
 
   return (
-    <div className="split">
-      <nav className="views">
-        <div className="views-h">My views</div>
-        {views.map(([k, n, list]) => <button key={k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{list.length}</em></button>)}
-        {tags.length > 0 && <div className="views-h">Tags</div>}
-        {tags.map((g) => <button key={g} className={view === `tag:${g}` ? 'on' : ''} onClick={() => setView(`tag:${g}`)}># {g}</button>)}
-        <button className="reset" onClick={reset}>Reset sample data</button>
-      </nav>
-      <section className="panel grow">
-        <div className="panel-h">
-          <h2>{label} <span className="count">{rows.length}</span></h2>
-          <input className="search" placeholder="Search my tickets…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <div className="table">
-          <div className="tr th"><span>Ticket</span><span>Contact</span><span>Status</span><span>Priority</span><span>Deadline</span><span>Owner</span></div>
-          {rows.length === 0 && <p className="empty">Nothing here. You only see tickets assigned to you or where you were asked for advice.</p>}
-          {rows.map((t) => {
-            const adv = pendingAdviceFor(t, me).length > 0
-            return (
-              <button key={t.id} className="tr" onClick={() => open(t.id)}>
-                <span className="subj"><b>{t.subject}</b>
-                  <small>#{t.id} · {topicLabel(t.topic)}{t.resolvedByAI ? ' · Auto-replied' : ''}{adv ? ' · Advice requested' : ''}{(t.tags || []).map((g) => ` #${g}`).join('')}</small></span>
-                <span className="contact"><Avatar name={t.customer} />{t.customer}</span>
-                <span><Status s={t.status} /></span>
-                <span><Prio urgent={t.urgent} /></span>
-                <span className="duecol"><Due t={t} /></span>
-                <span className="owner">{t.assignee === me ? 'Me' : agentName(t.assignee)}</span>
-              </button>
-            )
-          })}
-        </div>
-      </section>
-    </div>
+    <>
+      <div className="tabs bigtabs" role="tablist">
+        {TABS.map(([k, n, c]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}<em>{c}</em></button>)}
+      </div>
+      {tab === 'human' && <p className="mute small tabnote">Tickets that need a person to answer.</p>}
+      {tab === 'ai' && <p className="mute small tabnote">Answered by the AI agent and closed. Open one to read the reply that was sent.</p>}
+      {tab === 'all' && <p className="mute small tabnote">Everything: tickets a person needs to answer and tickets the AI agent answered.</p>}
+      <div className={tab === 'human' ? 'split' : 'split one'}>
+        {tab === 'human' && (
+          <nav className="views">
+            <div className="views-h">My views</div>
+            {views.map(([k, n, list]) => <button key={k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{list.length}</em></button>)}
+            {tags.length > 0 && <div className="views-h">Tags</div>}
+            {tags.map((g) => <button key={g} className={view === `tag:${g}` ? 'on' : ''} onClick={() => setView(`tag:${g}`)}># {g}</button>)}
+            <button className="reset" onClick={reset}>Reset sample data</button>
+          </nav>
+        )}
+        <section className="panel grow">
+          <div className="panel-h">
+            <h2>{label} <span className="count">{rows.length}</span></h2>
+            <input className="search" placeholder="Search tickets…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="table">
+            <div className="tr th"><span>Ticket</span><span>Contact</span><span>Status</span><span>Priority</span><span>Deadline</span><span>Owner</span></div>
+            {rows.length === 0 && <p className="empty">{tab === 'ai' ? 'No tickets have been answered by the AI agent yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+            {rows.map((t) => {
+              const adv = pendingAdviceFor(t, me).length > 0
+              return (
+                <button key={t.id} className="tr" onClick={() => open(t.id)}>
+                  <span className="subj"><b>{t.subject}</b>
+                    <small>#{t.id} · {topicLabel(t.topic)}{t.resolvedByAI ? ' · AI answered' : ''}{adv ? ' · Advice requested' : ''}{(t.tags || []).map((g) => ` #${g}`).join('')}</small></span>
+                  <span className="contact"><Avatar name={t.customer} />{t.customer}</span>
+                  <span><Status s={t.status} /></span>
+                  <span><Prio urgent={t.urgent} /></span>
+                  <span className="duecol"><Due t={t} /></span>
+                  <span className="owner">{t.resolvedByAI ? 'AI agent' : t.assignee === me ? 'Me' : agentName(t.assignee)}</span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      </div>
+    </>
   )
 }
 
-export function Detail({ ticket: t, all, me, canned, update, transfer, merge, toast, back }) {
+export function Detail({ ticket: t, all, me, canned, helper, update, transfer, merge, toast, back }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
   const [tag, setTag] = useState('')
@@ -87,9 +103,12 @@ export function Detail({ ticket: t, all, me, canned, update, transfer, merge, to
   const mergeTargets = all.filter((x) => x.id !== t.id && x.assignee === me && x.status !== 'Closed')
   const stamp = () => new Date().toISOString()
 
-  const send = (e) => {
+  const send = async (e) => {
     e.preventDefault()
     if (!text.trim()) return
+    if (tab === 'reply' && t.threadId && helper?.token) {
+      try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text }) }) } catch (err) { toast(`Email not sent: ${err.message}`); return }
+    }
     const m = { from: agentName(me), text, at: stamp(), ...(tab === 'note' ? { note: true } : { email: true }) }
     update(t.id, (x) => ({ replies: [...x.replies, m], status: tab === 'reply' && x.status === 'Open' ? 'In progress' : x.status }))
     setText('')
@@ -123,17 +142,17 @@ export function Detail({ ticket: t, all, me, canned, update, transfer, merge, to
         <section className="panel">
           <div className="panel-h col">
             <h2>{t.subject}</h2>
-            <div className="row"><Status s={t.status} /><Prio urgent={t.urgent} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">Resolved automatically</span>}</div>
+            <div className="row"><Status s={t.status} /><Prio urgent={t.urgent} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">AI answered</span>}</div>
           </div>
-          <div className="ai-box"><b>Automated triage</b><p>{t.note}</p></div>
+          <div className="ai-box"><b>{t.resolvedByAI ? 'AI agent' : 'Automated triage'}</b><p>{t.note}</p></div>
           <div className="thread">
             {thread.map((m, i) => m.event
               ? <div key={i} className="event">{m.text} · {ago(m.at)}</div>
               : (
                 <article key={i} className={`msg ${m.inbound ? 'in' : m.note ? 'note' : 'out'}`}>
-                  <Avatar name={m.from} />
+                  <Avatar name={m.ai && t.resolvedByAI ? 'AI agent' : m.from} />
                   <div>
-                    <div className="msg-h"><b>{m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? 'Received by email' : m.ai ? 'Sent automatically by email' : 'Sent by email'} · {ago(m.at)}</small></div>
+                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? 'Received by email' : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : 'Sent by email'} · {ago(m.at)}</small></div>
                     <p>{m.text}</p>
                   </div>
                 </article>

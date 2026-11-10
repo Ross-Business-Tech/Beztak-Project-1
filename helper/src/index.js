@@ -56,9 +56,12 @@ export async function pollInbox(env) {
   }
 }
 
-export async function sendReply(env, id, text) {
+export async function sendReply(env, id, text, auto = false) {
   const t = await getTicket(env, id)
   if (!t) return null
+  // The automatic answer is only ever sent once per ticket, even if several browsers ask.
+  if (auto && t.autoReplied) return t
+  if (auto) { t.autoReplied = true; await saveTicket(env, t) }
   const last = [...t.replies].reverse().find((r) => r.inbound)
   const to = (t.customer.match(/<(.+)>/) || [null, t.customer])[1]
   const subject = /^re:/i.test(t.subject) ? t.subject : 'Re: ' + t.subject
@@ -85,9 +88,9 @@ export default {
       }
       const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)
       if (m && req.method === 'POST') {
-        const { text } = await req.json()
+        const { text, auto } = await req.json()
         if (!text || text.length > 10000) return json({ error: 'Reply text is required' }, 400)
-        const t = await sendReply(env, m[1], text)
+        const t = await sendReply(env, m[1], text, Boolean(auto))
         return t ? json(t) : json({ error: 'Ticket not found' }, 404)
       }
       return json({ error: 'Not found' }, 404)

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AGENTS, CANNED, SEED_DOCS, SEED_TICKETS } from './data'
 import { Canned, Compose, Dashboard, Documents, Profile, Setup } from './Pages'
 import { Detail, List } from './Tickets'
-import { DEFAULT_HELPER_URL, Inbox } from './Inbox'
+import { DEFAULT_HELPER_URL, helperCall } from './helper'
+import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
 
 const store = (key, fallback) => {
@@ -12,7 +13,6 @@ const store = (key, fallback) => {
 const Ico = ({ d }) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
 const NAV = [
   ['tickets', 'M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z', 'Tickets'],
-  ['inbox', 'M3 6h18v12H3zM3 7l9 7 9-7', 'Email'],
   ['dashboard', 'M4 20V10M10 20V4M16 20v-7M22 20H2', 'Reports'],
   ['replies', 'M4 5h16v11H9l-5 4z', 'Replies'],
   ['kb', 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7', 'Documents'],
@@ -33,6 +33,65 @@ export default function App() {
   useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v4', JSON.stringify(tickets)); localStorage.setItem('hr-desk-canned-v1', JSON.stringify(canned)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v1', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, canned, me, docs, prefs, helper])
   useEffect(() => { document.documentElement.dataset.theme = prefs.theme }, [prefs.theme])
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 4500); return () => clearTimeout(id) }, [toast])
+
+  const ticketsRef = useRef(tickets)
+  useEffect(() => { ticketsRef.current = tickets }, [tickets])
+  const syncing = useRef(false)
+  // Every 30 seconds: pull new emails from the helper, turn them into tickets, let the
+  // AI agent answer what it can (sent by email), and attach customer follow-ups.
+  useEffect(() => {
+    if (!helper.token || !helper.url) return
+    const parse = (from) => { const m = from.match(/^\s*"?([^"<]*?)"?\s*<(.+)>\s*$/); return m ? { name: m[1] || m[2], email: m[2] } : { name: from, email: from } }
+    const run = async () => {
+      if (syncing.current) return
+      syncing.current = true
+      try {
+        const remote = await helperCall(helper, '/tickets?refresh=1')
+        const cur = ticketsRef.current
+        const created = []
+        const follow = {}
+        let nextId = Math.max(1000, ...cur.map((x) => x.id))
+        for (const r of [...remote].reverse()) {
+          const inbound = r.replies.filter((m) => m.inbound)
+          const local = cur.find((x) => x.threadId === r.id)
+          if (local) {
+            const known = new Set(local.replies.map((m) => m.messageId).filter(Boolean))
+            const fresh = inbound.filter((m) => m.messageId !== local.firstMessageId && !known.has(m.messageId))
+            if (fresh.length) follow[local.id] = fresh
+          } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer)) {
+            const { name, email } = parse(r.customer)
+            const res = triage(r.subject, inbound[0].text)
+            const reply = res.resolved ? res.answer : ackText(name, agentName(res.assignee), res.urgent, res.sensitive, res.extra)
+            try { await helperCall(helper, `/tickets/${r.id}/reply`, { method: 'POST', body: JSON.stringify({ text: reply, auto: true }) }) } catch { /* ticket is still created */ }
+            const now = new Date().toISOString()
+            created.unshift({
+              id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,
+              status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent),
+              resolvedByAI: res.resolved, channel: 'Email', note: res.note, advice: [],
+              tags: [...(res.resolved ? ['ai-resolved'] : []), ...(res.tags || (res.sensitive ? ['sensitive'] : []))],
+              replies: [{ from: 'HR Assistant (automated)', text: reply, at: now, email: true, ai: true }, ...inbound.slice(1).map((m) => ({ inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId }))],
+            })
+          }
+        }
+        const ids = Object.keys(follow)
+        if (created.length || ids.length) {
+          setTickets((p) => [...created.filter((c) => !p.some((x) => x.threadId === c.threadId)), ...p.map((t) => {
+            const f = follow[t.id]
+            if (!f) return t
+            const reopen = t.status === 'Closed'
+            return { ...t, status: reopen ? 'Open' : t.status, resolvedByAI: reopen ? false : t.resolvedByAI, tags: reopen ? t.tags.filter((g) => g !== 'ai-resolved') : t.tags,
+              note: reopen ? 'The employee replied after the automatic answer, so a person needs to look at it.' : t.note,
+              replies: [...t.replies, ...f.map((m) => ({ inbound: true, from: t.customer, text: m.text, at: m.at, messageId: m.messageId }))] }
+          })])
+          setToast(`${created.length ? `${created.length} new email ticket${created.length > 1 ? 's' : ''}` : ''}${created.length && ids.length ? ' and ' : ''}${ids.length ? `${ids.length} customer repl${ids.length > 1 ? 'ies' : 'y'}` : ''}.`)
+        }
+      } catch { /* the helper may be offline; try again next time */ }
+      syncing.current = false
+    }
+    run()
+    const id = setInterval(run, 30000)
+    return () => clearInterval(id)
+  }, [helper])
 
   const mine = tickets.filter((t) => canSee(t, me))
   const update = (id, patch) => setTickets((p) => p.map((t) => (t.id === id ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t)))
@@ -83,9 +142,8 @@ export default function App() {
         </header>
         <div className="content">
           {page === 'tickets' && (openId
-            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
+            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
-          {page === 'inbox' && <Inbox helper={helper} goProfile={() => go('profile')} toast={setToast} />}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}

@@ -145,3 +145,10 @@ button.brand:hover,button.brand.on{outline:2px solid rgba(255,255,255,.55);outli
 .inbox-row.sel{background:var(--soft)}
 .msg{border-top:1px solid var(--line);padding:10px 0}.msg.out{background:var(--soft);padding:10px;border-radius:6px;margin:6px 0}.msg p{margin:4px 0}
 textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);width:100%}
+
+.bigtabs{display:flex;gap:4px;margin:0 0 6px;border-bottom:1px solid var(--line)}
+.bigtabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;cursor:pointer;font:inherit;font-weight:600;color:var(--mute);display:flex;gap:8px;align-items:center;border-radius:0}
+.bigtabs button.on{color:var(--ink);border-bottom-color:var(--prim)}
+.bigtabs em{font-style:normal;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:0 8px;font-size:12px;color:var(--mute)}
+.tabnote{margin:0 0 10px}
+.split.one{grid-template-columns:1fr}

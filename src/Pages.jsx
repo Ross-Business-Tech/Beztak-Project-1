@@ -59,7 +59,7 @@ export function Dashboard({ tickets, me }) {
   const overdue = open.filter((t) => dueInfo(t)?.cls === 'red').length
   const byTopic = DEPTS.map((d) => [d, owned.filter((t) => t.topic === d).length])
   const max = Math.max(1, ...byTopic.map((x) => x[1]))
-  const stats = [['My open tickets', open.length], ['Urgent', open.filter((t) => t.urgent).length], ['Overdue', overdue], ['Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length).length], ['Resolved automatically', ai], ['Closed', owned.filter((t) => t.status === 'Closed').length]]
+  const stats = [['My open tickets', open.length], ['Urgent', open.filter((t) => t.urgent).length], ['Overdue', overdue], ['Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length).length], ['AI answered', ai], ['Closed', owned.filter((t) => t.status === 'Closed').length]]
   return (
     <div className="dash">
       <p className="mute">Showing only {agentName(me)}'s tickets.</p>
@@ -188,7 +188,7 @@ export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switc
         <p className="mute small">Connects Beztakets to the email helper so emails become tickets and replies go out by email. The password is saved only in this browser.</p>
         <label className="field">Helper address<input value={helper.url} onChange={(e) => setHelper({ ...helper, url: e.target.value.trim() })} /></label>
         <label className="field">Helper password<input type="password" autoComplete="off" value={helper.token} onChange={(e) => setHelper({ ...helper, token: e.target.value.trim() })} placeholder="Paste the helper password" /></label>
-        <p><span className={`badge ${helper.token ? 'violet' : 'red'}`}>{helper.token ? 'Password saved, check the Email page' : 'Not connected'}</span></p>
+        <p><span className={`badge ${helper.token ? 'violet' : 'red'}`}>{helper.token ? 'Connected: new emails become tickets' : 'Not connected'}</span></p>
       </section>
       <section className="panel pad"><h2>Account</h2>
         <p className="mute small">Switch to another team member to see the desk from their point of view (demo).</p>
