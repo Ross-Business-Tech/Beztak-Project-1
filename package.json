@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:helper": "vite build --config helper/vite.config.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "smoke": "node scripts/smoke-test.cjs",

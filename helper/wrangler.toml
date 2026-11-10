@@ -1,5 +1,5 @@
 name = "beztakets-helper"
-main = "src/index.js"
+main = "bundle/worker.js"
 compatibility_date = "2025-01-01"
 
 # Checks the burner inbox every minute.

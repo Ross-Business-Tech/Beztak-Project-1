@@ -1,5 +1,9 @@
-// Beztakets email helper. Turns emails sent to the burner Gmail into tickets,
-// and sends ticket replies by email. All keys come from Cloudflare secrets.
+// Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
+// answer what it safely can (and sends that answer by email), and sends ticket replies.
+// All keys come from Cloudflare secrets.
+import { decide, FOOTER } from '../../src/aiAgent.js'
+import { ackText } from '../../src/triage.js'
+import { AGENTS } from '../../src/data.js'
 
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...cors } })
@@ -51,7 +55,20 @@ export async function pollInbox(env) {
     const entry = { inbound: true, from, text: stripQuote(bodyText(m.payload)) || m.snippet, at: new Date(+m.internalDate).toISOString(), messageId: header(m, 'message-id') }
     let t = await getTicket(env, m.threadId)
     if (t) { t.replies.push(entry); if (t.status === 'Closed') t.status = 'Open' }
-    else t = { id: m.threadId, subject: header(m, 'subject') || '(no subject)', customer: from, status: 'Open', createdAt: entry.at, replies: [entry] }
+    else {
+      t = { id: m.threadId, subject: header(m, 'subject') || '(no subject)', customer: from, status: 'Open', createdAt: entry.at, replies: [entry] }
+      if (!/no-?reply|mailer-daemon/i.test(from)) {
+        // New conversation: decide who answers, then send the automatic email.
+        const res = await decide(env, t.subject, entry.text)
+        const name = (from.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || from
+        const agent = AGENTS.find((a) => a.id === res.assignee)
+        const reply = res.resolved ? res.answer + FOOTER : ackText(name, agent.name, res.urgent, res.sensitive, res.extra)
+        t.triage = { ...res, replyText: reply }
+        await saveTicket(env, t)
+        try { await sendReply(env, t.id, reply, true) } catch { /* the ticket still exists; a person can reply */ }
+        continue
+      }
+    }
     await saveTicket(env, t)
   }
 }

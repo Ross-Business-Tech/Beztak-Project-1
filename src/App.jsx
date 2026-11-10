@@ -48,7 +48,7 @@ export default function App() {
       if (syncing.current) return
       syncing.current = true
       try {
-        const remote = await helperCall(helper, '/tickets?refresh=1')
+        const remote = await helperCall(helper, '/tickets')
         const cur = ticketsRef.current
         const created = []
         const follow = {}
@@ -62,9 +62,11 @@ export default function App() {
             if (fresh.length) follow[local.id] = fresh
           } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer)) {
             const { name, email } = parse(r.customer)
-            const res = triage(r.subject, inbound[0].text)
-            const reply = res.resolved ? res.answer : ackText(name, agentName(res.assignee), res.urgent, res.sensitive, res.extra)
-            try { await helperCall(helper, `/tickets/${r.id}/reply`, { method: 'POST', body: JSON.stringify({ text: reply, auto: true }) }) } catch { /* ticket is still created */ }
+            // The helper already decided and sent the automatic email. Older tickets without that
+            // decision fall back to the simple rules here.
+            const res = r.triage || triage(r.subject, inbound[0].text)
+            const reply = r.triage?.replyText || (res.resolved ? res.answer : ackText(name, agentName(res.assignee), res.urgent, res.sensitive, res.extra))
+            if (!r.triage) { try { await helperCall(helper, `/tickets/${r.id}/reply`, { method: 'POST', body: JSON.stringify({ text: reply, auto: true }) }) } catch { /* ticket is still created */ } }
             const now = new Date().toISOString()
             created.unshift({
               id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,
