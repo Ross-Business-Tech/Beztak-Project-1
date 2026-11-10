@@ -154,7 +154,7 @@ export function Setup({ me }) {
   )
 }
 
-export function Profile({ me, tickets, prefs, setPrefs, switchUser, reset, toast }) {
+export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switchUser, reset, toast }) {
   const a = agent(me)
   const mineAll = tickets.filter((t) => t.assignee === me)
   const open = mineAll.filter((t) => t.status !== 'Closed').length
@@ -183,6 +183,12 @@ export function Profile({ me, tickets, prefs, setPrefs, switchUser, reset, toast
         <div className="setrow"><div><b>Out of office</b><p className="mute small">Lets teammates know you are away.</p></div>
           <label><input type="checkbox" checked={prefs.ooo} onChange={(e) => set({ ooo: e.target.checked })} /> On</label></div>
         <p className="mute small">These are saved on this device only (demo).</p>
+      </section>
+      <section className="panel pad"><h2>Email connection</h2>
+        <p className="mute small">Connects Beztakets to the email helper so emails become tickets and replies go out by email. The password is saved only in this browser.</p>
+        <label className="field">Helper address<input value={helper.url} onChange={(e) => setHelper({ ...helper, url: e.target.value.trim() })} /></label>
+        <label className="field">Helper password<input type="password" autoComplete="off" value={helper.token} onChange={(e) => setHelper({ ...helper, token: e.target.value.trim() })} placeholder="Paste the helper password" /></label>
+        <p><span className={`badge ${helper.token ? 'violet' : 'red'}`}>{helper.token ? 'Password saved, check the Email page' : 'Not connected'}</span></p>
       </section>
       <section className="panel pad"><h2>Account</h2>
         <p className="mute small">Switch to another team member to see the desk from their point of view (demo).</p>

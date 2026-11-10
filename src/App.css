@@ -140,3 +140,8 @@ button.brand:hover,button.brand.on{outline:2px solid rgba(255,255,255,.55);outli
 .setrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}.setrow:first-of-type{border-top:0}.setrow p{margin:0}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 @media(max-width:820px){.kv{grid-template-columns:110px 1fr}}
+
+.inbox-row{display:block!important;grid-template-columns:none!important;text-align:left;width:100%}
+.inbox-row.sel{background:var(--soft)}
+.msg{border-top:1px solid var(--line);padding:10px 0}.msg.out{background:var(--soft);padding:10px;border-radius:6px;margin:6px 0}.msg p{margin:4px 0}
+textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);width:100%}
