@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE } from './data'
+import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE, TOPIC_LABELS } from './data'
 import { ackText, topicLabel, triage } from './triage'
-import { agentName, dueInfo, pendingAdviceFor } from './util'
+import { agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
 
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
 
@@ -59,7 +59,7 @@ export function Dashboard({ tickets, me }) {
   const overdue = open.filter((t) => dueInfo(t)?.cls === 'red').length
   const byTopic = DEPTS.map((d) => [d, owned.filter((t) => t.topic === d).length])
   const max = Math.max(1, ...byTopic.map((x) => x[1]))
-  const stats = [['My open tickets', open.length], ['Urgent', open.filter((t) => t.urgent).length], ['Overdue', overdue], ['Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length).length], ['Resolved automatically', ai], ['Closed', owned.filter((t) => t.status === 'Closed').length]]
+  const stats = [['My open tickets', open.length], ['Urgent', open.filter((t) => t.urgent).length], ['Overdue', overdue], ['Advice requested', tickets.filter((t) => pendingAdviceFor(t, me).length).length], ['AI answered', ai], ['Closed', owned.filter((t) => t.status === 'Closed').length]]
   return (
     <div className="dash">
       <p className="mute">Showing only {agentName(me)}'s tickets.</p>
@@ -149,6 +149,51 @@ export function Setup({ me }) {
       <section className="panel pad"><h2>Email connection</h2>
         <p><span className="badge red">Not connected</span></p>
         <p>Right now tickets are created with the <b>Simulate email</b> button. A real HR inbox (for example a Gmail test account) can't be read by the website itself: it needs a small helper that runs on Google's side and hands each new email to this app. That is a setup step for your instructor.</p>
+      </section>
+    </>
+  )
+}
+
+export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switchUser, reset, toast }) {
+  const a = agent(me)
+  const mineAll = tickets.filter((t) => t.assignee === me)
+  const open = mineAll.filter((t) => t.status !== 'Closed').length
+  const email = `${a.name.toLowerCase().replace(/[^a-z ]/g, '').replace(' ', '.')}@examplecompany.com`
+  const set = (patch) => { setPrefs({ ...prefs, ...patch }); toast('Saved.') }
+  const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['system', 'Match my device']]
+  return (
+    <>
+      <section className="panel pad">
+        <div className="profile-head">
+          <div className="profile-sq" aria-hidden="true">{initials(a.name)}</div>
+          <div><h2>{a.name}</h2><p className="mute">{a.skill} specialist, HR team</p><p><span className="badge grey">{prefs.ooo ? 'Out of office' : 'Available'}</span></p></div>
+        </div>
+        <dl className="kv">
+          <dt>Email</dt><dd>{email}</dd>
+          <dt>Team</dt><dd>Beztakets HR team</dd>
+          <dt>Handles</dt><dd className="chips">{a.topics.map((t) => <span key={t} className="badge violet">{TOPIC_LABELS[t]}</span>)}</dd>
+          <dt>Tickets</dt><dd>{open} open, {mineAll.length - open} closed</dd>
+        </dl>
+      </section>
+      <section className="panel pad"><h2>Settings</h2>
+        <div className="setrow"><div><b>Appearance</b><p className="mute small">Light is the default.</p></div>
+          <div className="choice" role="group" aria-label="Appearance">{THEMES.map(([k, l]) => <button key={k} className={prefs.theme === k ? 'on' : ''} aria-pressed={prefs.theme === k} onClick={() => set({ theme: k })}>{l}</button>)}</div></div>
+        <div className="setrow"><div><b>Email notifications</b><p className="mute small">Get an email when a ticket is assigned to you.</p></div>
+          <label><input type="checkbox" checked={prefs.notify} onChange={(e) => set({ notify: e.target.checked })} /> On</label></div>
+        <div className="setrow"><div><b>Out of office</b><p className="mute small">Lets teammates know you are away.</p></div>
+          <label><input type="checkbox" checked={prefs.ooo} onChange={(e) => set({ ooo: e.target.checked })} /> On</label></div>
+        <p className="mute small">These are saved on this device only (demo).</p>
+      </section>
+      <section className="panel pad"><h2>Email connection</h2>
+        <p className="mute small">Connects Beztakets to the email helper so emails become tickets and replies go out by email. The password is saved only in this browser.</p>
+        <label className="field">Helper address<input value={helper.url} onChange={(e) => setHelper({ ...helper, url: e.target.value.trim() })} /></label>
+        <label className="field">Helper password<input type="password" autoComplete="off" value={helper.token} onChange={(e) => setHelper({ ...helper, token: e.target.value.trim() })} placeholder="Paste the helper password" /></label>
+        <p><span className={`badge ${helper.token ? 'violet' : 'red'}`}>{helper.token ? 'Connected: new emails become tickets' : 'Not connected'}</span></p>
+      </section>
+      <section className="panel pad"><h2>Account</h2>
+        <p className="mute small">Switch to another team member to see the desk from their point of view (demo).</p>
+        <div className="choice">{AGENTS.filter((x) => x.id !== me).map((x) => <button key={x.id} onClick={() => switchUser(x.id)}>{x.name}</button>)}</div>
+        <div className="setrow"><div><b>Reset sample data</b><p className="mute small">Puts tickets, replies and documents back to the starting examples.</p></div><button className="btn" onClick={reset}>Reset</button></div>
       </section>
     </>
   )
