@@ -12,9 +12,11 @@ export const Status = ({ s }) => <span className={`badge st-${s.replace(' ', '')
 export const Avatar = ({ name }) => <span className="avatar">{initials(name)}</span>
 const Due = ({ t }) => { const d = dueInfo(t); return d ? <span className={`badge ${d.cls}`}>{d.text}</span> : <span className="mute">–</span> }
 
-export function List({ tickets, me, open, reset }) {
-  const [tab, setTab] = useState('human')
-  const [view, setView] = useState('mine')
+export function List({ tickets, me, open, reset, nav, setNav }) {
+  // The tab and view live in App so they survive opening a ticket and coming back.
+  const { tab, view } = nav
+  const setTab = (t) => setNav({ ...nav, tab: t })
+  const setView = (v) => setNav({ ...nav, view: v })
   const [q, setQ] = useState('')
   const live = (t) => t.status !== 'Closed'
   const human = tickets.filter((t) => !t.resolvedByAI)
@@ -135,7 +137,7 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
 
   return (
     <div className="detail">
-      <div className="crumbs"><button className="link" onClick={back}>← All tickets</button> <span>#{t.id}</span></div>
+      <div className="crumbs"><button className="link" onClick={back}>← Back to the list</button> <span>#{t.id}</span></div>
       {!owner && <div className="banner">You're helping <b>{agentName(t.assignee)}</b> on this ticket. You can read it and answer the advice request below.</div>}
       {t.mergedInto && <div className="banner">This ticket was merged into #{t.mergedInto}.</div>}
       <div className="detail-grid">
