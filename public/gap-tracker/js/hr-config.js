@@ -7,6 +7,7 @@
   'use strict';
   if (!/[?&]embed=1\b/.test(location.search)) return;
   window.GAP_EMBEDDED = true;
+  document.documentElement.classList.add('embedded');
   window.GAP_CATEGORIES = [
     { id: 'benefits', name: 'Benefits', parentId: null },
     { id: 'payroll', name: 'Payroll', parentId: null },

@@ -1,13 +1,25 @@
-import { TOPIC_LABELS } from './data'
+import { KNOWLEDGE, TOPIC_LABELS } from './data'
+import { SECTIONS as OPS } from './data/opsManual.js'
 
 // Turns the HR desk's tickets into the question records the Manual Gap Tracker reads.
 // This is the single place that defines how "what the AI agent handled" becomes "a question".
 // A real agent feed (a shared store, an export) only has to produce the same row shape.
 
-const POLICY_TAGS = ['personal-record', 'pay-error', 'needs-approval', 'management-decision', 'confidential', 'security', 'sensitive']
+// Tags that mean "a person must handle this by policy", so they are not gaps in the manual.
+const POLICY_TAGS = ['personal-record', 'pay-error', 'needs-approval', 'management-decision', 'confidential', 'security', 'sensitive', 'crisis', 'danger', 'emergency', 'injury', 'concern', 'private-info', 'legal', 'medical']
 const STATUS = { Open: 'Open', 'In progress': 'In Progress', 'In Progress': 'In Progress', Resolved: 'Resolved', Closed: 'Closed' }
 
 const answeredByAI = (t) => Boolean(t.resolvedByAI) || (t.tags || []).includes('ai-resolved') || /^Answered automatically/.test(t.note || '')
+// Which manual entry answered a question, read from the citation the AI agent put in its reply
+// ([HR-2] for the HR answers, [6.3] for the Operations Manual).
+function citedSection(text) {
+  const hr = /\[HR-(\d+)\]/.exec(text || '')
+  if (hr && KNOWLEDGE[hr[1] - 1]) return { source: 'HR answers', section: `HR answers: ${TOPIC_LABELS[KNOWLEDGE[hr[1] - 1].topic]}, ${KNOWLEDGE[hr[1] - 1].keys[0]}` }
+  const op = /\[§?\s?(\d+)\.(\d+)\]/.exec(text || '')
+  const sec = op && OPS.find((x) => x.n === Number(op[1]))
+  if (sec) return { source: 'Operations Manual', section: `Ops Manual §${sec.n} ${sec.title}` }
+  return null
+}
 const humanReplies = (t) => (t.replies || []).filter((r) => !r.event && !r.ai && !r.inbound && r.text)
 
 export function ticketsToRows(tickets) {
@@ -17,6 +29,7 @@ export function ticketsToRows(tickets) {
     const lastHuman = humanReplies(t).slice(-1)[0]
     const firstAI = (t.replies || []).find((r) => r.ai)
     const policy = (t.tags || []).some((x) => POLICY_TAGS.includes(x))
+    const cited = ai ? citedSection(firstAI?.text) : null
     const row = {
       question_id: `HR-${t.id}`,
       conversation_id: `HR-${t.id}`,
@@ -25,7 +38,8 @@ export function ticketsToRows(tickets) {
       question_text: `${t.subject}. ${t.body}`.slice(0, 1900),
       response_text: ai ? (firstAI?.text || '') : '',
       resolution_status: ai ? 'Answered' : closed ? 'Ticket Closed' : 'Ticket Open',
-      answer_source: ai ? 'HR answers list' : '',
+      answer_source: ai ? (cited?.source || 'HR answers list') : '',
+      manual_section: ai ? (cited?.section || `HR answers: ${TOPIC_LABELS[t.topic] || 'General'}`) : '',
       category: TOPIC_LABELS[t.topic] || 'General',
       theme: t.subject,
     }

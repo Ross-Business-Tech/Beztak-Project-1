@@ -150,7 +150,7 @@ export default function App() {
             ? <Detail backLabel={{ human: 'Tickets', ai: 'AI answered', all: 'All tickets' }[nav.tab]} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
-          {page === 'gaps' && <GapTracker tickets={tickets} />}
+          {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} />}
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
           {page === 'profile' && <Profile helper={helper} setHelper={setHelper} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}

@@ -417,3 +417,20 @@ dialog.sheet::backdrop { background: rgba(10, 10, 9, .35); }
   * { animation: none !important; transition: none !important; }
 }
 @media print { .side, .topbar, .panel { display: none; } .shell { display: block; } }
+
+/* ---------- embedded in the Beztakets desk: same look as the desk's own pages ---------- */
+html.embedded { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --radius: 6px; --shadow: none;
+  --ink-2: color-mix(in srgb, var(--ink) 65%, var(--ink-3)); --line-strong: color-mix(in srgb, var(--line) 75%, var(--ink)); }
+html.embedded body { background: var(--bg); }
+html.embedded .side, html.embedded .topbar, html.embedded .skip { display: none !important; }
+html.embedded .shell { display: block; min-height: 0; padding-bottom: 0; }
+html.embedded .content { padding: 0 0 24px; }
+html.embedded .embed-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+html.embedded .embed-bar .ctl-row { flex-direction: row; gap: 8px; }
+html.embedded .embed-bar .btn.ghost { border: 1px solid var(--line); background: var(--surface); justify-content: center; color: var(--ink); min-height: 36px; }
+html.embedded .embed-bar .btn.ghost:hover { background: var(--surface-2); }
+html.embedded .embed-bar .datastatus { padding: 0; }
+html.embedded .embed-bar .datastatus { margin: 0 0 0 auto; color: var(--ink-3); font-size: 12.5px; }
+html.embedded .embed-bar .month { width: auto; border-color: var(--line); border-radius: 6px; }
+html.embedded[data-theme="dark"] .logo { filter: none; }
+@media (max-width: 860px) { html.embedded .content { padding: 0 0 24px; } html.embedded .embed-bar .datastatus { margin-left: 0; width: 100%; } }
