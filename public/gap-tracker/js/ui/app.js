@@ -22,6 +22,7 @@
   let navButtons = {};
   let monthSelects = [];
   let statusLines = [];
+  let lastSent = null;
 
   // ---------- chrome ----------
 
@@ -117,6 +118,8 @@
     if (!b) { if (ready) A.hero(view); syncChrome(); return; }
     Object.keys(navButtons).forEach(function (k) { if (k === ui.view) navButtons[k].setAttribute('aria-current', 'page'); else navButtons[k].removeAttribute('aria-current'); });
     if (ui.view !== 'fixes') A.fixes.closePanel();
+    // Tell the desk which tab is showing (for jumps like "open this gap" from the overview).
+    if (window.GAP_EMBEDDED && window.parent !== window && lastSent !== ui.view) { lastSent = ui.view; window.parent.postMessage({ type: 'gap-tracker:view', view: ui.view }, location.origin); }
     ({ overview: A.overview.render, fixes: function (el) { A.fixes.render(el); }, results: A.results, manual: A.manual, reports: A.reports }[ui.view] || A.overview.render)(view, b);
     syncChrome();
   }

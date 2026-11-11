@@ -417,3 +417,14 @@ dialog.sheet::backdrop { background: rgba(10, 10, 9, .35); }
   * { animation: none !important; transition: none !important; }
 }
 @media print { .side, .topbar, .panel { display: none; } .shell { display: block; } }
+
+/* Inside the HR desk: the desk shows the tabs, so hide this tracker's own menu and keep one slim control bar. */
+.embedded .shell { display: block; padding-bottom: 0; }
+.embedded .side { display: none; }
+.embedded .topbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 8px 14px; position: sticky; top: 0; z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.embedded .topbar .brand { display: none; }
+.embedded .top-ctl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex: 1; min-width: 0; }
+.embedded .top-ctl .ctl-row { display: flex; flex-direction: row; gap: 4px; }
+.embedded .top-ctl .datastatus { display: none; }
+.embedded .top-ctl .month { width: auto; max-width: 220px; }
+@media (max-width: 860px) { .embedded .top-ctl .btn .txt { display: none; } }

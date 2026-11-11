@@ -122,7 +122,7 @@
       return h('div', { class: 'action' }, h('div', {}, h('b', {}, title), h('p', { class: 'sub' }, text)), h('button', { type: 'button', class: 'btn', id: id, onclick: fn }, A.icon(ic), label));
     };
     root.replaceChildren(h('div', { class: 'page' },
-      A.pageHead('Reports', 'Share progress with leadership and keep owners on track.'),
+      A.pageHead(window.GAP_EMBEDDED ? 'Monthly report' : 'Reports', 'Share progress with leadership and keep owners on track.'),
       h('section', { class: 'card' }, h('div', { class: 'card-h' }, h('h2', {}, 'Download now')),
         rowBtn('Progress deck', 'Leadership slides for ' + b.range.label + ' (PowerPoint).', 'Download deck', 'download', function () { svc.downloadDeck(); }, 'dl-deck'),
         rowBtn('Fix list', 'Every gap with status, owner and due date (spreadsheet).', 'Download CSV', 'download', function () { svc.downloadCsv(); }, 'dl-csv')),
