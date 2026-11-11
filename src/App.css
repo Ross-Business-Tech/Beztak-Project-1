@@ -161,3 +161,16 @@ textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px
 .seg button.on{background:var(--rail);color:#fff}
 .gaps-frame{width:100%;height:calc(100vh - 118px);min-height:560px;border:0;display:block;background:var(--surface)}
 @media(max-width:820px){.gaps{margin:-12px -12px -80px}.gaps-bar{padding:8px 12px 0}.gaps-frame{height:calc(100dvh - 58px - 49px - 112px);min-height:420px}}
+
+/* Guardrails page */
+.gr-sum{font-weight:600;padding:10px 12px;border-radius:6px;margin:10px 0 0}.gr-sum.ok{background:#dcfce7;color:#15803d}.gr-sum.bad{background:#fee2e2;color:#b91c1c}
+.badge.pass{background:#dcfce7;color:#15803d}
+.gr-lane h3{font-size:16px;font-weight:600}.gr-lane>p{margin:0 0 8px}
+.gr-case{border-top:1px solid var(--line)}
+.gr-head{display:flex;gap:10px;align-items:flex-start;width:100%;background:none;border:0;padding:10px 0;text-align:left;cursor:pointer;color:inherit;font:inherit}
+.gr-q{display:flex;flex-direction:column;min-width:0;gap:2px}.gr-q b{font-weight:500;overflow-wrap:anywhere}.gr-q small{color:var(--mute)}
+.gr-body{padding:0 0 12px 54px}.gr-body p{margin:4px 0}
+.gr-reply{background:var(--soft);border-radius:6px;padding:8px 10px;white-space:pre-wrap;font-size:13px}
+.gr-prob{color:#b91c1c}
+@media(max-width:820px){.gr-body{padding-left:0}}
+:root[data-theme="dark"] .badge.pass,:root[data-theme="dark"] .gr-sum.ok{background:#1a3a26;color:#9bd3ab}:root[data-theme="dark"] .gr-sum.bad{background:#4a1f1b;color:#f4b4ad}

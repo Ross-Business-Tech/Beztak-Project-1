@@ -42,7 +42,7 @@ export const ESCALATIONS = [
     test: /(coworker|co-worker|colleague|teammate|manager|boss|someone|\w+'s).*(salary|make|earn|paid|pay)\b|(salary|pay) of (my|a|the) (coworker|colleague|manager|boss)/,
     extra: 'We cannot share information about other employees.' },
   { id: 'bereavement', reason: 'Requires appropriate authorization', topic: 'timeoff', tag: 'needs-approval', example: 'Can you approve my bereavement leave?',
-    test: /approve.*(leave|bereavement|time off|request|pto)|bereavement/,
+    test: /approv\w*.*(leave|bereavement|time off|request|pto|vacation|days? off|holiday)|bereavement/,
     extra: 'We are sorry for your loss. Leave must be approved by an authorized team member, who will contact you shortly.' },
   { id: 'write-up', reason: 'Requires details about an individual incident', topic: 'relations', tag: 'confidential', example: 'Why did my manager write me up?',
     test: /write.?up|written up|disciplin|formal warning|why did my manager/,
