@@ -48,5 +48,5 @@ export function ackText(name, agentName, urgent, sensitive, extra) {
   return `Hi ${first}, thanks for contacting HR. ` +
     (extra ? `${extra} ` : sensitive ? `This is a confidential matter, so a person on the team will handle it personally. ` : '') +
     `We passed your message to ${agentName}.` +
-    (urgent ? ' It is marked urgent, so it will be looked at first.' : ' You can expect a reply within one business day.')
+    (urgent ? ' It is marked urgent, so it will be looked at first. Our HR team works Monday to Friday, 9am to 5pm.' : ' You can expect a reply within one business day.')
 }

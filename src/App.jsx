@@ -72,7 +72,7 @@ export default function App() {
             const now = new Date().toISOString()
             created.unshift({
               id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,
-              status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent),
+              status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent, inbound[0].at),
               resolvedByAI: res.resolved, channel: 'Email', note: res.note, advice: [], draft: res.draft || undefined,
               tags: [...(res.resolved ? ['ai-resolved'] : []), ...(res.tags || (res.sensitive ? ['sensitive'] : []))],
               replies: [{ from: 'HR Assistant (automated)', text: reply, at: now, email: true, ai: true }, ...inbound.slice(1).map((m) => ({ inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId }))],

@@ -1,3 +1,57 @@
+//#region src/hours.js
+var WORK = {
+	start: 9,
+	end: 17,
+	days: [
+		1,
+		2,
+		3,
+		4,
+		5
+	],
+	label: "Monday to Friday, 9:00 am to 5:00 pm"
+};
+var isWorkday = (d) => WORK.days.includes(d.getDay());
+var at = (d, hour) => {
+	const x = new Date(d);
+	x.setHours(hour, 0, 0, 0);
+	return x;
+};
+var nextDay = (d) => {
+	const x = at(d, WORK.start);
+	x.setDate(x.getDate() + 1);
+	return x;
+};
+var isWorkTime = (d) => isWorkday(d) && d.getHours() >= WORK.start && d.getHours() < WORK.end;
+function nextOpen(d) {
+	let x = new Date(d);
+	for (let i = 0; i < 14; i++) {
+		if (isWorkday(x) && x < at(x, WORK.end)) return x < at(x, WORK.start) ? at(x, WORK.start) : x;
+		x = nextDay(x);
+	}
+	return x;
+}
+function addWorkHours(from, hours) {
+	let t = nextOpen(from);
+	let left = hours * 36e5;
+	for (let i = 0; i < 30; i++) {
+		const close = at(t, WORK.end);
+		if (t.getTime() + left <= close.getTime()) return new Date(t.getTime() + left);
+		left -= close - t;
+		t = nextOpen(close);
+	}
+	return t;
+}
+function dueFrom(created, urgent) {
+	const c = new Date(created);
+	if (urgent) return isWorkTime(c) ? addWorkHours(c, 2) : nextOpen(c);
+	let d = at(c, WORK.end);
+	do
+		d.setDate(d.getDate() + 1);
+	while (!isWorkday(d));
+	return d;
+}
+//#endregion
 //#region src/data.js
 var AGENTS = [
 	{
@@ -357,7 +411,7 @@ var T = (id, subject, body, customer, status, urgent, topic, assignee, age, note
 	channel: "Email",
 	tags: [],
 	advice: [],
-	dueAt: (/* @__PURE__ */ new Date(Date.now() - age * 6e4 + (urgent ? 4 : 24) * 36e5)).toISOString(),
+	dueAt: dueFrom(d(age), urgent).toISOString(),
 	...extra
 });
 T(1008, "Unsafe wiring in the break room", "There are exposed wires near the microwave in the 3rd floor break room. Someone could get hurt.", "Taylor Reed", "Open", true, "relations", "sam", 12, "Sensitive subject (\"unsafe\"): the assistant never answers these, a person handles it. Routed to Employee relations. Marked urgent: \"unsafe\".", [ai("Hi Taylor, thanks for contacting HR. This is a confidential matter, so a person on the team will handle it personally. We passed your message to Sam Brooks. It is marked urgent, so it will be looked at first.", d(11))], { tags: ["sensitive", "safety"] }), T(1007, "How do I request time off?", "Hi, I want to take next Friday off. How do I request it?", "Mia Torres", "Closed", false, "timeoff", "priya", 45, "Answered automatically from the HR answers list. No person needed.", [ai("To request time off, open the HR portal, choose Time Off → New Request, pick your dates, and submit. Your manager will get a notification to approve it.", d(44))], {
@@ -1038,7 +1092,7 @@ function triage(subject, body) {
 	};
 }
 function ackText(name, agentName, urgent, sensitive, extra) {
-	return `Hi ${(name || "there").split(" ")[0]}, thanks for contacting HR. ` + (extra ? `${extra} ` : sensitive ? `This is a confidential matter, so a person on the team will handle it personally. ` : "") + `We passed your message to ${agentName}.` + (urgent ? " It is marked urgent, so it will be looked at first." : " You can expect a reply within one business day.");
+	return `Hi ${(name || "there").split(" ")[0]}, thanks for contacting HR. ` + (extra ? `${extra} ` : sensitive ? `This is a confidential matter, so a person on the team will handle it personally. ` : "") + `We passed your message to ${agentName}.` + (urgent ? " It is marked urgent, so it will be looked at first. Our HR team works Monday to Friday, 9am to 5pm." : " You can expect a reply within one business day.");
 }
 //#endregion
 //#region src/aiAgent.js

@@ -1,3 +1,5 @@
+import { dueFrom } from './hours'
+
 // All sample data is made up.
 export const HR_ADDRESS = 'hr@examplecompany.com'
 
@@ -77,7 +79,7 @@ const ai = (text, at) => ({ from: 'HR Assistant (automated)', text, at, email: t
 const T = (id, subject, body, customer, status, urgent, topic, assignee, age, note, replies = [], extra = {}) => ({
   id, subject, body, customer, email: `${customer.toLowerCase().replace(/[^a-z]+/g, '.')}@examplecompany.com`,
   status, urgent, topic, assignee, createdAt: d(age), note, replies, channel: 'Email', tags: [], advice: [],
-  dueAt: new Date(Date.now() - age * 60000 + (urgent ? 4 : 24) * 3600000).toISOString(), ...extra,
+  dueAt: dueFrom(d(age), urgent).toISOString(), ...extra,
 })
 export const SEED_TICKETS = [
   T(1008, 'Unsafe wiring in the break room', 'There are exposed wires near the microwave in the 3rd floor break room. Someone could get hurt.', 'Taylor Reed', 'Open', true, 'relations', 'sam', 12, 'Sensitive subject ("unsafe"): the assistant never answers these, a person handles it. Routed to Employee relations. Marked urgent: "unsafe".', [ai('Hi Taylor, thanks for contacting HR. This is a confidential matter, so a person on the team will handle it personally. We passed your message to Sam Brooks. It is marked urgent, so it will be looked at first.', d(11))], { tags: ['sensitive', 'safety'] }),

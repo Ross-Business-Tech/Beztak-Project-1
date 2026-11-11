@@ -1,4 +1,5 @@
 import { AGENTS } from './data'
+import { dueFrom } from './hours'
 
 export const agent = (id) => AGENTS.find((a) => a.id === id)
 export const agentName = (id) => agent(id)?.name ?? 'Unassigned'
@@ -8,7 +9,7 @@ const span = (ms) => {
   return m < 60 ? `${m}m` : m < 2880 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`
 }
 export const ago = (iso) => `${span(Date.now() - new Date(iso))} ago`
-export const dueIn = (urgent) => new Date(Date.now() + (urgent ? 4 : 24) * 3600000).toISOString()
+export const dueIn = (urgent, from = new Date()) => dueFrom(from, urgent).toISOString()
 
 // What to show for a ticket's deadline timer.
 export function dueInfo(t) {
@@ -16,6 +17,7 @@ export function dueInfo(t) {
   const diff = new Date(t.dueAt) - Date.now()
   if (diff < 0) return { text: `Overdue ${span(-diff)}`, cls: 'red' }
   if (diff < 4 * 3600000) return { text: `Due in ${span(diff)}`, cls: 'amber' }
+  if (diff >= 8 * 3600000) return { text: `Due ${new Date(t.dueAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`, cls: 'grey' }
   return { text: `Due in ${span(diff)}`, cls: 'grey' }
 }
 // How urgently a ticket needs a person. The HR list is sorted by this, most urgent first.

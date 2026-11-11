@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
 import { manualDraft } from './aiAgent'
+import { WORK } from './hours'
 import { helperCall } from './helper'
 import { agentName, ago, byUrgency, dueInfo, fill, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
 
@@ -45,7 +46,7 @@ export function List({ tickets, me, open, reset }) {
       <div className="tabs bigtabs" role="tablist">
         {TABS.map(([k, n, c]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}<em>{c}</em></button>)}
       </div>
-      {tab === 'human' && <p className="mute small tabnote">Tickets that need a person, <b>most urgent first</b>: Critical → High → Medium → Normal, then the nearest deadline. Open a ticket to see why it has its priority.</p>}
+      {tab === 'human' && <p className="mute small tabnote"><b>Most urgent first</b>: Critical → High → Medium → Normal, then nearest deadline. Deadlines count only team hours ({WORK.label}).</p>}
       {tab === 'ai' && <p className="mute small tabnote">Answered by the AI agent and closed. Open one to read the reply that was sent.</p>}
       {tab === 'all' && <p className="mute small tabnote">Everything: tickets a person needs to answer and tickets the AI agent answered.</p>}
       <div className={tab === 'human' ? 'split' : 'split one'}>

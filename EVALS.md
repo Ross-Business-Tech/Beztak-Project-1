@@ -36,6 +36,16 @@ If an employee replies to an AI answer, the ticket reopens for a person.
 
 **Most urgent first:** the HR team's ticket list is sorted by priority. **Critical** covers safety and emergencies. **High** covers tickets marked urgent (harassment, missing pay) and overdue ones. **Medium** covers pay, approvals, personal records and confidential matters, plus anything due within 4 hours. **Normal** is everything else. Ties go to the nearest deadline, then the oldest ticket. Each ticket shows why it has its priority.
 
+**Deadlines follow the team's hours** (Monday to Friday, 9:00 am to 5:00 pm). Only work hours count, so nothing becomes overdue while the team is off.
+
+| Ticket | Arrives | Due |
+|---|---|---|
+| Urgent | During work hours | Within 2 work hours. If that runs past 5 pm, the rest carries over to the next morning. |
+| Urgent | Evenings, nights, weekends | 9:00 am at the next clock-in, so it's the first thing the team answers |
+| Normal | Any time | 5:00 pm on the next workday, matching "a reply within one business day" |
+
+The automatic email for urgent tickets tells the employee the team's hours. Emergencies always get the safety number immediately, whatever the time.
+
 ---
 
 ## Lane 1: The AI may answer on its own (must pass)
