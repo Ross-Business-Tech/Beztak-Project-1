@@ -141,9 +141,13 @@ export function Canned({ canned, setCanned }) {
   )
 }
 
-export function Setup({ me }) {
+export function Setup({ me, openGuardrails }) {
   return (
     <>
+      <section className="panel pad"><h2>For the project team: AI guardrails</h2>
+        <p>The checks that prove the AI assistant only answers what it safely can, and hands everything else to a person. This is a back-office page, so it is not in the main menu.</p>
+        <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>
+      </section>
       <section className="panel pad"><h2>Signing in (demo)</h2>
         <p>You are signed in as <b>{agentName(me)}</b>. The "Signed in as" menu at the top lets you try the team from each person's point of view, and each person only sees their own tickets and any ticket they were asked to advise on.</p>
         <p className="mute small">This is a demo: there are no real accounts or passwords yet, and tickets are stored only in this browser. Real private logins and shared tickets need a server, which is a setup step for your instructor. Team members: {AGENTS.map((a) => a.name).join(', ')}.</p>

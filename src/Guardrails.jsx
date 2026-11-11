@@ -14,7 +14,7 @@ export default function Guardrails() {
     <>
       <section className="panel pad">
         <div className="row between">
-          <h2>Guardrails</h2>
+          <h2>Guardrails <span className="nl gray">Project team only</span></h2>
           <button className="btn" onClick={run}>Run checks again</button>
         </div>
         <p>These are the promises the AI assistant makes. AI can make things up, so it may only answer when the HR answers or the Operations Manual say exactly what to reply. Everything else goes to a person. People ask the same thing in different words, so most promises are tested with several wordings, and every wording must pass. All of them run against the real assistant every time this page opens.</p>

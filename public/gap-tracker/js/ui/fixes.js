@@ -30,6 +30,12 @@
     return a.owner ? h('span', { class: 'owner' }, h('i', { class: 'av' }, a.owner.trim().charAt(0).toUpperCase()), a.owner) : h('span', { class: 'muted' }, 'Unassigned');
   }
 
+  // Notion-style colored labels: each category keeps the same color.
+  const CAT_COLORS = ['purple', 'green', 'blue', 'orange', 'pink', 'brown', 'yellow', 'red', 'gray'];
+  function catColor(name) { let n = 0; for (let i = 0; i < name.length; i++) n = (n * 31 + name.charCodeAt(i)) >>> 0; return CAT_COLORS[n % CAT_COLORS.length]; }
+  function label(text, color, title) { return h('span', { class: 'nl ' + color, title: title || '' }, text); }
+  const ST_COLORS = { todo: 'gray', doing: 'blue', done: 'green', dismissed: 'brown' };
+
   function matches(c) {
     if (ui.cat && c.category !== ui.cat) return false;
     const q = U.norm(ui.search);
@@ -52,12 +58,13 @@
       tr.addEventListener('focus', function () { ui.hi = i; });
       tr.append(
         h('td', { class: 'c-rk' }, c.rank || '–'),
-        h('td', { class: 'c-fix' }, h('b', {}, A.chip(ui.tab === 'done' ? (c.kind === 'add' ? 'Added' : 'Clarified') : svc.verb(c), 'verb ' + c.kind), ' ', c.theme, c.rising ? A.chip('Rising', 'rising') : null),
-          h('span', { class: 'sub block clip' }, c.category + '  ·  “' + c.example + '”')),
+        h('td', { class: 'c-fix' }, h('b', { class: 'clip block' }, c.theme), h('span', { class: 'sub block clip' }, '“' + c.example + '”')),
+        h('td', { class: 'c-type' }, label(ui.tab === 'done' ? (c.kind === 'add' ? 'Added' : 'Clarified') : svc.verb(c), c.kind === 'add' ? 'blue' : 'yellow'), c.rising ? label('Rising', 'red') : null),
+        h('td', { class: 'c-cat' }, label(c.category, catColor(c.category))),
         h('td', { class: 'c-tk' }, h('b', {}, U.n0(c.tickets)), h('i', { class: 'mini', 'aria-hidden': 'true' }, h('u', { style: 'width:' + Math.max(4, (c.tickets / max) * 100) + '%' }))),
-        h('td', { class: 'c-est hide-sm' }, '≈ ' + U.n0(c.more)),
-        h('td', { class: 'c-ow hide-sm' }, ownerCell(c)),
-        h('td', { class: 'c-st' }, A.statusChip(a.status)));
+        h('td', { class: 'c-est' }, '≈ ' + U.n0(c.more)),
+        h('td', { class: 'c-ow' }, ownerCell(c)),
+        h('td', { class: 'c-st' }, label(Q.statusLabel(a.status), ST_COLORS[a.status] || 'gray')));
       tbody.append(tr);
     });
     if (!shown.length) {
@@ -67,7 +74,7 @@
         done: 'No fixes marked done yet. Fixes found in your questions file are listed under Results.',
         dismissed: 'Nothing dismissed.'
       }[ui.tab];
-      tbody.append(h('tr', {}, h('td', { colspan: '6', class: 'none' }, msg)));
+      tbody.append(h('tr', {}, h('td', { colspan: '8', class: 'none' }, msg)));
     }
   }
 
@@ -95,7 +102,7 @@
       h('option', { value: '' }, 'All categories'), cats.map(function (c) { return h('option', { value: c, selected: ui.cat === c }, c); }));
     tbody = h('tbody', {});
     const table = h('table', { class: 'tbl fixes' },
-      h('thead', {}, h('tr', {}, h('th', { class: 'c-rk' }, '#'), h('th', {}, 'Fix'), h('th', { class: 'c-tk' }, 'Tickets'), h('th', { class: 'c-est hide-sm' }, 'Fewer / month'), h('th', { class: 'c-ow hide-sm' }, 'Owner'), h('th', {}, 'Status'))), tbody);
+      h('thead', {}, h('tr', {}, h('th', { class: 'c-rk' }, '#'), h('th', { class: 'c-fix' }, 'Fix'), h('th', {}, 'Type'), h('th', {}, 'Category'), h('th', { class: 'c-tk' }, 'Tickets'), h('th', { class: 'c-est' }, 'Fewer / month'), h('th', { class: 'c-ow' }, 'Owner'), h('th', {}, 'Status'))), tbody);
     root.replaceChildren(h('div', { class: 'page' },
       A.pageHead('Fix list', lede),
       h('div', { class: 'toolbar' }, tabsEl, h('div', { class: 'filters' }, h('label', { class: 'searchbox' }, A.icon('search'), search), catSel)),
