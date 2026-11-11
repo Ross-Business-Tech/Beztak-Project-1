@@ -4,6 +4,8 @@
 **Last updated:** 2026-11-11
 **Purpose:** The promises the AI assistant makes to employees and to the HR team: what it may answer on its own, what it must always hand to a person, and the tricks it must not fall for. AI can make things up, so the assistant only answers when the company manuals say exactly what to reply. **Every change to the assistant must pass all of these before it is shared.**
 
+**How it works:** the assistant is **non-deterministic**: an AI model writes each answer, so wording varies from email to email. It sits inside **fixed rules** that decide what may be sent: safety and personal-matter rules run before the AI sees anything, and fixed checks (real citations, every fact found in the cited section, plus a second AI check) run before anything is sent. If the AI isn't connected, the simple keyword answers are used instead.
+
 The checks live in `src/evals.js`. Run them with `npm run eval`, or open the **Guardrails** page in the app, which runs them live and shows Pass or Fail for each one.
 
 ---

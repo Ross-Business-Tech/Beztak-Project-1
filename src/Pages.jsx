@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE, TOPIC_LABELS } from './data'
 import { ackText, topicLabel } from './triage'
-import { decide } from './aiAgent'
+import { BROWSER_AI, decide, FOOTER } from './aiAgent'
 import { agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
 
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
@@ -11,6 +11,7 @@ export function Compose({ tickets, onClose, onCreate }) {
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [busy, setBusy] = useState(false)
   const answerable = [
     ['How many vacation days do I get?', 'Hi, how many vacation days do I get per year?'],
     ['When is payday?', 'When do I get paid this month? What is the pay schedule?'],
@@ -22,9 +23,12 @@ export function Compose({ tickets, onClose, onCreate }) {
   const submit = async (e) => {
     e.preventDefault()
     // Same decision the email helper makes for real emails (safety rules, then answers or a person).
-    const r = await decide({}, subject, body)
+    if (busy) return
+    setBusy(true)
+    const r = await decide(BROWSER_AI, subject, body)
+    setBusy(false)
     const now = new Date().toISOString()
-    const text = r.resolved ? r.answer : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
+    const text = r.resolved ? r.answer + (r.aiAnswered ? FOOTER : '') : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
     onCreate({
       id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body, customer: name || 'Employee',
       email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,
@@ -48,7 +52,7 @@ export function Compose({ tickets, onClose, onCreate }) {
         <label>From (email)<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alex.kim@examplecompany.com" /></label>
         <label>Subject<input required value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
         <label>Message<textarea required rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></label>
-        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" type="submit">Create ticket</button></div>
+        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" type="submit" disabled={busy}>{busy ? 'The AI is reading the email…' : 'Create ticket'}</button></div>
       </form>
     </div>
   )
