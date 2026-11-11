@@ -147,7 +147,7 @@ export default function App() {
         </header>
         <div className="content">
           {page === 'tickets' && (openId
-            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
+            ? <Detail backLabel={{ human: 'Tickets', ai: 'AI answered', all: 'All tickets' }[nav.tab]} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'gaps' && <GapTracker tickets={tickets} />}

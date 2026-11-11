@@ -89,7 +89,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
   )
 }
 
-export function Detail({ ticket: t, all, me, canned, helper, update, transfer, merge, toast, back }) {
+export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper, update, transfer, merge, toast, back }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
   const [tag, setTag] = useState('')
@@ -97,7 +97,7 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
   const [adviceQ, setAdviceQ] = useState('')
   const [mergeId, setMergeId] = useState('')
   const [answers, setAnswers] = useState({})
-  if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← Back to tickets</button></>
+  if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← {backLabel}</button></>
 
   const owner = t.assignee === me
   const thread = [{ from: t.customer, text: t.body, at: t.createdAt, inbound: true }, ...t.replies]
@@ -137,7 +137,7 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
 
   return (
     <div className="detail">
-      <div className="crumbs"><button className="link" onClick={back}>← Back to the list</button> <span>#{t.id}</span></div>
+      <div className="crumbs"><button className="link" onClick={back}>← {backLabel}</button> <span>#{t.id}</span></div>
       {!owner && <div className="banner">You're helping <b>{agentName(t.assignee)}</b> on this ticket. You can read it and answer the advice request below.</div>}
       {t.mergedInto && <div className="banner">This ticket was merged into #{t.mergedInto}.</div>}
       <div className="detail-grid">
