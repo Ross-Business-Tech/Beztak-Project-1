@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
+import { manualDraft } from './aiAgent'
 import { helperCall } from './helper'
-import { agentName, ago, dueInfo, fill, initials, pendingAdviceFor, toLocalInput } from './util'
+import { agentName, ago, byUrgency, dueInfo, fill, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
 
 const STATUSES = ['Open', 'In progress', 'On hold', 'Closed']
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
 
-export const Prio = ({ urgent }) => <span className={`badge ${urgent ? 'red' : 'grey'}`}>{urgent ? 'Urgent' : 'Normal'}</span>
+export const Prio = ({ t }) => { const p = priorityOf(t); return <span className={`badge ${p.cls}`} title={p.why}>{p.label}</span> }
 export const Status = ({ s }) => <span className={`badge st-${s.replace(' ', '')}`}>{s}</span>
 export const Avatar = ({ name }) => <span className="avatar">{initials(name)}</span>
 const Due = ({ t }) => { const d = dueInfo(t); return d ? <span className={`badge ${d.cls}`}>{d.text}</span> : <span className="mute">–</span> }
@@ -36,8 +37,7 @@ export function List({ tickets, me, open, reset }) {
   const text = q.trim().toLowerCase()
   const byNewest = (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   const rows = current.filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort(tab === 'human' ? (a, b) => new Date(a.dueAt) - new Date(b.dueAt) || b.id - a.id : byNewest)
-    .sort(tab === 'human' ? (a, b) => Number(live(b)) - Number(live(a)) : () => 0)
+    .sort(tab === 'human' ? byUrgency : byNewest)
   const TABS = [['human', 'Tickets', human.filter(live).length], ['ai', 'AI answered', aiDone.length], ['all', 'All tickets', tickets.length]]
 
   return (
@@ -45,7 +45,7 @@ export function List({ tickets, me, open, reset }) {
       <div className="tabs bigtabs" role="tablist">
         {TABS.map(([k, n, c]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}<em>{c}</em></button>)}
       </div>
-      {tab === 'human' && <p className="mute small tabnote">Tickets that need a person to answer.</p>}
+      {tab === 'human' && <p className="mute small tabnote">Tickets that need a person, <b>most urgent first</b>: Critical → High → Medium → Normal, then the nearest deadline. Open a ticket to see why it has its priority.</p>}
       {tab === 'ai' && <p className="mute small tabnote">Answered by the AI agent and closed. Open one to read the reply that was sent.</p>}
       {tab === 'all' && <p className="mute small tabnote">Everything: tickets a person needs to answer and tickets the AI agent answered.</p>}
       <div className={tab === 'human' ? 'split' : 'split one'}>
@@ -74,7 +74,7 @@ export function List({ tickets, me, open, reset }) {
                     <small>#{t.id} · {topicLabel(t.topic)}{t.resolvedByAI ? ' · AI answered' : ''}{adv ? ' · Advice requested' : ''}{(t.tags || []).map((g) => ` #${g}`).join('')}</small></span>
                   <span className="contact"><Avatar name={t.customer} />{t.customer}</span>
                   <span><Status s={t.status} /></span>
-                  <span><Prio urgent={t.urgent} /></span>
+                  <span><Prio t={t} /></span>
                   <span className="duecol"><Due t={t} /></span>
                   <span className="owner">{t.resolvedByAI ? 'AI agent' : t.assignee === me ? 'Me' : agentName(t.assignee)}</span>
                 </button>
@@ -95,6 +95,7 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
   const [adviceQ, setAdviceQ] = useState('')
   const [mergeId, setMergeId] = useState('')
   const [answers, setAnswers] = useState({})
+  const [hideDraft, setHideDraft] = useState(false)
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← Back to tickets</button></>
 
   const owner = t.assignee === me
@@ -132,6 +133,10 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
     update(t.id, (x) => ({ advice: x.advice.map((y) => (y.id === a.id ? { ...y, answer: v, answeredAt: stamp() } : y)) }))
   }
   const mt = mergeTargets.find((x) => String(x.id) === mergeId)
+  // Human in the loop: a suggested reply the HR person checks, edits and sends. Never sent on its own.
+  const personReplied = t.replies.some((m) => m.email && !m.ai && !m.inbound)
+  const draft = owner && !t.resolvedByAI && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
+  const useDraft = () => { setTab('reply'); setText(fill(`Hi {name},\n\n${draft.text.replace(/\s*\[[^\]]+\]/g, '')}\n\nBest,\n{agent}`, t.customer, me)) }
 
   return (
     <div className="detail">
@@ -142,9 +147,17 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
         <section className="panel">
           <div className="panel-h col">
             <h2>{t.subject}</h2>
-            <div className="row"><Status s={t.status} /><Prio urgent={t.urgent} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">AI answered</span>}</div>
+            <div className="row"><Status s={t.status} /><Prio t={t} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">AI answered</span>}</div>
           </div>
-          <div className="ai-box"><b>{t.resolvedByAI ? 'AI agent' : 'Automated triage'}</b><p>{t.note}</p></div>
+          <div className="ai-box"><b>{t.resolvedByAI ? 'AI agent' : 'Automated triage'}</b><p>{t.note}</p>{!t.resolvedByAI && t.status !== 'Closed' && <p className="small"><b>Priority: {priorityOf(t).label}.</b> {priorityOf(t).why}.</p>}</div>
+          {draft && (
+            <div className="draft-box">
+              <b>Suggested reply: check it before sending</b>
+              <small>{draft.source === 'AI' ? 'Written by the AI' : 'Closest answer'} from the manuals ({draft.refs.join(', ')}{draft.title ? `: ${draft.title}` : ''}). Nothing is sent until you send it. Make sure it fits this person's question.</small>
+              <p>{draft.text}</p>
+              <div className="row"><button className="btn primary" onClick={useDraft}>Use this draft</button><button className="btn" onClick={() => setHideDraft(true)}>Dismiss</button></div>
+            </div>
+          )}
           <div className="thread">
             {thread.map((m, i) => m.event
               ? <div key={i} className="event">{m.text} · {ago(m.at)}</div>

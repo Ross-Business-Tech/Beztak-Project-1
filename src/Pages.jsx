@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE, TOPIC_LABELS } from './data'
-import { ackText, topicLabel, triage } from './triage'
+import { ackText, topicLabel } from './triage'
+import { decide } from './aiAgent'
 import { agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
 
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
@@ -18,15 +19,16 @@ export function Compose({ tickets, onClose, onCreate }) {
     ['Dress code', 'What is the dress code and the work from home policy?'],
   ]
   const personal = ESCALATIONS.map((e) => [e.example, e.example])
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    const r = triage(subject, body)
+    // Same decision the email helper makes for real emails (safety rules, then answers or a person).
+    const r = await decide({}, subject, body)
     const now = new Date().toISOString()
     const text = r.resolved ? r.answer : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
     onCreate({
       id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body, customer: name || 'Employee',
       email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,
-      topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note,
+      topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note, draft: r.draft || undefined,
       tags: [...(r.resolved ? ['ai-resolved'] : []), ...(r.tags || (r.sensitive ? ['sensitive'] : []))],
       replies: [{ from: 'HR Assistant (automated)', text, at: now, email: true, ai: true }],
     })

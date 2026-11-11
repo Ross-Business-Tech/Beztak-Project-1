@@ -17,5 +17,7 @@ simple keyword answers.
 1. Safety rules first: emergencies, personal records, pay disputes, approvals, confidential matters,
    legal or medical questions, and anything containing passwords or ID numbers always go to a person.
 2. With an AI key: the AI answers only from the HR answers plus the Operations Manual and must cite sections.
-   If unsure, a person takes over.
+   Every number, phone number and email in the answer must appear in the cited sections, and a second AI
+   check must agree it is a general question (not about one person, an approval, or anything sensitive).
+   If not, a person takes over and gets a suggested reply to check, edit and send.
 3. Everything else gets a short "we passed this to ..." email.
