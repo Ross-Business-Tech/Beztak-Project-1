@@ -610,7 +610,7 @@ var SECTIONS = [
 			{
 				q: "What are the lease renewal standards?",
 				a: "• Know the owner's objective: raising rents or keeping occupancy.\n• Renew all leases at least 75 days before expiration.\n• Aim to bring residents to market rent; for residents already over market, the regional manager and owner set the % cap.\n• Renewal incentives are a last resort and need VP approval in writing.\n• The Regional, VP and Owners approve all recommended renewal rates.\n• Residents get personal contact before renewal rates are updated.\n• Renewal letters are usually generated 60-90 days before the lease expires.",
-				k: "renewal renew lease 75 days market rent incentive renewal letter"
+				k: "renewal renew lease 75 days before expiration market rent incentive renewal letter"
 			},
 			{
 				q: "What is an onsite transfer?",
@@ -633,7 +633,7 @@ var SECTIONS = [
 				k: "move out process inspection damages charges dispute deposit refund"
 			},
 			{
-				q: "What are the SODA (Statement of Deposit Accounting) rules?",
+				q: "When must a SODA (Statement of Deposit Accounting) be completed, and where does it go?",
 				a: "• SODAs must be completed within 7 days of move-out.\n• SODAs that need a refund are sent to SDRefunds@beztak.com.\n• SODAs that leave a balance are mailed to the resident at the forwarding address given at move-out.",
 				k: "soda statement of deposit accounting deposit refund 7 days forwarding address finish complete after move out how long"
 			},
@@ -656,7 +656,7 @@ var SECTIONS = [
 			{
 				q: "When is a purchase order (PO) required?",
 				a: "A PO is required before any work is done by a vendor, to stay on budget and process invoices, except for emergencies and utility bills. POs are created manually (P2P Finance Manager role) or through Yardi Marketplace. Work should not start until the PO has final approval.",
-				k: "purchase order po required before work approval"
+				k: "purchase order po required before vendor start work approval"
 			},
 			{
 				q: "What are manual POs, Marketplace POs, service contracts and recurring POs?",
@@ -671,7 +671,7 @@ var SECTIONS = [
 			{
 				q: "What are the petty cash rules?",
 				a: "• Petty cash is for site expenses that cannot be ordered in Yardi Marketplace, such as resident functions, refreshments, gas for site trucks and postage.\n• Keep it locked and secure in the office or in a bank account; Green Dot cards are preferred.\n• Submit it when 50% has been spent, and at least once a month.\n• Maintenance items need written approval from the Regional Manager.\n• It is not used to reimburse mileage; use an Expense Report.\n• Amount on hand: 0-300 units $300; 301-599 units $500; 600+ units $750.",
-				k: "petty cash green dot amount reimburse limit units"
+				k: "petty cash green dot amount reimburse limit units unit keep on hand property size"
 			},
 			{
 				q: "How is petty cash reconciled, and what happens when a manager leaves?",
@@ -710,7 +710,7 @@ var SECTIONS = [
 				k: "hire hiring post a job paycor recruiter"
 			},
 			{
-				q: "When must timecards be approved?",
+				q: "When must timecards be approved before they lock?",
 				a: "Timecards must be approved by 10:00 a.m. EST on the Monday of a pay week. After that they lock and cannot be changed; later edits need a Timecard Correction Form emailed to HR@beztak.com. Monitor timecards during the week for errors and missing punches, approve PTO requests promptly, and review on-call hours.",
 				k: "timecard approve deadline monday 10 am correction form missing punch"
 			},
@@ -755,9 +755,9 @@ var SECTIONS = [
 				k: "customer service respond 24 hours reviews rating resident requests"
 			},
 			{
-				q: "How should prospective residents be greeted and followed up?",
+				q: "How fast must we respond to prospects and e-leads, and how do we greet and follow up?",
 				a: "• Greet every prospect and offer refreshments on arrival and during every tour.\n• Enter guest card data on the leasing tablet, never on paper.\n• Respond to e-leads within 2 hours; process prospect calls and call-center messages daily.\n• Thank-you call within 24 hours of every live tour, 72-hour follow-up by phone or email, and same-day follow-up on all inquiries.\n• Goals: 50% first contact to appointment, 75% appointment to tour, 35% tours to leases.",
-				k: "prospect tour follow up e-lead email lead refreshments guest card conversion"
+				k: "prospect tour follow up e-lead email lead respond answer fast quickly refreshments guest card conversion"
 			},
 			{
 				q: "What are the Preferred Employer and Hometown Hero programs?",
@@ -802,7 +802,7 @@ var SECTIONS = [
 		title: "Applications and Leases",
 		items: [
 			{
-				q: "What are the application standards?",
+				q: "How fast must applications be approved, and what are the application standards?",
 				a: "• Applications are submitted online and must pass ID verification (government ID and a selfie) first.\n• Approve or decline within 72 hours of submission.\n• Application fees are paid online before a unit is taken off the market.\n• Screen everyone 18 and over using the property's Yardi Rental Screening Criteria; use Yardi Verification of Income.\n• Attach denials and cancellations in Yardi within 24 hours.",
 				k: "application approve decline 72 hours screening background check id verification income"
 			},
@@ -812,7 +812,7 @@ var SECTIONS = [
 				k: "lease signing 24 hours after approval"
 			},
 			{
-				q: "How long can an apartment be held?",
+				q: "How long can we hold an apartment?",
 				a: "The Lost Rent Days standard is 7 days or less (a maximum, not an average). See the Rate Adjustment Form (RAF) for hold times and short-term fees.",
 				k: "hold apartment holding unit lost rent days 7 days"
 			}
@@ -838,7 +838,7 @@ var SECTIONS = [
 			{
 				q: "How fast must work orders be completed?",
 				a: "Routine service requests are completed within 24 hours, or 48 hours if a part is on order or a contractor is needed. If work cannot be completed, contact the resident and document the follow-up in a memo. Water infiltration and mold are high priority, and excessive cases are emergencies.",
-				k: "work order how long 24 hours 48 hours repair mold water"
+				k: "work order 24 hours 48 hours repair mold water"
 			},
 			{
 				q: "What is the 24-Hour Maintenance Guarantee?",
@@ -851,7 +851,7 @@ var SECTIONS = [
 				k: "on call emergency response 30 minutes rotation"
 			},
 			{
-				q: "How is on-call duty paid?",
+				q: "What is on-call pay, and what is the on-call bonus?",
 				a: "• Hourly: regular rate up to 40 hours worked per week, 1.5 times after 40. Two hours of straight-time pay automatically for being on call; two hours minimum for the first call and for each additional drive out. Plus a $100 bonus for taking on-call 3-7 days in a week.\n• Salaried: a $200 bonus for taking on-call 3-7 days in a week.\nMore than one bonus per month is possible.",
 				k: "on call pay bonus $100 $200 hourly salaried two hours minimum"
 			},
@@ -867,12 +867,12 @@ var SECTIONS = [
 		title: "Curb Appeal and Make Ready",
 		items: [
 			{
-				q: "What are the curb appeal standards?",
+				q: "What are the curb appeal and pool opening standards?",
 				a: "• Keep all areas clean and litter-free; inspect Priority One areas daily.\n• Water grass and plantings daily; change seasonal plantings in Spring, Summer and Fall.\n• Holiday lighting is white only in Priority One areas, and decorations need owner approval.\n• Signs and lights in Priority One areas must work every night; keep lighting logs.\n• Pools open by April 15 (weather permitting) until about October 15 in northern states.\n• Replace damaged turf with sod, not seed, in high-priority areas, by 5/15.",
 				k: "curb appeal grounds landscaping holiday lights pool open sod plantings"
 			},
 			{
-				q: "What are the make ready standards?",
+				q: "How many days do we have to make an apartment ready after move-out, and what are the make ready standards?",
 				a: "• Change locks (and electronic codes) within 24 hours of move-out.\n• Make apartments ready within four business days of move-out (weekend move-outs count from Monday); the Regional Manager can grant exceptions.\n• Never scavenge parts, appliances, cabinets or doors from another apartment.\n• Walk vacant units bi-weekly for damage, water or mold.\n• Complete the Make Ready and Final Move In Checklists in HappyCo. The Market Ready goal is 100%.\n• Schedule a pre-walk at least a week before move-out.",
 				k: "make ready turn unit turnover four days locks changed market ready"
 			},
@@ -888,7 +888,7 @@ var SECTIONS = [
 		title: "HR Policies",
 		items: [
 			{
-				q: "When is the work week?",
+				q: "When does the work week start and end?",
 				a: "The work week starts at 12:00 a.m. Saturday and runs until 11:59 p.m. the following Friday.",
 				k: "work week start saturday friday"
 			},
@@ -29751,7 +29751,7 @@ var init_sdk = __esmMin((() => {
 //#endregion
 //#region src/aiAgent.js
 var AI_MODEL = "claude-opus-5-5";
-var FOOTER = "\n\nThis answer was prepared by Beztakets, an AI assistant, from our company manuals. Reply to this email if you would like a person to follow up.";
+var FOOTER = "\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. Reply to this email if you would like a person to follow up.";
 var HARD_STOPS = [
 	[
 		/suicid|kill myself|end my life|hurt myself|harm myself|self[- ]?harm|want to die|don'?t want to live|end(ing)? it all|no reason to live|better off dead/i,
@@ -30057,31 +30057,50 @@ function checkAiReply(ai) {
 		answer
 	};
 }
-var STOP = new Set("the and for are was were what when where which who whom how does did do can could would should will shall have has had you your our we they them this that with from about into there their then than just also any some much many get got make need want like know tell please thanks thank hello dear question work company".split(" "));
-var words = (t) => [...new Set(t.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.replace(/(ies|es|s)$/, "")))];
-var INDEX = [...KNOWLEDGE.map((k, i) => ({
-	ref: `HR-${i + 1}`,
-	title: k.keys[0],
-	text: k.answer,
-	w: new Set(words(`${k.keys.join(" ")} ${k.answer}`))
-})), ...SECTIONS.flatMap((s) => s.items.map((it, i) => ({
-	ref: `${s.n}.${i + 1}`,
-	title: it.q,
-	text: it.a,
-	w: new Set(words(`${it.q} ${it.k || ""}`))
-})))];
+var STOP = new Set("the and for are was were what when where which who whom how does did do can could would should will shall have has had you your our we they them this that with from about into there their then than just also any some much many get got need want like know tell please thanks thank hello dear question work company long".split(" "));
+var stem = (w) => {
+	let x = w.replace(/ies$/, "y").replace(/(ss|x|ch|sh)es$/, "$1").replace(/([^s])s$/, "$1");
+	if (x.length > 5) x = x.replace(/(ing|al|ed)$/, "");
+	if (x.length > 4) x = x.replace(/e$/, "");
+	return x;
+};
+var SHORT = /* @__PURE__ */ new Set([
+	"po",
+	"id",
+	"hr",
+	"it"
+]);
+var words = (t) => [...new Set(t.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => (w.length > 2 || SHORT.has(w)) && !STOP.has(w)).map(stem))];
+var entry = (ref, title, text, qText, kText) => {
+	const qw = new Set(words(qText));
+	return {
+		ref,
+		title,
+		text,
+		qw,
+		kw: new Set(words(kText).filter((w) => !qw.has(w)))
+	};
+};
+var HR_INDEX = KNOWLEDGE.map((k, i) => entry(`HR-${i + 1}`, k.keys[0], k.answer, k.keys.join(" "), k.answer));
+var MANUAL_INDEX = SECTIONS.flatMap((s) => s.items.map((it, i) => entry(`${s.n}.${i + 1}`, it.q, it.a, it.q, it.k || "")));
+var scoreOf = (q, e) => q.reduce((n, w) => n + (e.qw.has(w) ? 2 : e.kw.has(w) ? 1 : 0), 0);
+var rank = (index, subject, body) => {
+	const q = words(`${subject} ${body}`);
+	return index.map((e) => ({
+		e,
+		score: scoreOf(q, e)
+	})).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+};
+var rankManual = (subject, body) => rank(MANUAL_INDEX, subject, body);
+function manualAnswer(subject, body) {
+	const [best, next] = rankManual(subject, body);
+	if (!best || best.score < 4 || best.score - (next?.score || 0) < 2) return null;
+	return best.e;
+}
 function manualDraft(subject, body) {
 	if (mustGoToPerson(subject, body)) return null;
-	const q = words(`${subject} ${body}`);
-	let best = null;
-	for (const e of INDEX) {
-		const score = q.filter((w) => e.w.has(w)).length;
-		if (score >= 2 && (!best || score > best.score)) best = {
-			score,
-			e
-		};
-	}
-	return best ? {
+	const [best] = [...rank(HR_INDEX, subject, body), ...rankManual(subject, body)].sort((a, b) => b.score - a.score);
+	return best && best.score >= 4 ? {
 		text: best.e.text,
 		refs: [best.e.ref],
 		source: "manual match",
@@ -30092,9 +30111,26 @@ async function decide(env, subject, body, { ask = askModel, scope = askScope } =
 	const stop = mustGoToPerson(subject, body);
 	if (stop) return stop;
 	const local = triage(subject, body);
-	const withDraft = (r) => r.resolved ? r : {
-		...r,
-		draft: manualDraft(subject, body)
+	const withDraft = (r) => {
+		if (r.resolved) return r;
+		const e = manualAnswer(subject, body);
+		if (e) {
+			const a = agentFor(r.topic);
+			return {
+				resolved: true,
+				topic: r.topic,
+				urgent: false,
+				assignee: a.id,
+				tags: ["manual-answer"],
+				manualAnswered: true,
+				answer: `${e.text}\n\n(From the ${MANUAL.title}, ${e.ref}: ${e.title})`,
+				note: `Answered automatically from the ${MANUAL.title} (${e.ref}: ${e.title}). The match was clear, so no person was needed.${r.note?.includes("AI") ? ` ${r.note.slice(r.note.indexOf("("))}` : ""}`
+			};
+		}
+		return {
+			...r,
+			draft: manualDraft(subject, body)
+		};
 	};
 	if (!aiConnected(env)) return withDraft({
 		...local,

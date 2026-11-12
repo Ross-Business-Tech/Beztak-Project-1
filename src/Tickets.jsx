@@ -33,7 +33,7 @@ export function List({ tickets, me, open, reset }) {
     ['due', 'Due soon', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)), 'Overdue or due within 4 work hours.'],
     ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length), 'Teammates asked for your advice on these.'],
     ['closed', 'Closed', owned.filter((t) => !live(t)), 'Tickets you have closed.'],
-    ['ai', 'AI answered', tickets.filter((t) => t.resolvedByAI), 'Answered by the AI agent and closed. Open one to read the reply that was sent.'],
+    ['ai', 'Answered automatically', tickets.filter((t) => t.resolvedByAI), 'Answered automatically from the Beztak manual (by the AI when it is connected) and closed. Open one to read the reply that was sent.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
   const [, , list, note] = VIEWS.find((v) => v[0] === view) || VIEWS[0]
@@ -62,12 +62,12 @@ export function List({ tickets, me, open, reset }) {
           <div className="nrow nhead" role="row">
             {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
           </div>
-          {rows.length === 0 && <p className="empty">{view === 'ai' ? 'No tickets have been answered by the AI agent yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+          {rows.length === 0 && <p className="empty">{view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
           {rows.map((t) => {
             const p = priorityOf(t)
             const d = dueInfo(t)
             const adv = pendingAdviceFor(t, me).length > 0
-            const tg = [...(t.resolvedByAI ? ['AI answered'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved')]
+            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved')]
             return (
               <button key={t.id} className="nrow" role="row" onClick={() => open(t.id)}>
                 <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}</small></span>
@@ -75,7 +75,7 @@ export function List({ tickets, me, open, reset }) {
                 <span className="ncell" role="cell"><Label color={STATUS_COLOR[t.status]}>{t.status}</Label></span>
                 <span className="ncell" role="cell"><Avatar name={t.customer} />{t.customer}</span>
                 <span className="ncell" role="cell"><Label color={TOPIC_COLOR[t.topic]}>{topicLabel(t.topic)}</Label></span>
-                <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={g === 'AI answered' ? 'brown' : g === 'Advice requested' ? 'yellow' : 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
+                <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={g === 'Answered automatically' ? 'brown' : g === 'Advice requested' ? 'yellow' : 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
                 <span className={`ncell ndue ${d?.cls || ''}`} role="cell">{d ? d.text : '–'}</span>
                 <span className="ncell" role="cell">{t.resolvedByAI ? <><Avatar name="AI agent" />AI agent</> : <><Avatar name={agentName(t.assignee)} />{t.assignee === me ? 'Me' : agentName(t.assignee)}</>}</span>
               </button>

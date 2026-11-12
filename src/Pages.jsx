@@ -29,7 +29,7 @@ export function Compose({ tickets, onClose, onCreate }) {
     const r = await decide(BROWSER_AI, subject, body)
     setBusy(false)
     const now = new Date().toISOString()
-    const text = r.resolved ? r.answer + (r.aiAnswered ? FOOTER : '') : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
+    const text = r.resolved ? r.answer + FOOTER : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
     onCreate({
       id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body, customer: name || 'Employee',
       email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,

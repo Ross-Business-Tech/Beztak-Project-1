@@ -17,7 +17,7 @@ import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { triage } from './triage'
 
 export const AI_MODEL = 'claude-opus-5-5'
-export const FOOTER = '\n\nThis answer was prepared by Beztakets, an AI assistant, from our company manuals. Reply to this email if you would like a person to follow up.'
+export const FOOTER = '\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. Reply to this email if you would like a person to follow up.'
 
 // ---- rules the AI must never handle ----
 const HARD_STOPS = [
@@ -196,21 +196,45 @@ export function checkAiReply(ai) {
 // ---- drafts for HR (human in the loop) ----
 // When nobody can answer automatically, Beztakets suggests a reply for the HR person to check,
 // edit and send. Never for emergencies, personal records, approvals or confidential matters.
-const STOP = new Set('the and for are was were what when where which who whom how does did do can could would should will shall have has had you your our we they them this that with from about into there their then than just also any some much many get got make need want like know tell please thanks thank hello dear question work company'.split(' '))
-const words = (t) => [...new Set(t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.replace(/(ies|es|s)$/, '')))]
-const INDEX = [
-  ...KNOWLEDGE.map((k, i) => ({ ref: `HR-${i + 1}`, title: k.keys[0], text: k.answer, w: new Set(words(`${k.keys.join(' ')} ${k.answer}`)) })),
-  ...SECTIONS.flatMap((s) => s.items.map((it, i) => ({ ref: `${s.n}.${i + 1}`, title: it.q, text: it.a, w: new Set(words(`${it.q} ${it.k || ''}`)) }))),
-]
+const STOP = new Set('the and for are was were what when where which who whom how does did do can could would should will shall have has had you your our we they them this that with from about into there their then than just also any some much many get got need want like know tell please thanks thank hello dear question work company long'.split(' '))
+// Simple word matching: lower-case, drop common words, and trim endings so "renewed",
+// "renewal" and "renew" or "leases" and "lease" count as the same word.
+const stem = (w) => {
+  let x = w.replace(/ies$/, 'y').replace(/(ss|x|ch|sh)es$/, '$1').replace(/([^s])s$/, '$1')
+  if (x.length > 5) x = x.replace(/(ing|al|ed)$/, '')
+  if (x.length > 4) x = x.replace(/e$/, '')
+  return x
+}
+const SHORT = new Set(['po', 'id', 'hr', 'it'])
+const words = (t) => [...new Set(t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => (w.length > 2 || SHORT.has(w)) && !STOP.has(w)).map(stem))]
+const entry = (ref, title, text, qText, kText) => {
+  const qw = new Set(words(qText))
+  return { ref, title, text, qw, kw: new Set(words(kText).filter((w) => !qw.has(w))) }
+}
+const HR_INDEX = KNOWLEDGE.map((k, i) => entry(`HR-${i + 1}`, k.keys[0], k.answer, k.keys.join(' '), k.answer))
+const MANUAL_INDEX = SECTIONS.flatMap((s) => s.items.map((it, i) => entry(`${s.n}.${i + 1}`, it.q, it.a, it.q, it.k || '')))
+// Words in the entry's own question count double; extra search words count once.
+const scoreOf = (q, e) => q.reduce((n, w) => n + (e.qw.has(w) ? 2 : e.kw.has(w) ? 1 : 0), 0)
+const rank = (index, subject, body) => {
+  const q = words(`${subject} ${body}`)
+  return index.map((e) => ({ e, score: scoreOf(q, e) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score)
+}
+export const rankManual = (subject, body) => rank(MANUAL_INDEX, subject, body)
+
+// Without the AI, a manual entry is sent only when the match is clearly strong: enough shared
+// words and clearly ahead of the next-best entry. Otherwise a person answers (with a draft).
+export const MANUAL_MIN_SCORE = 4
+export const MANUAL_MIN_LEAD = 2
+export function manualAnswer(subject, body) {
+  const [best, next] = rankManual(subject, body)
+  if (!best || best.score < MANUAL_MIN_SCORE || best.score - (next?.score || 0) < MANUAL_MIN_LEAD) return null
+  return best.e
+}
+
 export function manualDraft(subject, body) {
   if (mustGoToPerson(subject, body)) return null
-  const q = words(`${subject} ${body}`)
-  let best = null
-  for (const e of INDEX) {
-    const score = q.filter((w) => e.w.has(w)).length
-    if (score >= 2 && (!best || score > best.score)) best = { score, e }
-  }
-  return best ? { text: best.e.text, refs: [best.e.ref], source: 'manual match', title: best.e.title } : null
+  const [best] = [...rank(HR_INDEX, subject, body), ...rankManual(subject, body)].sort((a, b) => b.score - a.score)
+  return best && best.score >= MANUAL_MIN_SCORE ? { text: best.e.text, refs: [best.e.ref], source: 'manual match', title: best.e.title } : null
 }
 
 // The main entry point. Always returns a result; never throws.
@@ -219,7 +243,19 @@ export async function decide(env, subject, body, { ask = askModel, scope = askSc
   const stop = mustGoToPerson(subject, body)
   if (stop) return stop
   const local = triage(subject, body)
-  const withDraft = (r) => (r.resolved ? r : { ...r, draft: manualDraft(subject, body) })
+  // Without the AI: the short HR answers first, then any manual entry that clearly matches.
+  // Everything else goes to a person, with the closest manual entry as a suggested reply.
+  const withDraft = (r) => {
+    if (r.resolved) return r
+    const e = manualAnswer(subject, body)
+    if (e) {
+      const a = agentFor(r.topic)
+      return { resolved: true, topic: r.topic, urgent: false, assignee: a.id, tags: ['manual-answer'], manualAnswered: true,
+        answer: `${e.text}\n\n(From the ${MANUAL.title}, ${e.ref}: ${e.title})`,
+        note: `Answered automatically from the ${MANUAL.title} (${e.ref}: ${e.title}). The match was clear, so no person was needed.${r.note?.includes('AI') ? ` ${r.note.slice(r.note.indexOf('('))}` : ''}` }
+    }
+    return { ...r, draft: manualDraft(subject, body) }
+  }
   if (!aiConnected(env)) return withDraft({ ...local, note: `${local.note || ''} (AI not connected: used the simple rules.)`.trim() })
   try {
     const [ai, sc] = await Promise.all([ask(env, subject, body), scope(env, subject, body)])
