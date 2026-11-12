@@ -13,7 +13,7 @@
 //      If anything fails, a person replies (with the AI's draft to check).
 //   4. If the AI is not connected or can't be reached, the simple keyword answers are used instead.
 import { AGENTS, KNOWLEDGE, TOPIC_LABELS } from './data'
-import { MANUAL, SECTIONS } from './data/opsManual.js'
+import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { triage } from './triage'
 
 export const AI_MODEL = 'claude-opus-5-5'
@@ -22,11 +22,11 @@ export const FOOTER = '\n\nThis answer was prepared by Beztakets, an AI assistan
 // ---- rules the AI must never handle ----
 const HARD_STOPS = [
   [/suicid|kill myself|end my life|hurt myself|harm myself|self[- ]?harm|want to die|don'?t want to live|end(ing)? it all|no reason to live|better off dead/i, 'crisis', 'If you are thinking about harming yourself, please call or text 988 right now. You are not alone, and a person on our team will follow up as well.'],
-  [/weapon|\bgun\b|knife|threat|attack|assault|violen|stalk|in danger|unsafe|scared for my|\bfire\b|smoke|gas smell|smell(s)? (gas|like gas)|gas leak|carbon monoxide|\bco alarm/i, 'danger', 'If anyone is in danger, call 911 now and get to a safe place. Then call the emergency line at (734) 555-0199.'],
-  [/flood|leak|burst|water (everywhere|pouring|coming)|sewage|no heat|heat (is )?(out|off|not working)|furnace (is )?(out|broken|not working)/i, 'emergency', 'This looks like an emergency. Please call the 24/7 emergency maintenance line at (734) 555-0199 instead of waiting for email.'],
+  [/weapon|\bgun\b|knife|threat|attack|assault|violen|stalk|in danger|unsafe|scared for my|\bfire\b|smoke|gas smell|smell(s)? (gas|like gas)|gas leak|carbon monoxide|\bco alarm/i, 'danger', 'If anyone is in danger, call 911 now and get to a safe place. Then call your community\'s on-call maintenance line.'],
+  [/flood|leak|burst|water (everywhere|pouring|coming)|sewage|no heat|heat (is )?(out|off|not working)|furnace (is )?(out|broken|not working)/i, 'emergency', 'This looks like an emergency. Please call your community\'s on-call maintenance line now instead of waiting for email: the on-call technician responds right away.'],
   [/injur|\bhurt\b|accident|\bfell\b|slipped|bleeding/i, 'injury', 'If someone needs emergency care, call 911. A person on our team will follow up on this right away.'],
   [/harass|discriminat|retaliat|hostile work|bull(y|ied)|sexual|inappropriate (comment|touch|message|text|photo|picture|joke|behavio)|touch(es|ing|ed)? me|keeps touching|unwanted (touch|advance|attention)|uncomfortable|racis|sexis/i, 'concern', 'This is a confidential matter, so a person will handle it personally.'],
-  [/wire (instruction|transfer|fraud)|new (bank|payment|wire) (details|info|instructions)|phish|suspicious (link|email)|hacked|data breach|lost (my |a )?(laptop|phone|device|tablet)/i, 'security', 'Please do not act on this message. Call the IT Help Desk at (734) 555-0145. A person on our team will follow up.'],
+  [/wire (instruction|transfer|fraud)|new (bank|payment|wire) (details|info|instructions)|phish|suspicious (link|email)|hacked|data breach|lost (my |a )?(laptop|phone|device|tablet)/i, 'security', 'Please do not act on this message. Report it to the Help Desk at helpdesk@beztak.com. A person on our team will follow up.'],
   [/\b\d{3}-?\d{2}-?\d{4}\b|password\s*(is|:)|\bssn\b|social security|routing number|account number|alarm code is|gate code is/i, 'private-info', 'For your safety, please do not send passwords, ID numbers or account numbers by email. A person will follow up.'],
   [/\b(sue|suing|lawsuit|lawyer|attorney|legal advice|illegal|is (it|this|that)( even)? legal)\b/i, 'legal', 'Legal questions go to a person, because we cannot give legal advice by email.'],
   [/\b(diagnos|symptom|medication|dosage|treatment)\w*/i, 'medical', 'We cannot give medical advice. For health concerns please see a medical professional. A person will follow up.'],
@@ -57,13 +57,13 @@ const OPS = SECTIONS.flatMap((s) => s.items.map((it, i) => ({ ref: `${s.n}.${i +
 const VALID_REFS = new Set([...HR.map((x) => x.ref), ...OPS.map((x) => x.ref)])
 
 const MANUAL_TEXT = [
-  '## HR ANSWERS (employee questions about pay, benefits, time off, onboarding, policies)',
+  '## HR ANSWERS (short answers to common employee questions, taken from the Beztak Operations Manual)',
   ...HR.map((x) => `### [${x.ref}] ${x.q}\n${x.a}`),
-  `## ${MANUAL.title.toUpperCase()} (${MANUAL.version}): property operations procedures`,
+  `## ${MANUAL.title.toUpperCase()} (${MANUAL.version}): policies and procedures for Beztak site teams`,
   ...SECTIONS.map((s) => `### Section ${s.n}: ${s.title}\n` + s.items.map((it, i) => `[${s.n}.${i + 1}] ${it.q}\n${it.a}`).join('\n\n')),
 ].join('\n\n')
 
-const SYSTEM_PROMPT = `You are the AI agent for Beztakets, the help desk at Great Lakes Property Group (GLPG), a fictional company. You read one employee email and decide whether you can answer it from the company manuals below.
+const SYSTEM_PROMPT = `You are the AI agent for Beztakets, the HR help desk for Beztak (Oakland Management Corp.), a property management company. You read one email from a Beztak employee and decide whether you can answer it from the company manuals below.
 
 RULES
 - Answer ONLY from the manuals between <manuals> tags. Never invent procedures, numbers, dates, contacts or approvals.

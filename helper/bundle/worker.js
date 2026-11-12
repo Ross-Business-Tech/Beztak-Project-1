@@ -126,9 +126,11 @@ var KNOWLEDGE = [
 			"pto allowance",
 			"days off do we get",
 			"days off per year",
-			"vacation policy"
+			"vacation policy",
+			"pto policy",
+			"how does pto work"
 		],
-		answer: "Full-time employees get 15 days of paid vacation per year, plus 10 company holidays. You can see your current balance in the HR portal under Time Off."
+		answer: "All regular full-time and part-time site employees accrue paid time off (PTO), and the amount depends on your length of service. You can use PTO for vacation, sick time, family needs, personal affairs or rest. The current PTO policy is in Egnyte (Employee Handbook)."
 	},
 	{
 		topic: "timeoff",
@@ -136,9 +138,11 @@ var KNOWLEDGE = [
 			"request time off",
 			"request vacation",
 			"book vacation",
-			"take a day off"
+			"take a day off",
+			"request pto",
+			"submit pto"
 		],
-		answer: "To request time off, open the HR portal, choose Time Off → New Request, pick your dates, and submit. Your manager will get a notification to approve it."
+		answer: "PTO requests go through Paycor, and your manager approves them. For questions about your PTO time, email HR@beztak.com."
 	},
 	{
 		topic: "payroll",
@@ -151,75 +155,100 @@ var KNOWLEDGE = [
 			"how often are we paid",
 			"how often do we get paid",
 			"when will i be paid",
-			"when are we paid"
+			"when are we paid",
+			"payroll calendar"
 		],
-		answer: "We pay every second Friday. If a payday falls on a holiday, you are paid on the working day before."
+		answer: "Payroll is bi-weekly, with paydays every other Friday. Each paycheck covers the two-week period ending the Friday before payday. The payroll calendar is in Egnyte."
+	},
+	{
+		topic: "timeoff",
+		keys: [
+			"paid holidays",
+			"which holidays",
+			"holiday pay",
+			"holidays off",
+			"holidays do we",
+			"holiday schedule",
+			"holiday calendar"
+		],
+		answer: "The paid holidays generally observed are New Year's Day, Memorial Day, Independence Day, Labor Day, Thanksgiving Day and Christmas Day; the list is published each year and the calendar is in Egnyte. Full-time hourly employees who must work a holiday get 1.5 times their regular rate plus holiday pay. To receive holiday pay, work your scheduled hours the day before and the day after the holiday (pre-approved time off is fine)."
+	},
+	{
+		topic: "general",
+		keys: [
+			"lunch break",
+			"meal break",
+			"rest break",
+			"breaks do i get",
+			"how long is lunch",
+			"break policy"
+		],
+		answer: "You get a one-hour (60-minute) unpaid meal break each day you work more than four hours, plus two 15-minute paid rest breaks. Hourly employees clock out for any break longer than 20 minutes."
 	},
 	{
 		topic: "payroll",
 		keys: [
-			"pay stub",
-			"payslip",
-			"w-2",
-			"w2",
-			"tax form"
+			"how does overtime",
+			"overtime policy",
+			"overtime rate",
+			"time and a half",
+			"comp time",
+			"when do i get overtime"
 		],
-		answer: "Pay stubs and tax forms are in the HR portal under Pay → Documents. Tax forms are posted by January 31 each year."
+		answer: "Hourly (non-exempt) employees are paid one and one-half times their hourly rate for time worked over 40 hours in a week. The work week runs from 12:00 a.m. Saturday to 11:59 p.m. Friday. Comp time must be taken in the same pay period it is earned."
 	},
 	{
-		topic: "benefits",
+		topic: "timeoff",
 		keys: [
-			"open enrollment",
-			"enroll in health",
-			"health insurance enroll",
-			"add dependent",
-			"add a dependent",
-			"enrollment period",
-			"sign up for health",
-			"sign up for benefits",
-			"change my benefits"
+			"call in sick",
+			"calling in sick",
+			"call out sick",
+			"calling out",
+			"will be late",
+			"going to be late",
+			"running late",
+			"be absent",
+			"miss work today"
 		],
-		answer: "Open enrollment runs November 1–15. You can also change coverage within 30 days of a life event such as marriage or a new baby, in the HR portal under Benefits."
+		answer: "Tell your immediate manager at least two hours before your workday starts and give the reason, by text, email or phone (whichever your manager prefers). Social media messages are not accepted. If you get no reply, call your manager to make sure they received it."
 	},
 	{
-		topic: "benefits",
+		topic: "payroll",
 		keys: [
-			"401k",
-			"401(k)",
-			"retirement match",
-			"match retirement",
-			"retirement contribution",
-			"retirement plan"
+			"when are bonuses paid",
+			"bonus paid",
+			"bonuses paid",
+			"bonus payout",
+			"when do i get my bonus",
+			"commission paid",
+			"commissions paid"
 		],
-		answer: "The company matches 100% of your 401(k) contributions up to 4% of your pay. You are eligible after 30 days of employment."
+		answer: "Bonuses, including leasing and renewal commissions, quarterly bonuses and on-call bonuses, are paid on the second check of each month. You must be employed when they are paid out."
 	},
 	{
 		topic: "onboarding",
 		keys: [
-			"first day",
-			"what do i bring",
-			"new hire paperwork",
-			"what should i bring",
-			"day one",
-			"starting next week",
-			"start next week"
+			"fair housing training",
+			"first week",
+			"new hire training",
+			"training do i need",
+			"what training"
 		],
-		answer: "On your first day, bring a photo ID and your signed offer letter. Your manager will meet you at reception at 9:00am, and IT will set up your laptop."
+		answer: "All new associates complete Fair Housing training within one week of employment. Always wear your Beztak name badge when representing Beztak, and attend the quarterly safety meetings."
 	},
 	{
 		topic: "general",
 		keys: [
 			"dress code",
-			"work from home policy",
-			"remote work policy",
-			"hybrid policy",
 			"what to wear",
 			"what should i wear",
 			"wear jeans",
 			"attire",
-			"days in the office"
+			"uniform policy",
+			"do we have uniforms",
+			"do we wear uniforms"
 		],
-		answer: "We follow a hybrid model: three days in the office and two days remote each week, agreed with your manager. The dress code is business casual."
+		answer: "Beztak provides uniforms and name tags. Office and maintenance uniforms are ordered twice a year (Spring and Fall) through ICO Uniforms by your Property Manager, and maintenance staff can get new boots once a year through Shoes for Crews. Office and leasing staff wear proper business attire at all times. Not every ownership group participates, so check with your Regional Manager."
 	}
 ];
 var ESCALATIONS = [
@@ -248,7 +277,7 @@ var ESCALATIONS = [
 		tag: "needs-approval",
 		example: "Can I take tomorrow off?",
 		test: /\b(can|could|may) i\b.*\b(take|have|get)\b.*\boff\b|\b(am i allowed|may i)\b.*\boff\b|\b(can|could|may) i\b.*\b(leave early|skip|miss work|come in late|work from home|wfh|swap (my )?shift)\b|\b(is (it|that)|would (it|that) be) (ok|okay|fine|alright|all right)\b|\bneed .*\boff\b.*\?|\bpermission\b/,
-		extra: "Time off needs your manager's approval. A team member will follow up, and you can also submit a request in the HR portal."
+		extra: "Time off needs your manager's approval. A team member will follow up, and you can also submit the request in Paycor."
 	},
 	{
 		id: "promotion",
@@ -302,7 +331,7 @@ var ESCALATIONS = [
 		tag: "security",
 		example: "Can you change my direct deposit information?",
 		test: /(change|update|switch|edit).*(direct deposit|bank|routing number|account number)/,
-		extra: "For your security, please do not send bank details by email. Payroll will contact you through the secure HR portal."
+		extra: "For your security, please do not send bank details by email. Payroll will contact you directly through a secure process."
 	},
 	{
 		id: "password",
@@ -435,7 +464,7 @@ var T = (id, subject, body, customer, status, urgent, topic, assignee, age, note
 	dueAt: dueFrom(d(age), urgent).toISOString(),
 	...extra
 });
-T(1008, "Unsafe wiring in the break room", "There are exposed wires near the microwave in the 3rd floor break room. Someone could get hurt.", "Taylor Reed", "Open", true, "relations", "sam", 12, "Sensitive subject (\"unsafe\"): the assistant never answers these, a person handles it. Routed to Employee relations. Marked urgent: \"unsafe\".", [ai("Hi Taylor, thanks for contacting HR. This is a confidential matter, so a person on the team will handle it personally. We passed your message to Sam Brooks. It is marked urgent, so it will be looked at first.", d(11))], { tags: ["sensitive", "safety"] }), T(1007, "How do I request time off?", "Hi, I want to take next Friday off. How do I request it?", "Mia Torres", "Closed", false, "timeoff", "priya", 45, "Answered automatically from the HR answers list. No person needed.", [ai("To request time off, open the HR portal, choose Time Off → New Request, pick your dates, and submit. Your manager will get a notification to approve it.", d(44))], {
+T(1008, "Unsafe wiring in the break room", "There are exposed wires near the microwave in the 3rd floor break room. Someone could get hurt.", "Taylor Reed", "Open", true, "relations", "sam", 12, "Sensitive subject (\"unsafe\"): the assistant never answers these, a person handles it. Routed to Employee relations. Marked urgent: \"unsafe\".", [ai("Hi Taylor, thanks for contacting HR. This is a confidential matter, so a person on the team will handle it personally. We passed your message to Sam Brooks. It is marked urgent, so it will be looked at first.", d(11))], { tags: ["sensitive", "safety"] }), T(1007, "How do I request time off?", "Hi, I want to take next Friday off. How do I request it?", "Mia Torres", "Closed", false, "timeoff", "priya", 45, "Answered automatically from the HR answers list. No person needed.", [ai(KNOWLEDGE[1].answer, d(44))], {
 	resolvedByAI: true,
 	tags: ["ai-resolved"]
 }), T(1001, "My paycheck was short this month", "Hi, my paycheck is about $400 lower than usual and I have not been paid for my overtime. Please look into this asap.", "Jordan Lee", "Open", true, "payroll", "omar", 95, "No ready answer. Routed to Payroll. Marked urgent: \"asap\".", [ai("Thanks Jordan, we received your email and passed it to Omar Haddad in Payroll. Because it affects your pay, it is marked urgent.", d(94))], {
@@ -450,7 +479,7 @@ T(1008, "Unsafe wiring in the break room", "There are exposed wires near the mic
 	}]
 }), T(1006, "Adding my spouse to health insurance", "We got married last month. How do I add my spouse to my health plan?", "Noah Kim", "In progress", false, "benefits", "dana", 180, "No ready answer. Routed to Benefits. Not urgent.", [ai("Hi Noah, thanks for contacting HR. We passed your message to Dana Whitfield. You can expect a reply within one business day.", d(179)), {
 	from: "Dana Whitfield",
-	text: "Congratulations Noah! Marriage counts as a life event, so you have 30 days. I am sending you the form now.",
+	text: "Congratulations Noah! I am sending you the form to add your spouse now.",
 	at: d(120),
 	email: true
 }], {
@@ -459,12 +488,12 @@ T(1008, "Unsafe wiring in the break room", "There are exposed wires near the mic
 		id: 1,
 		from: "dana",
 		to: "priya",
-		question: "Does the 30-day life-event window count from the wedding date or the date HR is told?",
+		question: "Does adding a spouse change anything on the time-off side for Noah?",
 		at: d(150),
-		answer: "It counts from the wedding date, so Noah has until the end of next week.",
+		answer: "No, PTO is based on length of service, so nothing changes there.",
 		answeredAt: d(130)
 	}]
-}), T(1005, "What is the dress code?", "Is there a dress code for client days?", "Ella Brooks", "Closed", false, "general", "sam", 400, "Answered automatically from the HR answers list. No person needed.", [ai("We follow a hybrid model: three days in the office and two days remote each week, agreed with your manager. The dress code is business casual.", d(399))], {
+}), T(1005, "What is the dress code?", "Is there a dress code for client days?", "Ella Brooks", "Closed", false, "general", "sam", 400, "Answered automatically from the HR answers list. No person needed.", [ai(KNOWLEDGE[9].answer, d(399))], {
 	resolvedByAI: true,
 	tags: ["ai-resolved"]
 }), T(1004, "Question about parental leave", "My partner and I are expecting in March. How does parental leave work and who do I talk to?", "Ana Souza", "In progress", false, "benefits", "dana", 1500, "No ready answer. Routed to Benefits. Not urgent.", [{
@@ -472,595 +501,455 @@ T(1008, "Unsafe wiring in the break room", "There are exposed wires near the mic
 	text: "Congratulations Ana! I will send you the leave guide and book a short call this week.",
 	at: d(1400),
 	email: true
-}], { tags: ["leave"] }), T(1003, "Laptop not ready for my start date", "I start Monday but IT says my laptop order has not been approved. Who can help?", "Sofia Rossi", "Open", false, "onboarding", "luca", 2e3, "No ready answer. Routed to Onboarding. Not urgent.", [ai("Hi Sofia, thanks for contacting HR. We passed your message to Luca Romano. You can expect a reply within one business day.", d(1999))]), T(1002, "How many vacation days do I get?", "Quick question: how many vacation days do I get per year?", "Chris Park", "Closed", false, "timeoff", "priya", 3e3, "Answered automatically from the HR answers list. No person needed.", [ai("Full-time employees get 15 days of paid vacation per year, plus 10 company holidays. You can see your current balance in the HR portal under Time Off.", d(2999))], {
+}], { tags: ["leave"] }), T(1003, "Laptop not ready for my start date", "I start Monday but IT says my laptop order has not been approved. Who can help?", "Sofia Rossi", "Open", false, "onboarding", "luca", 2e3, "No ready answer. Routed to Onboarding. Not urgent.", [ai("Hi Sofia, thanks for contacting HR. We passed your message to Luca Romano. You can expect a reply within one business day.", d(1999))]), T(1002, "How many vacation days do I get?", "Quick question: how many vacation days do I get per year?", "Chris Park", "Closed", false, "timeoff", "priya", 3e3, "Answered automatically from the HR answers list. No person needed.", [ai(KNOWLEDGE[0].answer, d(2999))], {
 	resolvedByAI: true,
 	tags: ["ai-resolved"]
 }), T(1009, "Dental coverage for my kids", "Does our dental plan cover orthodontics for my two kids?", "Lena Park", "Open", false, "benefits", "dana", 30, "No ready answer. Routed to Benefits. Not urgent.", [ai("Hi Lena, thanks for contacting HR. We passed your message to Dana Whitfield. You can expect a reply within one business day.", d(29))], { tags: ["dental"] });
-(/* @__PURE__ */ new Date()).toISOString(), (/* @__PURE__ */ new Date()).toISOString();
+(/* @__PURE__ */ new Date()).toISOString();
 //#endregion
-//#region src/data/opsManual.js
+//#region src/data/beztakManual.js
 var MANUAL = {
-	title: "GLPG Operations Manual",
+	title: "Beztak Operations Manual",
 	short: "Ops Manual",
-	version: "Demo Edition 1.0",
-	effective: "November 3, 2026",
-	owner: "Riley Carter, Property Operations Lead"
+	version: "updated 09.28.2026",
+	effective: "September 28, 2026",
+	owner: "Beztak (Oakland Management Corp.)"
 };
 var SECTIONS = [
 	{
 		n: 1,
-		title: "Using This Manual",
+		title: "Who to Contact",
 		items: [
 			{
-				q: "What is this manual for?",
-				a: "It is the first place to look for how day-to-day property operations work at GLPG: emergencies, maintenance, vendors, keys, leasing, rent, residents, safety, and office procedures. It applies to all GLPG employees. Independent agents follow it whenever they work on GLPG-managed properties.",
-				k: "purpose scope applies"
+				q: "Where do I send HR questions (benefits, pay, PTO, FMLA, Paycor login, time clock)?",
+				a: "Log all requests about benefits, pay amounts, PTO time, FMLA, disability, Paycor login or password resets, and time clock issues or punch errors through the HR email: HR@beztak.com.",
+				k: "hr email contact benefits pay pto fmla disability paycor password reset punch error time clock"
 			},
 			{
-				q: "Where can I find the standard operating procedures (SOPs) for my department?",
-				a: "This manual is GLPG's standard operating procedures for all property operations staff, and the current version is in the employee portal under Operations. Department checklists (leasing, maintenance, accounting, and office) are in the same place under Operations › Checklists. If you can't find a procedure for your role, ask your property manager or email operations@glpg-demo.example.",
-				k: "sop sops standard operating procedures department checklist where find manual location"
+				q: "Who handles recruiting help?",
+				a: "Managers who want to sponsor a post on Indeed or need help with full-cycle recruiting for a role email recruiting@beztak.com.",
+				k: "recruiting indeed hiring sponsor job post recruiter"
 			},
 			{
-				q: "What if a procedure isn't in the manual or seems wrong?",
-				a: "Ask your property manager first. If it is still unclear, email operations@glpg-demo.example with the section number and what you are trying to do. Do not invent a workaround for anything involving money, access, safety, or Fair Housing.",
-				k: "unclear missing conflict question"
+				q: "Who do I contact about training and Yardi eLearning?",
+				a: "Questions about Yardi eLearning logins, passwords and courses go to training@beztak.com.",
+				k: "training elearning yardi course login password"
 			},
 			{
-				q: "Which version applies?",
-				a: "The current version in the employee portal controls. Printed copies may be outdated. The manual is reviewed every October and whenever a major process changes; changes are announced by company email.",
-				k: "update revision latest"
+				q: "When should I contact the Help Desk?",
+				a: "The Help Desk (helpdesk@beztak.com, IT and Yardi) is for when technology, hardware or software is not working correctly, including marketing websites, marketing system errors, and pricing or lead tracking issues. System training questions (Yardi, Payscan and so on) go to your supervisor, not the Help Desk. Do not email anyone directly.",
+				k: "help desk it computer broken software hardware not working website error technology"
 			},
 			{
-				q: "Who can change a procedure?",
-				a: "Only the Property Operations Lead (Riley Carter) can change an operating procedure, with Managing Member approval for anything involving spending limits or legal risk. Property managers can suggest changes but cannot approve exceptions on their own.",
-				k: "exception approve change"
+				q: "Where do marketing requests go?",
+				a: "Floor plans, collateral design, sign packages, new property websites, online presence and recommendations for new marketing resources go through mrequests@beztak.com.",
+				k: "marketing request floor plan collateral sign website design"
+			},
+			{
+				q: "Where do I send security deposit (SODA) questions?",
+				a: "Questions about a SODA (Statement of Deposit Accounting) go to SDRefunds@beztak.com, not to an individual property accountant.",
+				k: "security deposit refund soda question"
+			},
+			{
+				q: "Who handles vendor setup, vendor insurance and vendor payments?",
+				a: "Questions about adding a vendor, updating vendor insurance, inviting a vendor to Vendor Café and vendor payments go to Vendor Maintenance: VendorMain@beztak.com.",
+				k: "vendor add new vendor insurance vendor cafe payment vendor maintenance"
 			}
 		]
 	},
 	{
 		n: 2,
-		title: "Contacts and Escalation",
+		title: "Rent Collections",
 		items: [
 			{
-				q: "Who do I contact for operations questions?",
-				a: "• Property operations, keys, vendors, resident issues: Riley Carter, Property Operations Lead: operations@glpg-demo.example · (734) 555-0147\n• Maintenance and work orders: Sam Rivera, Maintenance Coordinator: maintenance@glpg-demo.example · (734) 555-0150\n• After-hours emergency maintenance line (24/7): (734) 555-0199\n• Rent, deposits, payments, vendor invoices: Taylor Nguyen, Accounting: accounting@glpg-demo.example · (734) 555-0148\n• Leasing compliance, Fair Housing, licensing: Avery Chen, Managing Broker: compliance@glpg-demo.example · (734) 555-0146\n• IT and security: helpdesk@glpg-demo.example · (734) 555-0145 · security@glpg-demo.example\n• Executive escalation: Jordan Patel, Managing Member: jordan.patel@glpg-demo.example · (734) 555-0144",
-				k: "contact phone email directory who call"
+				q: "When is rent due?",
+				a: "Under Section 4 of the Beztak lease, residents agree to pay rent on or before the first day of each month, without needing a reminder.",
+				k: "rent due date first of month when pay rent"
 			},
 			{
-				q: "How fast should I expect a response from Operations?",
-				a: "• Emergencies: call, don't email. The on-call technician responds within 1 hour, 24/7.\n• Urgent issues: acknowledged the same business day.\n• Routine questions: acknowledged within 1 business day; answered within 3 business days.\nThese are internal targets, not guarantees.",
-				k: "response time how long wait"
+				q: "What are the rent collection standards?",
+				a: "• Rent must be paid in full; partial rent is never accepted.\n• 75% of rent should be collected within the first 7 days of the month.\n• Delinquent rent at the end of the financial period should not exceed 0.75% of total income booked for the month; the goal is 0.50%.\n• At month end, all check batches are mailed to the corporate office accounting department.",
+				k: "partial rent collection standard delinquency goal 75% first 7 days"
 			},
 			{
-				q: "What if I don't get a response?",
-				a: "Reply once and copy operations@glpg-demo.example. If there is still no response after one more business day, contact Jordan Patel. For anything involving safety, active water damage, or a security breach, call. Don't wait on email.",
-				k: "escalate no answer ignored"
+				q: "What payment methods are accepted for rent?",
+				a: "Rent must be paid electronically. Accepted methods: ACH through BILT, credit card (additional fees may apply), certified check (additional fees may apply), Flex Pay, and Pay Near Me / WIPS (Walk-In Payment System). Personal checks and money orders are not accepted. Cashier's checks may only be used after the 7th or by anyone with an NSF, and must be scanned within 24 hours of receipt.",
+				k: "payment methods personal check money order cashiers check credit card ach bilt flex pay pay near me"
 			},
 			{
-				q: "Where do HR questions go?",
-				a: "This manual covers operations only. For pay, benefits, time off, or workplace concerns, contact People Operations: Morgan Ellis, people@glpg-demo.example, (734) 555-0142.",
-				k: "hr pay benefits pto vacation sick leave payroll human resources"
+				q: "What is the convenience fee?",
+				a: "Cashier's checks and payments not set up on automatic withdrawal carry a $10 convenience fee per payment, added to the tenant's account. Residents should set up auto-pay before move-in; otherwise the $10 fee is added as a recurring fee for the whole lease term.",
+				k: "convenience fee $10 auto pay autopay automatic withdrawal"
+			},
+			{
+				q: "How do late fees work?",
+				a: "Late fees are charged when rent is not paid as agreed, using the late fee function in Yardi. Fees may vary by state regulations and owner preference; see Section 4 of the lease agreement.",
+				k: "late fee charge late rent"
+			},
+			{
+				q: "When are legal fees applied?",
+				a: "Legal fees are applied to a resident's account when the file is sent to an attorney to file with court, and should be applied by the 15th of the month. They vary by jurisdiction, so confirm the charges with your attorney.",
+				k: "legal fees attorney court eviction filing 15th"
+			},
+			{
+				q: "What is an NSF and what do I do about it?",
+				a: "A Non-Sufficient Funds (NSF) payment is one returned by the bank (no money in the account, a closed account, a disputed payment, or wrong bank details). Review the Collect Dashboard in Yardi for payments that need handling, and add late fees and legal fees to the account when a resident NSFs, if applicable.",
+				k: "nsf returned payment bounced non sufficient funds collect dashboard"
+			},
+			{
+				q: "What are manual deposits?",
+				a: "Checks that cannot be processed through the office check scanner: physical cashier's checks that cause scanning errors, and ACH deposits from Housing Assistance Programs (HAP) or similar third parties. A check that cannot be processed must be taken to the bank immediately; if the bank is not local, coordinate with your accountant to mail it promptly.",
+				k: "manual deposit scanner error hap housing assistance bank"
 			}
 		]
 	},
 	{
 		n: 3,
-		title: "Emergencies and After-Hours",
+		title: "Renewals, Notices and Move-Out",
 		items: [
 			{
-				q: "What counts as an emergency?",
-				a: "Anything that threatens life, safety, or serious property damage right now:\n• Fire, smoke, gas smell, or carbon monoxide alarm\n• Active water leak, flooding, or sewage backup\n• No heat when the outdoor temperature is below 55°F\n• Electrical sparking, exposed live wires, or total power loss in a unit (not a utility outage)\n• A broken exterior door, window, or lock that leaves a unit unsecured\n• Elevator entrapment (call 911 first)\nLife-threatening situations: call 911 first, then the emergency line.",
-				k: "urgent emergency definition"
+				q: "What are the lease renewal standards?",
+				a: "• Know the owner's objective: raising rents or keeping occupancy.\n• Renew all leases at least 75 days before expiration.\n• Aim to bring residents to market rent; for residents already over market, the regional manager and owner set the % cap.\n• Renewal incentives are a last resort and need VP approval in writing.\n• The Regional, VP and Owners approve all recommended renewal rates.\n• Residents get personal contact before renewal rates are updated.\n• Renewal letters are usually generated 60-90 days before the lease expires.",
+				k: "renewal renew lease 75 days market rent incentive renewal letter"
 			},
 			{
-				q: "What do I do if there is a fire, gas smell, or carbon monoxide alarm?",
-				a: "Evacuate. Don't investigate or re-enter. Call 911 or the gas utility's emergency number from a safe location. Then call the emergency maintenance line at (734) 555-0199 and notify Riley Carter. Do not operate light switches or electronics near a gas smell.",
-				k: "smoke alarm evacuate gas leak co"
+				q: "What is an onsite transfer?",
+				a: "An onsite transfer is when a current or on-notice resident moves to another unit in the same property. It is done with the onsite transfer function in Yardi.",
+				k: "transfer move to another unit same property"
 			},
 			{
-				q: "What do I do about a water leak or flooding?",
-				a: "• If it is safe, shut off the water at the fixture or the unit's main shutoff valve.\n• Call the emergency maintenance line at (734) 555-0199. Don't just send an email.\n• Move belongings away from water if safe, and take photos.\n• Notify any units below that may be affected.\n• Create a work order marked \"Emergency\" and file an incident report within 24 hours.",
-				k: "leak water pipe burst flood ceiling dripping overflow"
+				q: "What is a roommate promotion?",
+				a: "A roommate promotion happens with a lease assignment, when the primary leaseholder moves out and the remaining roommate(s) stay in the unit.",
+				k: "roommate promotion lease assignment primary leaseholder moves out"
 			},
 			{
-				q: "How does the after-hours emergency line work?",
-				a: "Call (734) 555-0199. It is answered 24/7 and routes to the on-call maintenance technician, who calls back within 15 minutes and aims to be on site within 1 hour. If you don't get a callback within 15 minutes, call again and then call Riley Carter.",
-				k: "after hours weekend night on call callback"
+				q: "What is the process when a resident gives notice to vacate?",
+				a: "• Contact each resident personally to try to save the lease.\n• Get a written notice to vacate signed by all leaseholders within the time frame in the lease.\n• Do a pre-move-out inspection no less than 10 days before move-out.\n• Residents who end their lease early are charged according to their lease; in Michigan they must choose their early termination option in writing.",
+				k: "notice to vacate moving out early termination break lease pre move out inspection"
 			},
 			{
-				q: "A resident has no heat. Is that an emergency?",
-				a: "Yes, when the outdoor temperature is below 55°F. Call the emergency line at (734) 555-0199. If the repair will take longer than 4 hours in cold weather, Operations may provide space heaters or arrange temporary lodging. Riley Carter approves lodging.",
-				k: "heat furnace cold heater broken"
+				q: "How does the move-out and collection process work?",
+				a: "The move-out process is completed within 48 hours. A move-out inspection identifies damages and charges; residents are told about the charges and can pay or dispute them under state law. Security deposit refunds are issued per state regulations, and any balance owed after move-out goes to the debt collection process.",
+				k: "move out process inspection damages charges dispute deposit refund"
 			},
 			{
-				q: "What about a power outage?",
-				a: "First check whether the utility has a wider outage. If it does, post a notice for residents and monitor it; do not call the emergency line for a utility outage. If only one unit or building is affected, treat it as an emergency maintenance call.",
-				k: "electricity lights power out"
+				q: "What are the SODA (Statement of Deposit Accounting) rules?",
+				a: "• SODAs must be completed within 7 days of move-out.\n• SODAs that need a refund are sent to SDRefunds@beztak.com.\n• SODAs that leave a balance are mailed to the resident at the forwarding address given at move-out.",
+				k: "soda statement of deposit accounting deposit refund 7 days forwarding address finish complete after move out how long"
 			},
 			{
-				q: "What do I do in severe weather?",
-				a: "Follow alerts from local emergency officials. Don't travel to properties during a warning. After the event, Operations sends a check list of properties to inspect. Report damage through work orders with photos.",
-				k: "storm tornado snow ice weather"
+				q: "When do balances go to collections?",
+				a: "Past-resident balances of $100 or more go to collections within 14 days of move-out if not paid. Writing off an account is a two-day process: day one, mark it for collections in Yardi; day two, complete the write-off once confirmation is received.",
+				k: "collections write off balance $100 14 days past resident"
 			}
 		]
 	},
 	{
 		n: 4,
-		title: "Maintenance Requests and Work Orders",
+		title: "Expenses and Purchasing",
 		items: [
 			{
-				q: "How do I submit a work order?",
-				a: "Enter it in the property management system (PMS) under Work Orders. Include the property and unit, the problem, when it started, the priority, photos, and whether the resident gives permission to enter. Residents can submit their own requests through the resident portal; staff should enter any request received by phone, email, or in person the same day.",
-				k: "maintenance request repair fix broken submit create log"
+				q: "What are the expense standards?",
+				a: "• Expenses may not exceed approved budget guidelines without the Owner's advance written approval.\n• Purchase orders (POs) are required for all purchases before buying.\n• Vendors add invoices through Vendor Café; the site processes them in Yardi (P2P Finance Manager role). Utility, legal and municipality invoices are batched and scanned daily.\n• Expense and mileage reports are due within 30 days after the end of the month the expense occurred.",
+				k: "expense budget owner approval invoice processing mileage report"
 			},
 			{
-				q: "How do I report an issue or problem at one of our properties?",
-				a: "• Safety hazard (exposed wiring, broken stairs, a large spill): make the area safe if you can (block it off or post a warning), then call the emergency line at (734) 555-0199 or Operations at (734) 555-0147.\n• Building or common-area problems (lighting, doors, gates, parking lot, laundry): create a work order in the PMS for the property, choose \"Common area\", and add photos.\n• Problems inside a resident's unit: create a work order for that unit (see 4.1).\n• Anything involving an injury, damage, or police: also file an incident report (Section 13).",
-				k: "report issue problem property common area building hazard notice see"
+				q: "When is a purchase order (PO) required?",
+				a: "A PO is required before any work is done by a vendor, to stay on budget and process invoices, except for emergencies and utility bills. POs are created manually (P2P Finance Manager role) or through Yardi Marketplace. Work should not start until the PO has final approval.",
+				k: "purchase order po required before work approval"
 			},
 			{
-				q: "What are the maintenance priority levels and response times?",
-				a: "• Emergency: on site within 1 hour, 24/7 (see Section 3).\n• Urgent: within 24 hours. Examples: no hot water, AC out when it is above 85°F, refrigerator not working, the only toilet in a unit not working, a broken smoke detector.\n• Routine: within 5 business days. Examples: dripping faucet, appliance noise, a sticking door.\n• Scheduled / cosmetic: within 30 days or at the next unit turn. Examples: paint touch-ups, carpet wear.",
-				k: "priority urgent routine how fast timeline sla response"
+				q: "What are manual POs, Marketplace POs, service contracts and recurring POs?",
+				a: "• Manual POs: for work like turnovers, plumbing and heating/cooling repairs; receive the PO in Yardi once the service is done.\n• Marketplace POs: all parts must be ordered from Yardi Marketplace for competitive pricing.\n• Service contracts: entered in Yardi for monthly or recurring services with a contract, such as advertising or lawn care.\n• Recurring POs: for recurring services without a contract, such as office or hallway cleaning.",
+				k: "manual po marketplace parts order service contract recurring po cleaning lawn"
 			},
 			{
-				q: "Can I enter a unit to do a repair?",
-				a: "Only with authorization. For routine and urgent work, give the resident at least 24 hours' written notice through the PMS, unless the resident's request gives permission to enter. Enter between 8:00 a.m. and 7:00 p.m., Monday–Saturday. In a genuine emergency you may enter without notice, but you must leave a written notice and log the entry the same day. Always knock, announce yourself, and wear your GLPG ID.",
-				k: "entry enter apartment notice permission access unit"
+				q: "How do vendors get set up and paid?",
+				a: "All vendors (except special cases such as city inspections or utilities) upload invoices through Vendor Café. To add a vendor, the vendor completes a new vendor packet, the site manager sends it to Vendor Maintenance, accounting enters the vendor in Yardi, and the vendor gets an invitation to set up a Vendor Café account.",
+				k: "new vendor packet vendor cafe invoice setup add vendor"
 			},
 			{
-				q: "When is a work order closed?",
-				a: "When the work is done and checked, photos are attached, parts and costs are recorded, and the resident has been told it is complete. If the resident reports the same problem within 30 days, reopen the original work order instead of creating a new one.",
-				k: "close complete finish"
+				q: "What are the petty cash rules?",
+				a: "• Petty cash is for site expenses that cannot be ordered in Yardi Marketplace, such as resident functions, refreshments, gas for site trucks and postage.\n• Keep it locked and secure in the office or in a bank account; Green Dot cards are preferred.\n• Submit it when 50% has been spent, and at least once a month.\n• Maintenance items need written approval from the Regional Manager.\n• It is not used to reimburse mileage; use an Expense Report.\n• Amount on hand: 0-300 units $300; 301-599 units $500; 600+ units $750.",
+				k: "petty cash green dot amount reimburse limit units"
 			},
 			{
-				q: "What should I do if a contractor fails to complete an assigned repair?",
-				a: "• Document what is incomplete or wrong with dated photos and notes on the work order.\n• Contact the vendor in writing (through the PMS or email) and ask them to finish within 2 business days. For urgent or emergency work, call instead.\n• Notify the Maintenance Coordinator (Sam Rivera, maintenance@glpg-demo.example) and ask Accounting to hold the invoice until the work is verified.\n• If the vendor doesn't respond or can't finish, the Maintenance Coordinator reassigns the job to another approved vendor.\n• Keep the resident updated. Operations records vendor performance, and repeated problems can remove a vendor from the approved list.",
-				k: "contractor vendor fails incomplete unfinished poor quality bad work no show didnt finish complete repair"
+				q: "How is petty cash reconciled, and what happens when a manager leaves?",
+				a: "Receipts plus cash on hand must equal the starting amount (for example $250 receipts + $250 cash = $500). Enter it in P2P Finance Manager as a manual invoice with the Petty Cash Reconciliation Form. With a Green Dot card, send Petty Cash Expense Reports to your Property Accountant. A departing Property Manager reconciles on their last day, and shortages are deducted from the final paycheck; on a manager change, both Property Managers and the Regional Manager sign off.",
+				k: "petty cash reconcile reconciliation manager leaving shortage"
 			},
 			{
-				q: "What do I do about pests or bed bugs?",
-				a: "Routine pests (ants, mice): create a routine work order; the approved pest vendor treats within 5 business days. Bed bugs or cockroach infestations: mark the work order urgent; the vendor inspects within 48 hours and adjoining units may need inspection. Don't move furniture or belongings between units.",
-				k: "pest bugs mice roaches exterminator"
+				q: "How do expense reports work?",
+				a: "Expense reports are for travel and other company-related purchases and need valid receipts. The associate must be added to Yardi as a vendor to be paid: email Vendor Maintenance (vendormain@beztak.com). Check with your supervisor whether the report is processed as an invoice or sent directly to accounting. Reports are due within 30 days after the end of the month of the expense.",
+				k: "expense report reimbursement receipts travel mileage"
 			},
 			{
-				q: "What about mold or water damage?",
-				a: "Mark the work order urgent. Find and stop the moisture source first. Areas larger than about 10 square feet, or any mold in a resident's health complaint, go to Operations for an approved remediation vendor. Don't give residents health advice; document and route.",
-				k: "mold mildew moisture damp water damage"
+				q: "When is a Bid Approval Form needed?",
+				a: "For all contracted work over $5,000. Property or Service Managers collect comparable bids from three vendors and send the form to the Regional Manager to present to ownership.",
+				k: "bid approval form $5000 three bids"
 			},
 			{
-				q: "How are smoke and CO detectors maintained?",
-				a: "They are tested at every move-in and every preventive maintenance visit, at least once a year. A resident report of a missing or broken detector is an urgent work order (within 24 hours). Never remove a detector without replacing it the same visit.",
-				k: "smoke detector carbon monoxide alarm battery beeping chirping"
-			},
-			{
-				q: "How does preventive maintenance work?",
-				a: "Each property has a seasonal schedule in the PMS: HVAC filters every 90 days, furnace and AC service each spring and fall, gutters each fall, and fire extinguisher checks monthly in common areas. The Maintenance Coordinator assigns these as scheduled work orders.",
-				k: "preventive pm schedule hvac filter seasonal"
-			},
-			{
-				q: "Who handles snow and ice removal?",
-				a: "Approved snow vendors clear drives and walkways after 2 inches of snow, with main walkways cleared by 7:00 a.m. on business days. Staff report missed areas or icy spots to Operations right away. Salt slippery entrances when it is safe to do so and note it in the PMS.",
-				k: "snow ice plow salt shovel winter"
+				q: "Who can sign contracts, and what are the contract rules?",
+				a: "• Only VPs, the President, COO, Partner and Owner may sign a contract.\n• Contracts are written under the legal name of the community, never under Oakland Management Corp. or Beztak.\n• Recurring monthly contracts are limited to one year without auto-renewal.\n• Include current insurance and W-9s, use the Service Contract Recap sheet as a cover sheet, and attach all contracts to the vendor in Yardi.\n• Keep executed copies in the Community Development binder.\n• No significant capital work without a contract and specific warranties. Approved templates are in DocuSign.",
+				k: "contract sign signature docusign authorized auto renew w-9 insurance"
 			}
 		]
 	},
 	{
 		n: 5,
-		title: "Vendors, Purchasing, and Spending Approvals",
+		title: "Site Team Standards, Timecards and Bonuses",
 		items: [
 			{
-				q: "How much can I approve for a repair or purchase?",
-				a: "Spending limits per work order or purchase:\n• Up to $500: property manager\n• $500 to $2,500: Property Operations Lead (Riley Carter)\n• Over $2,500: Managing Member (Jordan Patel)\nSplitting a job into smaller orders to stay under a limit is not allowed.",
-				k: "approval limit spend authority cost budget sign off"
+				q: "What are the standards for site employees?",
+				a: "• Follow the Beztak standard office set-up; use leasing tablets for leasing.\n• Comply with the Beztak Ensemble Program; always wear name badges when representing Beztak.\n• Property and Service Managers meet daily to set priorities; Property Managers hold weekly staff meetings.\n• Quarterly safety meetings hosted by the Risk Managers are required, and attendance is noted in writing.",
+				k: "name badge ensemble staff meeting safety meeting standards"
 			},
 			{
-				q: "How many quotes do I need?",
-				a: "• Up to $1,000: one written quote\n• $1,000 to $5,000: two written quotes\n• Over $5,000: three written quotes, unless Riley Carter approves a single source in writing\nAttach all quotes to the work order.",
-				k: "bids quotes estimates compare"
+				q: "How does recruiting and hiring work for a property?",
+				a: "Recruiting can be done in-house by posting the job in Paycor, or by using a Beztak Recruiter for an extra fee billed to the property. To use a recruiter, the Regional Manager emails Recruiting@beztak.com.",
+				k: "hire hiring post a job paycor recruiter"
 			},
 			{
-				q: "What about spending in an emergency?",
-				a: "In an emergency you may approve up to $2,500 to stop damage or make a unit safe, without waiting for normal approval. Notify Riley Carter within 24 hours and attach the invoice and photos. Anything over $2,500 needs a phone approval from Riley Carter or Jordan Patel first.",
-				k: "emergency spending urgent cost approve approval limit repair"
+				q: "When must timecards be approved?",
+				a: "Timecards must be approved by 10:00 a.m. EST on the Monday of a pay week. After that they lock and cannot be changed; later edits need a Timecard Correction Form emailed to HR@beztak.com. Monitor timecards during the week for errors and missing punches, approve PTO requests promptly, and review on-call hours.",
+				k: "timecard approve deadline monday 10 am correction form missing punch"
 			},
 			{
-				q: "How do I add a new vendor?",
-				a: "Only approved vendors may work at GLPG properties. To add one, send Operations the vendor's W-9, a certificate of insurance (at least $1,000,000 general liability, naming GLPG as additional insured), any required trade license, and a signed vendor agreement. Operations adds the vendor in the PMS, usually within 3 business days.",
-				k: "new vendor contractor onboard approve insurance w9 coi"
+				q: "When are bonuses paid and what are the deadlines?",
+				a: "Bonuses (leasing/renewal commissions, quarterly bonuses and on-call bonuses) are paid on the second check of each month. Use the latest template HR emails. Property Managers send completed templates to their Regional Managers by 3:00 p.m. EST on the Wednesday before payroll is due; Regional Managers send approved templates to HR@beztak.com by 3:00 p.m. EST on Friday.",
+				k: "bonus paid when commission deadline template second check"
 			},
 			{
-				q: "How do I let a vendor into a property?",
-				a: "Verify the work order, the vendor's identity, the scope of work, and the approved access window before giving access. Log entry and completion in the PMS. Never give a vendor a master key or a permanent access code.",
-				k: "vendor access let in contractor key code"
+				q: "How are uniforms and boots ordered?",
+				a: "Property Managers order maintenance and office uniforms through ICO. HR starts Spring and Fall reorders by email; employees view the lookbook and give their order to their Property Manager. Maintenance and grounds staff can get one new pair of boots per year from Shoes for Crews.",
+				k: "uniform order ico boots shoes for crews lookbook"
 			},
 			{
-				q: "How are vendor invoices paid?",
-				a: "Vendors send invoices to accounting@glpg-demo.example with the work order number. The property manager confirms the work was completed. Accounting pays approved invoices within 30 days. Never pay a vendor directly or in cash.",
-				k: "invoice bill pay vendor payment"
+				q: "How does corrective action work?",
+				a: "Attendance forms are for unexcused absences, tardiness, no-call no-shows (under three days), leaving without permission and on-call infractions, and should be done immediately. Coaching covers growth areas. Corrective Action / Final Corrective Action forms are for serious infractions (such as attendance, performance, insubordination, violence, dishonesty, harassment, theft, drugs or alcohol, property damage, dress code or safety violations). A Performance Improvement Plan (PIP) sets out a structured improvement plan. Email all completed forms to HR@beztak.com.",
+				k: "corrective action discipline write up coaching pip performance improvement form manager"
 			},
 			{
-				q: "A vendor sent new bank or payment details. What do I do?",
-				a: "Treat it as possible fraud. Don't update anything or reply to the email. Forward it to security@glpg-demo.example and call Accounting at (734) 555-0148. Accounting verifies changes by calling the vendor at a phone number already on file, never the number in the email.",
-				k: "bank change payment details wire fraud scam"
-			},
-			{
-				q: "Can I accept a gift from a vendor?",
-				a: "Modest promotional items valued at $50 or less are fine if they create no expectation of preferential treatment. Cash, gift cards over $25, travel, or anything tied to a contract award needs written Managing Broker approval first.",
-				k: "gift lunch tickets"
+				q: "What are the mystery shop standards?",
+				a: "A third party mystery shops properties monthly, and the phone shop is recorded for feedback. Employees must score 85% or higher on the Ellis shop and 100% on benchmarks (asking for the name, phone number and application). A shop below 90% means a written warning and the \"How to Ace Your Shop\" training; a second shop below 85% results in termination. Sales staff must keep a 75% phone-to-appointment ratio and a 35% tour-to-rental ratio.",
+				k: "mystery shop ellis score benchmark"
 			}
 		]
 	},
 	{
 		n: 6,
-		title: "Keys, Access Codes, and Lockouts",
-		items: [
-			{
-				q: "How are keys stored and checked out?",
-				a: "Keys are kept in the locked key cabinet at each office and are coded. Never label a key with a full property address. Sign every key out and back in on the key log, and return it the same business day unless your manager approves otherwise.",
-				k: "key cabinet storage check out sign log"
-			},
-			{
-				q: "I lost a key, fob, or access card. What do I do?",
-				a: "Call Operations at (734) 555-0147 right away and email operations@glpg-demo.example. Don't wait until the end of your shift. If the key was labeled, identifiable, or a master key, the affected locks are rekeyed within 24 hours.",
-				k: "lost key missing fob card stolen"
-			},
-			{
-				q: "A resident is locked out. What do I do?",
-				a: "• Verify identity: a photo ID that matches a leaseholder or an authorized occupant in the PMS.\n• Never let in someone who is not on the lease, even a family member, unless the leaseholder has given written authorization on file.\n• During business hours, office staff can unlock at no charge.\n• After hours, the on-call technician handles lockouts; the demo after-hours lockout fee is $75.\n• Log the lockout in the PMS.",
-				k: "lockout locked out let in resident door"
-			},
-			{
-				q: "Can I give out an access code or gate code?",
-				a: "Only through the approved secure system and only to an authorized person. Never send codes to an unverified phone number or post them in a group chat. Change vendor and showing codes after each use window.",
-				k: "code gate lockbox door code share text"
-			},
-			{
-				q: "Does a master key let me enter any unit?",
-				a: "No. A master key is not blanket permission. Follow the entry notice rules in Section 4 and the lease, and log every entry.",
-				k: "master key enter"
-			},
-			{
-				q: "When are locks changed?",
-				a: "At every move-out before the next move-in, when a key is lost and identifiable, and when a resident requests it for safety (for example a protective order). A resident's safety-related request is handled within 24 hours.",
-				k: "rekey lock change new locks"
-			}
-		]
+		title: "Operations Reports",
+		items: [{
+			q: "What regular reports do property managers complete?",
+			a: "• Monday Morning Report (MMR): every Monday, updates ownership on the past week.\n• Reclass/Accruals: at month end, reviewed Monday mornings.\n• Month End Checklist: in HappyCo during the last week of the month.\n• Owner's Report: mid-month, on performance, financials and expenses.\n• Rate Adjustment Form (RAF): tracks rate changes and specials; adjustments run Thursday to Wednesday.\n• 3-Year Plan: updated yearly with the budget, kept in the Community Development binder.",
+			k: "monday morning report mmr owner report month end checklist raf rate adjustment 3 year plan accruals"
+		}]
 	},
 	{
 		n: 7,
-		title: "Showings, Leasing, and Applications",
+		title: "Leasing, Marketing and Customer Service",
 		items: [
 			{
-				q: "How do I prepare for a showing?",
-				a: "Confirm the appointment time, the prospect's name and phone, and that the unit is available to show. Record a copy of the prospect's photo ID in the PMS before the showing. For an occupied unit, give the resident at least 24 hours' notice. Use the lone-worker check-in for vacant or after-hours showings (Section 12).",
-				k: "showing tour prospect view apartment"
+				q: "What are the customer service standards?",
+				a: "• Respond to resident requests within 24 hours.\n• Return phone, email and other messages the day they are received.\n• Online reviews must reflect 4.0+ ratings.\n• Annual resident satisfaction plans are required.\n• Greet residents by name and with a smile; personal contact is preferred.",
+				k: "customer service respond 24 hours reviews rating resident requests"
 			},
 			{
-				q: "Can prospects tour a unit by themselves?",
-				a: "Only at properties approved for self-guided tours, using the approved smart-lock system, which verifies identity. Never leave a key or code for an unverified person.",
-				k: "self guided tour alone unaccompanied"
+				q: "How should prospective residents be greeted and followed up?",
+				a: "• Greet every prospect and offer refreshments on arrival and during every tour.\n• Enter guest card data on the leasing tablet, never on paper.\n• Respond to e-leads within 2 hours; process prospect calls and call-center messages daily.\n• Thank-you call within 24 hours of every live tour, 72-hour follow-up by phone or email, and same-day follow-up on all inquiries.\n• Goals: 50% first contact to appointment, 75% appointment to tour, 35% tours to leases.",
+				k: "prospect tour follow up e-lead email lead refreshments guest card conversion"
 			},
 			{
-				q: "How do rental applications work?",
-				a: "• Applicants apply online through the resident portal.\n• The demo application fee is $40 per adult applicant.\n• Every applicant is screened with the same published criteria (income, rental history, and screening report).\n• Decisions are made within 3 business days of a complete application.\n• Denials and conditional approvals use the adverse action notice in the PMS. Never explain a denial in your own words.",
-				k: "application apply screening approve deny criteria credit background"
+				q: "What are the Preferred Employer and Hometown Hero programs?",
+				a: "Preferred Employers receive waived application fees. Hometown Heroes (military, police, firefighters, teachers, hospital staff, EMS) also receive waived fees.",
+				k: "hometown hero preferred employer waived application fee military police teacher"
 			},
 			{
-				q: "What can't I say to a prospect?",
-				a: "Don't describe a neighborhood or building as \"good for families\", \"safe\", or suited to any group. Don't ask about family plans, religion, disability, national origin, or any other protected characteristic. Give the same information to everyone. See Section 11.",
-				k: "fair housing steering neighborhood questions"
-			},
-			{
-				q: "How is a lease signed?",
-				a: "Leases are generated and signed electronically in the PMS. All adult occupants must sign. Don't change lease terms by hand or promise concessions that are not in the system; concessions need property manager approval and must appear in the lease.",
-				k: "lease sign signing contract concession discount"
-			},
-			{
-				q: "How are lease renewals handled?",
-				a: "Renewal offers go out through the PMS 90 days before the lease ends. Residents respond within 30 days. Property managers set renewal rates within the ranges Operations publishes each quarter.",
-				k: "renewal renew extend lease end"
-			},
-			{
-				q: "What is the procedure when a resident wants to terminate their lease early?",
-				a: "• Ask the resident to submit a written early-termination request through the resident portal. Don't agree to anything verbally.\n• Check the lease's early termination clause. The demo standard is 60 days' written notice plus an early-termination fee equal to two months' rent, or rent until the unit is re-rented, whichever the lease specifies.\n• Some situations have legal protections, such as military orders, domestic violence, or certain health situations. Send those to Operations and compliance@glpg-demo.example the same business day and don't quote fees until they review.\n• The property manager approves the agreement and Accounting calculates the final charges. Both are recorded in the PMS.\n• The normal move-out steps then apply (Section 8).",
-				k: "terminate break lease early termination end lease early leave early buyout"
-			},
-			{
-				q: "How do I process a resident's request to transfer units?",
-				a: "• The resident submits a written transfer request through the resident portal.\n• To qualify, the resident must be in good standing: no unpaid balance and no written lease violations in the last 6 months.\n• Confirm the new unit is available and get property manager approval.\n• The resident signs a new lease for the new unit. A demo transfer fee of $300 applies, except for transfers requested as a disability accommodation, which go to compliance@glpg-demo.example first.\n• Do a move-out inspection of the old unit and a move-in inspection of the new one. Accounting moves the security deposit after any deductions on the old unit.",
-				k: "transfer move to another unit switch units change apartment relocate"
+				q: "What marketing tools does Beztak use?",
+				a: "Knock (CRM), Elise (an AI leasing assistant), listing sites (Apartments.com/CoStar, Zillow, Apartment List, Weblisters), SOCi for reputation management, Yardi Revenue IQ for pricing, Perq and ResiDesk. Marketing materials are ordered through Lloyd Waters.",
+				k: "marketing tools knock elise zillow apartments.com soci revenue iq lloyd waters"
 			}
 		]
 	},
 	{
 		n: 8,
-		title: "Move-In and Move-Out",
+		title: "Fair Housing and Accommodations",
 		items: [
 			{
-				q: "What has to happen before move-in?",
-				a: "• The lease is fully signed by all adults.\n• First month's rent and the security deposit are received in cleared funds (online payment or certified funds).\n• Renter's insurance proof is uploaded, if required by the lease.\n• The unit passes the make-ready checklist, including smoke and CO detector tests.\nKeys are released only when all four are done.",
-				k: "move in requirements keys before checklist new resident give giving keys steps follow when new resident moves in"
+				q: "What are the Fair Housing requirements?",
+				a: "• All associates complete Fair Housing training within one week of employment.\n• Lease to every qualified prospect without regard to race, color, religion, sex, handicap, familial status or national origin, and treat everyone consistently.\n• All documents for prospects and residents carry the Fair Housing logo, and a company Fair Housing sign is displayed in a public area approved by the Regional Manager.",
+				k: "fair housing training discrimination logo sign"
 			},
 			{
-				q: "How is the move-in inspection done?",
-				a: "Walk the unit with the resident if possible, using the move-in condition form in the PMS, and take dated photos of every room. The resident has 7 days to note anything else on the form. Store the form and photos in the resident file.",
-				k: "move in inspection condition walk through photos"
+				q: "How are reasonable accommodation requests handled?",
+				a: "Residents may use the Reasonable Accommodation Request Form or any form with the same information. Forward every request to the Regional Manager immediately; no response goes to the resident until the Regional Manager has reviewed it and given direction. Upload all requests, documents and decisions to the resident's Yardi profile.",
+				k: "reasonable accommodation request disability form regional manager"
 			},
 			{
-				q: "How much notice does a resident have to give to move out?",
-				a: "At least 30 days' written notice before the lease end date, through the resident portal or in writing to the office. Record the notice in the PMS the day it is received.",
-				k: "notice to vacate move out leaving"
+				q: "What is the policy on assistance animals?",
+				a: "Assistance animals are not pets, so no pet fees or deposits may be charged. Treat every request as a reasonable accommodation request. Most communities use third-party pet screening; otherwise the person must establish the disability and the animal's training (a letter from a medical professional or the accommodation form). Do not deny an incomplete request outright: explain what is missing and give a time frame, and involve the Regional Manager before treating it as withdrawn.",
+				k: "assistance animal service animal emotional support pet fee deposit"
 			},
 			{
-				q: "What steps are required before a resident moves out?",
-				a: "• Record the resident's written notice in the PMS the day it arrives (at least 30 days before the lease end).\n• Send the move-out instructions and cleaning checklist from the PMS.\n• Offer an optional pre-move-out walk-through about 2 weeks before, so the resident can fix issues.\n• Confirm a forwarding address for the security deposit refund.\n• Remind the resident to transfer utilities and settle any balance.\n• Collect all keys, fobs, and remotes on move-out day and log them.\n• Do the move-out inspection within 2 business days (see the next procedure).",
-				k: "before move out steps moving out checklist leaving vacate requirements"
-			},
-			{
-				q: "How is the move-out inspection done?",
-				a: "Inspect within 2 business days after keys are returned, using the move-out form and dated photos, and compare against the move-in record. Note normal wear and tear separately from damage.",
-				k: "move out inspection walk through damage wear"
-			},
-			{
-				q: "How is the security deposit returned?",
-				a: "Accounting mails or deposits the refund with an itemized list of any deductions within 30 days after move-out to the forwarding address on file. Deductions must be supported by move-in and move-out photos and invoices. Disputes go to the property manager and Accounting.",
-				k: "security deposit refund return deductions"
-			},
-			{
-				q: "How long does a unit turn take?",
-				a: "The target is 7 calendar days from move-out inspection to \"ready to rent\": cleaning, repairs, paint as needed, rekey, and detector tests. Operations approves extensions for major work.",
-				k: "turn make ready turnover vacant"
+				q: "Do we accept Section 8 or other government income?",
+				a: "Yes. Beztak accepts all forms of legal, verifiable income at every community. If asked, the approved answer is: \"We accept all forms of legal, verifiable income, all of which is qualified using a standard screening process and rental criteria.\" Qualify it like an offer letter (an original computer-generated benefit letter with start date and monthly amount), or the screening model can calculate it after 2 consecutive months of deposits.",
+				k: "section 8 voucher government income subsidy source of income housing"
 			}
 		]
 	},
 	{
 		n: 9,
-		title: "Rent, Payments, and Late Fees",
+		title: "Applications and Leases",
 		items: [
 			{
-				q: "When is rent due and when is it late?",
-				a: "Rent is due on the 1st of each month. There is a grace period through the 5th. A demo late fee of $50 is charged on the 6th, as stated in the lease.",
-				k: "rent due date late fee grace period"
+				q: "What are the application standards?",
+				a: "• Applications are submitted online and must pass ID verification (government ID and a selfie) first.\n• Approve or decline within 72 hours of submission.\n• Application fees are paid online before a unit is taken off the market.\n• Screen everyone 18 and over using the property's Yardi Rental Screening Criteria; use Yardi Verification of Income.\n• Attach denials and cancellations in Yardi within 24 hours.",
+				k: "application approve decline 72 hours screening background check id verification income"
 			},
 			{
-				q: "How can residents pay rent?",
-				a: "Through the resident portal (bank transfer or card), or by check or money order in the office drop box. GLPG does not accept cash. Staff must never accept payments in the field or into a personal account.",
-				k: "pay rent payment methods check money order online portal cash"
+				q: "How fast must a lease be signed after approval?",
+				a: "The lease must be generated and signed online within 24 hours of approval, and the lease and application attached in Yardi within 24 hours.",
+				k: "lease signing 24 hours after approval"
 			},
 			{
-				q: "Can a resident get a payment plan?",
-				a: "Possibly. A payment plan needs approval from the property manager and Accounting and must be written and signed in the PMS. Don't promise a plan or waive fees verbally.",
-				k: "payment plan behind rent cant pay waive fee"
-			},
-			{
-				q: "What happens with a bounced payment?",
-				a: "A demo returned-payment fee of $35 applies. After two returned payments in 12 months, the resident must pay with certified funds. Accounting notifies the resident through the PMS.",
-				k: "bounced nsf returned check insufficient funds"
-			},
-			{
-				q: "What should I do if a resident disputes a charge?",
-				a: "• Listen and don't argue, but don't waive or change the charge yourself.\n• Ask the resident to submit the dispute in writing through the resident portal, with any receipts or photos.\n• Log it in the PMS and send it to Accounting (accounting@glpg-demo.example). Accounting reviews the lease, ledger, and documents and answers within 5 business days.\n• While a dispute is under review, no late fee is added to the disputed amount.\n• The resident gets a written decision. If they still disagree, the property manager reviews it, and Operations makes the final decision.",
-				k: "dispute charge disagree bill fee wrong incorrect overcharged ledger error contest"
-			},
-			{
-				q: "Can I discuss a resident's balance?",
-				a: "Only with people on the lease or someone the leaseholder authorized in writing in the PMS. Don't discuss balances in public spaces or by text to unverified numbers.",
-				k: "balance account ledger owe privacy"
-			},
-			{
-				q: "What about late rent and evictions?",
-				a: "Property staff send only the standard late notices generated by the PMS. Any legal notice or eviction filing is handled by Operations with the company's attorney. Don't threaten eviction or discuss legal outcomes with residents.",
-				k: "eviction legal notice nonpayment"
+				q: "How long can an apartment be held?",
+				a: "The Lost Rent Days standard is 7 days or less (a maximum, not an average). See the Rate Adjustment Form (RAF) for hold times and short-term fees.",
+				k: "hold apartment holding unit lost rent days 7 days"
 			}
 		]
 	},
 	{
 		n: 10,
-		title: "Resident Communication and Complaints",
-		items: [
-			{
-				q: "How do I handle a resident complaint?",
-				a: "Listen and stay calm. Write down the facts: who, what, when, and where. Log it in the PMS within 1 business day and acknowledge it to the resident within 1 business day. Route it to the right person: maintenance, the property manager, or Operations. Don't make promises about legal outcomes or other residents.",
-				k: "complaint upset angry resident issue tenant"
-			},
-			{
-				q: "What about noise complaints between neighbors?",
-				a: "Log the complaint, remind the other resident of the lease's quiet-hours rule (demo: 10:00 p.m. to 7:00 a.m.) in writing through the PMS, and don't share who complained. Repeated documented issues go to the property manager. Threats or violence: 911.",
-				k: "noise loud neighbor party"
-			},
-			{
-				q: "How should I handle a resident who repeatedly violates community rules?",
-				a: "• Document every incident in the PMS: the date, what happened, who saw it, and photos if relevant.\n• First time: a friendly reminder of the rule, in writing through the PMS.\n• Second time within 12 months: a formal lease violation notice using the PMS template, and a meeting or call with the property manager.\n• Third time, or any serious violation (safety, damage, threats): send it to Operations to decide on lease enforcement with the company's attorney.\n• Apply the rules the same way to every resident (Fair Housing). Never threaten eviction yourself.",
-				k: "violate violations repeated rules community rules lease violation warning repeat offender breaking rules"
-			},
-			{
-				q: "How do I send notices to residents?",
-				a: "Use the PMS notice templates (email plus posted notice where required). Building-wide notices, such as water shutoffs, need at least 48 hours' notice except in emergencies. Keep a copy of every notice in the PMS.",
-				k: "notice letter announcement communicate shutoff"
-			},
-			{
-				q: "A resident is aggressive or threatening. What do I do?",
-				a: "Don't argue or try to restrain anyone. Leave the area if you can. Call 911 if anyone is in danger. When you are safe, notify your manager and Operations and file an incident report within 24 hours.",
-				k: "threat aggressive yelling hostile violent"
-			},
-			{
-				q: "Can I share a resident's information?",
-				a: "No. Resident information is shared only with people who need it for an assigned business purpose, or with written consent. Requests from police, other agencies, or lawyers go to Operations. Don't confirm whether someone lives at a property.",
-				k: "privacy confidential share info police request"
-			}
-		]
+		title: "Maintenance: Inspections and Logs",
+		items: [{
+			q: "What inspection reports are done in HappyCo?",
+			a: "• Move Out Checklist: by the Service Manager within 24 hours of move-out, with photos.\n• Make Ready Checklist: by the technician when the unit is ready.\n• Final Move In Checklist: by the Property Manager before move-in.\n• Light Inspection: every two weeks, at night.\n• Preventative Maintenance: twice a year, in April and October.\n• Seasonal Checklists: quarterly.\n• Facilities Site Visit report: by the Facilities Director.",
+			k: "happyco inspection report move out checklist preventative maintenance light inspection"
+		}, {
+			q: "What weather and pool logs are required?",
+			a: "Kept by the Service Manager in a binder on the property: the Inclement Weather Log three times daily, October through March; the Snow Log daily (even with no snow), October through March; the Storm Log as hazards arise; and pool logs, testing the pool at least daily.",
+			k: "snow log weather log storm log pool log salt"
+		}]
 	},
 	{
 		n: 11,
-		title: "Fair Housing and Accommodation Requests",
+		title: "Work Orders and On-Call",
 		items: [
 			{
-				q: "What are the basic Fair Housing rules?",
-				a: "Treat every applicant and resident the same way, using written, consistent criteria for inquiries, applications, showings, and service requests. Never steer people toward or away from a property, use coded language, or make assumptions based on a protected characteristic. Escalate any concern to compliance@glpg-demo.example right away.",
-				k: "fair housing discrimination equal treatment protected class"
+				q: "How fast must work orders be completed?",
+				a: "Routine service requests are completed within 24 hours, or 48 hours if a part is on order or a contractor is needed. If work cannot be completed, contact the resident and document the follow-up in a memo. Water infiltration and mold are high priority, and excessive cases are emergencies.",
+				k: "work order how long 24 hours 48 hours repair mold water"
 			},
 			{
-				q: "A resident asks for an accommodation or modification. What do I do?",
-				a: "Acknowledge the request respectfully. Don't ask about a diagnosis, and don't approve or deny it yourself. Forward it to operations@glpg-demo.example and compliance@glpg-demo.example the same business day, and keep it confidential.",
-				k: "accommodation disability reasonable request modification grab bar ramp parking space"
+				q: "What is the 24-Hour Maintenance Guarantee?",
+				a: "For routine interior repairs only: if a technician does not respond within 24 hours, the resident gets a rent credit for each day or part of a day beyond the guarantee, up to five days. If a service date is given and the repair goes past it, the same daily credit applies.",
+				k: "maintenance guarantee rent credit 24 hour"
 			},
 			{
-				q: "What about assistance animals or service animals?",
-				a: "A request involving an assistance or service animal is an accommodation request. Don't deny it, charge pet fees, or ask for medical details. Forward it to Operations and Compliance the same business day.",
-				k: "service animal emotional support esa dog pet"
+				q: "How fast must on-call respond to an emergency?",
+				a: "Emergency calls are answered immediately, and the on-call Service Technician should arrive within 30 minutes. If a vendor is called, the on-call associate stays on site until they arrive. The Service Manager manages the on-call rotation.",
+				k: "on call emergency response 30 minutes rotation"
 			},
 			{
-				q: "What if an owner or client asks for a discriminatory preference?",
-				a: "Don't follow it. Explain that GLPG uses lawful, consistent criteria, and contact the Managing Broker (Avery Chen) right away.",
-				k: "owner request discriminatory preference"
+				q: "How is on-call duty paid?",
+				a: "• Hourly: regular rate up to 40 hours worked per week, 1.5 times after 40. Two hours of straight-time pay automatically for being on call; two hours minimum for the first call and for each additional drive out. Plus a $100 bonus for taking on-call 3-7 days in a week.\n• Salaried: a $200 bonus for taking on-call 3-7 days in a week.\nMore than one bonus per month is possible.",
+				k: "on call pay bonus $100 $200 hourly salaried two hours minimum"
 			},
 			{
-				q: "What about advertising listings?",
-				a: "Use only approved listing templates. Describe the property, not the people who might live there. Have photos, captions, and ad targeting reviewed for discriminatory wording or effect.",
-				k: "ad listing advertising marketing"
+				q: "Are master locks allowed?",
+				a: "No. Master locks are not permitted anywhere on the property; each apartment has its own unique lock that only its own key opens.",
+				k: "master key master lock locks keys"
 			}
 		]
 	},
 	{
 		n: 12,
-		title: "Field Safety and Property Visits",
+		title: "Curb Appeal and Make Ready",
 		items: [
 			{
-				q: "What do I do before a property visit?",
-				a: "Check the address, appointment details, known hazards, and access instructions. Tell a colleague or your manager where you are going and when you expect to finish. Carry a charged phone, keep keys secure, and park in a well-lit place where possible.",
-				k: "property visit safety before going site"
+				q: "What are the curb appeal standards?",
+				a: "• Keep all areas clean and litter-free; inspect Priority One areas daily.\n• Water grass and plantings daily; change seasonal plantings in Spring, Summer and Fall.\n• Holiday lighting is white only in Priority One areas, and decorations need owner approval.\n• Signs and lights in Priority One areas must work every night; keep lighting logs.\n• Pools open by April 15 (weather permitting) until about October 15 in northern states.\n• Replace damaged turf with sod, not seed, in high-priority areas, by 5/15.",
+				k: "curb appeal grounds landscaping holiday lights pool open sod plantings"
 			},
 			{
-				q: "How does lone-worker check-in work?",
-				a: "• Before a visit: send your location, appointment time, and expected end time to your manager or team channel.\n• On arrival send \"arrived\", and when leaving send \"clear\".\n• If you are 15 minutes overdue, a colleague calls you. After 10 more minutes with no response, your manager contacts emergency services if the risk warrants it.\n• After-hours visits need manager approval and a named check-in partner.",
-				k: "lone worker check in alone buddy"
+				q: "What are the make ready standards?",
+				a: "• Change locks (and electronic codes) within 24 hours of move-out.\n• Make apartments ready within four business days of move-out (weekend move-outs count from Monday); the Regional Manager can grant exceptions.\n• Never scavenge parts, appliances, cabinets or doors from another apartment.\n• Walk vacant units bi-weekly for damage, water or mold.\n• Complete the Make Ready and Final Move In Checklists in HappyCo. The Market Ready goal is 100%.\n• Schedule a pre-walk at least a week before move-out.",
+				k: "make ready turn unit turnover four days locks changed market ready"
 			},
 			{
-				q: "When should I not enter a property?",
-				a: "Don't enter if you see signs of forced entry, weapons, aggressive animals, hazardous materials, structural damage, or threatening behavior. Leave, move to a safe place, and call 911 if needed, then call Operations.",
-				k: "unsafe danger enter break in"
-			},
-			{
-				q: "I feel unsafe during a showing or visit. What do I do?",
-				a: "Leave right away if you can. Don't confront anyone. Go to a safe public place and call 911 if you are threatened. Notify your manager and Operations when you are safe.",
-				k: "unsafe scared showing threatened"
-			},
-			{
-				q: "What safety gear do maintenance staff need?",
-				a: "Wear the protective equipment listed on the work order: gloves, eye protection, and slip-resistant footwear at minimum, plus a respirator or ladder safety equipment when the task requires it. Use lockout/tagout before any electrical or equipment work. Never work on a gas line; call the utility.",
-				k: "ppe gear ladder electrical safety equipment"
-			},
-			{
-				q: "Can I use my phone while driving to a property?",
-				a: "Don't handle your phone while driving. Pull over safely before calling, texting, or entering directions.",
-				k: "driving phone car text"
+				q: "How should vacant apartments be kept?",
+				a: "Fall and winter: no warmer than 65 degrees. Spring and summer: no cooler than 75 degrees. Water heaters on the lowest (\"Vacation\") setting, refrigerators on the lowest setting (usually 1-3), blinds closed, windows and doors locked. Inspect weekly to remove circulars. If a unit will be off-market longer than the standard 96 hours, enter a memo on the unit.",
+				k: "vacant unit temperature thermostat 65 75 water heater"
 			}
 		]
 	},
 	{
 		n: 13,
-		title: "Incident Reporting",
+		title: "HR Policies",
 		items: [
 			{
-				q: "When do I need to file an incident report?",
-				a: "Within 24 hours of any injury (to staff, residents, or visitors), property damage, fire, flood, break-in or theft, vehicle accident on company business, threat or violent incident, or near miss that could have caused serious harm. Emergencies come first: call 911 if needed.",
-				k: "incident report when file accident injury"
+				q: "When is the work week?",
+				a: "The work week starts at 12:00 a.m. Saturday and runs until 11:59 p.m. the following Friday.",
+				k: "work week start saturday friday"
 			},
 			{
-				q: "How do I file an incident report?",
-				a: "Use the Incident Report form in the employee portal. Include the date, time, and location; the people involved; what happened in order; witnesses; photos if it is safe to take them; and what was done right away. Stick to facts. Don't guess about cause or fault.",
-				k: "incident form submit how document write up record resident tenant"
+				q: "What are the time clock rules?",
+				a: "Every non-exempt (hourly) employee clocks in and out at the start and end of the shift, and for any break longer than 20 minutes. If you miss a punch, tell your supervisor immediately. You are responsible for making sure your timesheet is accurate each week.",
+				k: "time clock clock in out missed punch timesheet"
 			},
 			{
-				q: "A resident or visitor was injured at a property. What do I do?",
-				a: "Call 911 if needed. Don't move an injured person unless they are in danger. Secure the hazard if you can. Don't admit fault, discuss insurance, or promise to pay anything. Notify Operations right away and file an incident report within 24 hours.",
-				k: "resident injured fell slip trip hurt visitor guest"
+				q: "What meal and rest breaks do I get?",
+				a: "A one-hour (60-minute) unpaid meal break each day you work more than four hours, plus two 15-minute paid rest breaks.",
+				k: "lunch break meal break rest break"
 			},
 			{
-				q: "I was injured on the job. What do I do?",
-				a: "Get medical care first: call 911 for emergencies. As soon as you are safe, tell your manager, file an incident report within 24 hours, and contact People Operations (people@glpg-demo.example) about workers' compensation.",
-				k: "injured hurt on the job workers comp employee"
+				q: "How does overtime and comp time work?",
+				a: "Non-exempt hourly employees get one and one-half times their hourly rate for time worked over 40 hours in a week. Comp time must be taken in the same pay period it is earned; otherwise it is added to hours worked that period. Comp time for salaried employees is at the manager's discretion.",
+				k: "overtime time and a half 40 hours comp time"
 			},
 			{
-				q: "What if there was a break-in or theft?",
-				a: "Call 911 if anyone is in danger, or the police non-emergency line otherwise. Don't disturb the scene. Secure the unit or building (emergency board-up or rekey through the emergency line), notify Operations, and file an incident report.",
-				k: "break in burglary theft stolen vandalism"
-			}
-		]
-	},
-	{
-		n: 14,
-		title: "Office Procedures and Records",
-		items: [
-			{
-				q: "How do I open and close the office?",
-				a: "Offices open at 8:30 a.m. and close at 5:00 p.m. Eastern, Monday–Friday. When closing: lock the key cabinet, secure files, check the drop box, turn off equipment, set the alarm, and lock all doors. Never share alarm codes.",
-				k: "open close office hours alarm lock up"
+				q: "When is payday?",
+				a: "Payroll is bi-weekly, with paydays every other Friday. Each paycheck covers the two-week period ending the Friday before payday. The payroll calendar is in Egnyte.",
+				k: "payday pay date paid every other friday biweekly paycheck schedule payroll calendar"
 			},
 			{
-				q: "How are visitors handled at the office?",
-				a: "Visitors sign in at the front desk and are escorted beyond the reception area. Don't leave visitors alone with files, the key cabinet, or unlocked computers.",
-				k: "visitor guest sign in front desk"
+				q: "What are the rules for bonuses when someone leaves?",
+				a: "Bonuses are paid on the second payroll of each month, and you must be employed when they are paid out. If you resign with proper notice and work your notice period, you can receive earned leasing bonuses or commissions for up to 30 days after your last day. Resigning without notice or termination for cause means no commissions or bonuses beyond the final paycheck.",
+				k: "bonus commission resign quit leave final paycheck notice"
 			},
 			{
-				q: "How are resident and property records stored?",
-				a: "Use the PMS and approved company storage only. No personal email, personal cloud drives, or USB drives. Lease files are kept 7 years after move-out (demo setting). Shred paper with personal or financial information in the locked shred bin.",
-				k: "records files storage retention shred documents"
+				q: "What is the dress code?",
+				a: "The company provides uniforms and name tags. Office and maintenance uniforms are bought twice a year (Spring and Fall) through ICO Uniforms by the Property Manager, and maintenance boots once a year through Shoes for Crews. Office and leasing staff wear proper business attire at all times. Not every ownership group participates, so check with your Regional Manager. For uniform help, email HR@beztak.com.",
+				k: "dress code wear uniform attire jeans clothes name tag"
 			},
 			{
-				q: "How is mail and package delivery handled?",
-				a: "Resident packages are logged in the PMS and residents are notified the same day. Packages not picked up after 14 days are returned to the carrier after one reminder. Office mail is opened by the office manager; checks go straight to the drop safe and are logged.",
-				k: "mail package delivery"
+				q: "How does paid time off (PTO) work?",
+				a: "All regular full-time and part-time site employees accrue PTO. You can use it for vacation, sick time, family needs, personal affairs or rest. The amount depends on length of service; current PTO policies are in Egnyte.",
+				k: "pto paid time off vacation days sick days how many accrue"
 			},
 			{
-				q: "Can I correct a record I got wrong?",
-				a: "Yes, but never overwrite or delete an official record to hide an error. Use the PMS correction function so the history is kept, and tell your manager.",
-				k: "correct mistake record error fix"
-			}
-		]
-	},
-	{
-		n: 15,
-		title: "Technology, Phishing, and Wire Fraud",
-		items: [
-			{
-				q: "I clicked a suspicious link. What now?",
-				a: "Don't enter any passwords or keep clicking. Call IT at (734) 555-0145 and email security@glpg-demo.example from a safe device with the time, device, sender, and what you clicked. Don't delete the message.",
-				k: "phishing suspicious link email clicked virus hacked"
+				q: "Which holidays are paid?",
+				a: "Generally New Year's Day, Memorial Day, Independence Day, Labor Day, Thanksgiving Day and Christmas Day; the list is published each year. Full-time hourly employees who must work a holiday get 1.5 times their regular rate plus holiday pay. To get holiday pay you must work your scheduled hours the day before and after the holiday (pre-approved time off excepted). The holiday calendar is in Egnyte.",
+				k: "holidays holiday pay paid holidays christmas thanksgiving"
 			},
 			{
-				q: "Someone sent new wire or payment instructions. What do I do?",
-				a: "Don't act on them. Verify by calling a phone number you already have on file, never the number in the email. Changes need two-person verification by the transaction lead and the Managing Broker. Report it to security@glpg-demo.example.",
-				k: "wire instructions transfer fraud scam"
+				q: "What do I do if I will be absent or late?",
+				a: "Notify your immediate manager at least two hours before your workday starts and give the reason, by text, email or phone (whichever your manager prefers); social media is not accepted. Make sure the message was received: if there is no reply, call your manager.",
+				k: "absent sick call in late tardy calling out notify manager"
 			},
 			{
-				q: "I lost a laptop, phone, or tablet. What do I do?",
-				a: "Report it right away to security@glpg-demo.example and call IT at (734) 555-0145. If it had property access apps or codes, also call Operations at (734) 555-0147.",
-				k: "lost laptop phone device stolen tablet"
+				q: "Where do I find bereavement, jury duty, FMLA and other leave policies?",
+				a: "They are in the Employee Handbook in Egnyte. Questions about leaves of absence go to HR@beztak.com.",
+				k: "bereavement jury duty fmla leave of absence unpaid time off handbook"
 			},
 			{
-				q: "I forgot my password or can't log in to the PMS.",
-				a: "Use the \"Forgot password\" link. If multi-factor authentication or account recovery fails, call IT at (734) 555-0145. Never share passwords or approve an MFA prompt you didn't start.",
-				k: "password login locked account mfa pms access"
-			},
-			{
-				q: "Can I use AI tools for work?",
-				a: "Only company-approved AI tools. Never enter resident, applicant, employee, or financial information, access codes, or passwords into a public AI tool. A person must check anything AI-generated before it is sent or used for a decision.",
-				k: "ai chatgpt tool"
+				q: "Where is the Employee Handbook and my job description?",
+				a: "The latest Employee Handbook and current policies are in Egnyte. Your signed job description is in your Paycor file, or ask HR@beztak.com.",
+				k: "employee handbook job description egnyte paycor"
 			}
 		]
 	}
 ];
-SECTIONS.flatMap((s) => s.items.map((it, i) => ({
-	section: s.n,
-	sectionTitle: s.title,
-	ref: `${s.n}.${i + 1}`,
-	q: it.q,
-	text: it.a,
-	k: it.k || ""
-})));
 //#endregion
 //#region src/triage.js
 function triage(subject, body) {
@@ -29872,12 +29761,12 @@ var HARD_STOPS = [
 	[
 		/weapon|\bgun\b|knife|threat|attack|assault|violen|stalk|in danger|unsafe|scared for my|\bfire\b|smoke|gas smell|smell(s)? (gas|like gas)|gas leak|carbon monoxide|\bco alarm/i,
 		"danger",
-		"If anyone is in danger, call 911 now and get to a safe place. Then call the emergency line at (734) 555-0199."
+		"If anyone is in danger, call 911 now and get to a safe place. Then call your community's on-call maintenance line."
 	],
 	[
 		/flood|leak|burst|water (everywhere|pouring|coming)|sewage|no heat|heat (is )?(out|off|not working)|furnace (is )?(out|broken|not working)/i,
 		"emergency",
-		"This looks like an emergency. Please call the 24/7 emergency maintenance line at (734) 555-0199 instead of waiting for email."
+		"This looks like an emergency. Please call your community's on-call maintenance line now instead of waiting for email: the on-call technician responds right away."
 	],
 	[
 		/injur|\bhurt\b|accident|\bfell\b|slipped|bleeding/i,
@@ -29892,7 +29781,7 @@ var HARD_STOPS = [
 	[
 		/wire (instruction|transfer|fraud)|new (bank|payment|wire) (details|info|instructions)|phish|suspicious (link|email)|hacked|data breach|lost (my |a )?(laptop|phone|device|tablet)/i,
 		"security",
-		"Please do not act on this message. Call the IT Help Desk at (734) 555-0145. A person on our team will follow up."
+		"Please do not act on this message. Report it to the Help Desk at helpdesk@beztak.com. A person on our team will follow up."
 	],
 	[
 		/\b\d{3}-?\d{2}-?\d{4}\b|password\s*(is|:)|\bssn\b|social security|routing number|account number|alarm code is|gate code is/i,
@@ -29951,7 +29840,7 @@ var OPS = SECTIONS.flatMap((s) => s.items.map((it, i) => ({
 	a: it.a
 })));
 var VALID_REFS = /* @__PURE__ */ new Set([...HR.map((x) => x.ref), ...OPS.map((x) => x.ref)]);
-var SYSTEM_PROMPT = `You are the AI agent for Beztakets, the help desk at Great Lakes Property Group (GLPG), a fictional company. You read one employee email and decide whether you can answer it from the company manuals below.
+var SYSTEM_PROMPT = `You are the AI agent for Beztakets, the HR help desk for Beztak (Oakland Management Corp.), a property management company. You read one email from a Beztak employee and decide whether you can answer it from the company manuals below.
 
 RULES
 - Answer ONLY from the manuals between <manuals> tags. Never invent procedures, numbers, dates, contacts or approvals.
@@ -29969,9 +29858,9 @@ OUTPUT: reply with one JSON object and nothing else:
 
 <manuals>
 ${[
-	"## HR ANSWERS (employee questions about pay, benefits, time off, onboarding, policies)",
+	"## HR ANSWERS (short answers to common employee questions, taken from the Beztak Operations Manual)",
 	...HR.map((x) => `### [${x.ref}] ${x.q}\n${x.a}`),
-	`## ${MANUAL.title.toUpperCase()} (${MANUAL.version}): property operations procedures`,
+	`## ${MANUAL.title.toUpperCase()} (${MANUAL.version}): policies and procedures for Beztak site teams`,
 	...SECTIONS.map((s) => `### Section ${s.n}: ${s.title}\n` + s.items.map((it, i) => `[${s.n}.${i + 1}] ${it.q}\n${it.a}`).join("\n\n"))
 ].join("\n\n")}
 </manuals>`;
