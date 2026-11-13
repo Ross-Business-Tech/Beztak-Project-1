@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import PdfViewer from './PdfViewer'
+import { deleteFile, getFile, putFile } from './fileStore'
 import { AGENTS, ESCALATIONS, KNOWLEDGE, TOPIC_LABELS } from './data'
 import { topicLabel } from './triage'
 import { MANUAL, SECTIONS } from './data/beztakManual.js'
@@ -25,35 +27,73 @@ export function Dashboard({ tickets, me }) {
   )
 }
 
+// Documents that come with the site as a real PDF file (by document id). The built-in manual entry was saved before
+// PDFs could be opened, so it is matched by id and not by a flag stored with it.
+const BUILTIN_PDFS = { 1: { file: 'docs/beztak-operations-manual.pdf', note: 'This is a text copy of the manual the assistant answers from, made for reading here. To read the original, upload the PDF.' } }
+const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
+
+// Opens one document: a real PDF page by page, or the plain text of a text file.
+function DocView({ doc }) {
+  const builtin = BUILTIN_PDFS[doc.id]
+  const [file, setFile] = useState(undefined) // undefined = looking, null = not found, otherwise the saved PDF
+  useEffect(() => {
+    let dead = false
+    if (doc.kind === 'pdf') getFile(doc.id).then((f) => { if (!dead) setFile(f || null) }).catch(() => { if (!dead) setFile(null) })
+    return () => { dead = true }
+  }, [doc.id, doc.kind])
+  if (doc.kind === 'pdf') {
+    if (file === undefined) return <p className="mute">Opening…</p>
+    if (file === null) return <p className="pdf-err">This PDF is no longer saved in this browser (browsers can clear saved files). Please upload it again.</p>
+    return <PdfViewer key={doc.id} file={file} name={doc.name} />
+  }
+  if (builtin) return <><PdfViewer key={doc.id} url={`${import.meta.env.BASE_URL}${builtin.file}`} name={doc.name} /><p className="mute small">{builtin.note}</p></>
+  return <pre>{doc.text}</pre>
+}
+
 export function Documents({ docs, setDocs }) {
   const [msg, setMsg] = useState('')
   const [viewing, setViewing] = useState(null)
-  const upload = (e) => {
+  const upload = async (e) => {
     const files = [...e.target.files]
     e.target.value = ''
-    files.forEach((f) => {
-      if (!/\.(txt|md|csv)$/i.test(f.name)) { setMsg(`"${f.name}" was not added. For now only .txt, .md and .csv files can be read here. PDF and Word files need the full connection.`); return }
-      if (f.size > 200000) { setMsg(`"${f.name}" is too large (limit 200 KB).`); return }
-      const r = new FileReader()
-      r.onload = () => { setDocs((p) => [{ id: Date.now() + Math.random(), name: f.name, size: f.size, addedAt: new Date().toISOString(), source: 'Uploaded', text: String(r.result) }, ...p]); setMsg(`Added "${f.name}".`) }
-      r.readAsText(f)
-    })
+    for (const f of files) {
+      if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') {
+        if (f.size > 25000000) { setMsg(`"${f.name}" is too large (limit 25 MB).`); continue }
+        const head = new TextDecoder().decode(await f.slice(0, 5).arrayBuffer())
+        if (head !== '%PDF-') { setMsg(`"${f.name}" does not look like a real PDF file, so it was not added.`); continue }
+        const id = Date.now() + Math.random()
+        try { await putFile(id, f) } catch (err) { setMsg(`"${f.name}" could not be saved in this browser: ${err.message}`); continue }
+        setDocs((p) => [{ id, name: f.name, size: f.size, addedAt: new Date().toISOString(), source: 'Uploaded', kind: 'pdf' }, ...p])
+        setMsg(`Added "${f.name}". Click its name to read it.`)
+        continue
+      }
+      if (!/\.(txt|md|csv)$/i.test(f.name)) { setMsg(`"${f.name}" was not added. Only PDF, .txt, .md and .csv files can be added for now. Word files are not supported yet.`); continue }
+      if (f.size > 200000) { setMsg(`"${f.name}" is too large (limit 200 KB for text files).`); continue }
+      const text = await f.text()
+      setDocs((p) => [{ id: Date.now() + Math.random(), name: f.name, size: f.size, addedAt: new Date().toISOString(), source: 'Uploaded', text }, ...p])
+      setMsg(`Added "${f.name}".`)
+    }
+  }
+  const remove = (d) => {
+    if (d.kind === 'pdf') deleteFile(d.id).catch(() => {})
+    setDocs(docs.filter((x) => x.id !== d.id))
+    if (viewing === d.id) setViewing(null)
   }
   const open = docs.find((d) => d.id === viewing)
   return (
     <>
       <section className="panel pad"><div className="row between"><h2>Documents</h2>
-        <label className="btn primary upload">Upload document<input type="file" multiple accept=".txt,.md,.csv" onChange={upload} hidden /></label></div>
-        <p className="mute">Policy documents the HR team keeps for reference. Use sample text only.</p>
-        {msg && <p className="note-line">{msg}</p>}
+        <label className="btn primary upload">Upload document<input type="file" multiple accept=".pdf,application/pdf,.txt,.md,.csv" onChange={upload} hidden /></label></div>
+        <p className="mute">Policy documents the HR team keeps for reference. PDFs open right here. Uploaded files are kept in this browser only, so use sample documents.</p>
+        {msg && <p className="note-line" role="status">{msg}</p>}
         <div className="table docs">
           <div className="tr th"><span>Name</span><span>Source</span><span>Added</span><span>Size</span><span /></div>
           {docs.length === 0 && <p className="empty">No documents yet.</p>}
           {docs.map((d) => (
-            <div key={d.id} className="tr"><button className="linkish" onClick={() => setViewing(d.id)}>{d.name}</button><span>{d.source}</span><span>{new Date(d.addedAt).toLocaleDateString()}</span><span>{Math.max(1, Math.round(d.size / 1024))} KB</span><button className="link" onClick={() => { setDocs(docs.filter((x) => x.id !== d.id)); if (viewing === d.id) setViewing(null) }}>Delete</button></div>
+            <div key={d.id} className="tr"><button className="linkish" onClick={() => setViewing(d.id)}>{d.name}</button><span>{d.source}</span><span>{new Date(d.addedAt).toLocaleDateString()}</span><span>{fmtSize(d.size)}</span><button className="link" onClick={() => remove(d)}>Delete</button></div>
           ))}
         </div>
-        {open && <div className="docview"><div className="row between"><b>{open.name}</b><button className="link" onClick={() => setViewing(null)}>Close</button></div><pre>{open.text}</pre></div>}
+        {open && <div className="docview"><div className="row between"><b>{open.name}</b><button className="link" onClick={() => setViewing(null)}>Close</button></div><DocView key={open.id} doc={open} /></div>}
       </section>
       <section className="panel pad"><h3>Egnyte</h3>
         <p><span className="badge red">Not connected</span></p>

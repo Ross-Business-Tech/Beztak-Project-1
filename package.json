@@ -11,10 +11,12 @@
     "preview": "vite preview",
     "smoke": "node scripts/smoke-test.cjs",
     "publish:preview": "node scripts/herenow-publish.mjs preview",
-    "eval": "node evals/run.mjs"
+    "eval": "node evals/run.mjs",
+    "build:manual-pdf": "node tools/build-manual-pdf.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

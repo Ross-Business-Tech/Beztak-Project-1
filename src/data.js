@@ -101,5 +101,5 @@ export const SEED_TICKETS = [
 ]
 
 export const SEED_DOCS = [
-  { id: 1, name: 'Beztak Operations Manual (updated 09.28.2026).pdf', size: 4600000, addedAt: new Date().toISOString(), source: 'Beztak', text: 'Beztak Operations Manual, 56 pages: Management (rent collections, renewals, move-out, deposits, purchasing, petty cash, timecards, bonuses), Leasing & Marketing, Maintenance and Human Resources. Its policies are loaded into the assistant\'s answer bank, listed further down this page.' },
+  { id: 1, name: 'Beztak Operations Manual (updated 09.28.2026).pdf', size: 139015, addedAt: new Date().toISOString(), source: 'Beztak', text: 'Beztak Operations Manual, 56 pages: Management (rent collections, renewals, move-out, deposits, purchasing, petty cash, timecards, bonuses), Leasing & Marketing, Maintenance and Human Resources. Its policies are loaded into the assistant\'s answer bank, listed further down this page.' },
 ]
