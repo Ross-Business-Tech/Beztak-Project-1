@@ -339,7 +339,13 @@ export async function suggestReply(env, input = {}, { ask = askSuggest } = {}) {
     if (mode === 'complete') {
       if (m) return { ok: true, mode, source: 'manual match', refs: m.refs, hasBlanks: false, note: `${why} This is the closest manual answer (${m.refs[0]}: ${m.title}). Check it before sending.`,
         text: frame(`${m.text}\n\nIf this does not fully answer your question, just reply and I will look into it with you.`) }
-      return { ok: false, mode, reason: `${why} ${stop ? 'This one depends on details only you have, so I cannot write a complete message for it.' : 'Nothing in the manuals covers this clearly, so a complete message would mean guessing.'} Use "Draft with blanks" instead.` }
+      // Nothing in the manuals settles it (or it is private): a short holding message with no facts, no blanks and no decisions.
+      // For private and safety emails it uses the careful wording of the automatic emails, with any safety numbers first.
+      const hold = stop?.extra
+        || (stop ? 'Thank you for telling us about this. I want to make sure it is handled properly, so I will look into it and follow up with you personally.'
+          : 'Thank you for reaching out. I am looking into this and will follow up with you.')
+      return { ok: true, mode, source: 'template', refs: [], hasBlanks: false, text: frame(hold),
+        note: `${why} The manuals do not settle this one, so this is a short holding message with no details in it. Check it, or switch to "Draft with blanks" to write the details yourself.` }
     }
     const parts = []
     if (stop?.extra) parts.push(stop.extra)

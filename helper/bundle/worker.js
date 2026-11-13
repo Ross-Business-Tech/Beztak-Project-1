@@ -30268,10 +30268,15 @@ async function suggestReply(env, input = {}, { ask = askSuggest } = {}) {
 				note: `${why} This is the closest manual answer (${m.refs[0]}: ${m.title}). Check it before sending.`,
 				text: frame(`${m.text}\n\nIf this does not fully answer your question, just reply and I will look into it with you.`)
 			};
+			const hold = stop?.extra || (stop ? "Thank you for telling us about this. I want to make sure it is handled properly, so I will look into it and follow up with you personally." : "Thank you for reaching out. I am looking into this and will follow up with you.");
 			return {
-				ok: false,
+				ok: true,
 				mode,
-				reason: `${why} ${stop ? "This one depends on details only you have, so I cannot write a complete message for it." : "Nothing in the manuals covers this clearly, so a complete message would mean guessing."} Use "Draft with blanks" instead.`
+				source: "template",
+				refs: [],
+				hasBlanks: false,
+				text: frame(hold),
+				note: `${why} The manuals do not settle this one, so this is a short holding message with no details in it. Check it, or switch to "Draft with blanks" to write the details yourself.`
 			};
 		}
 		const parts = [];
