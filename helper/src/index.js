@@ -69,28 +69,36 @@ export async function pollInbox(env) {
   await env.TICKETS.put('lock', mine, { expirationTtl: 60 })
   await new Promise((r) => setTimeout(r, 200))
   if ((await env.TICKETS.get('lock')) !== mine) return
-  try { await pollOnce(env) } finally { if ((await env.TICKETS.get('lock')) === mine) await env.TICKETS.delete('lock') }
+  // What this check found is saved, so the website can show it (and show any error, which would otherwise be invisible).
+  const stats = { at: new Date().toISOString(), ok: true, listed: 0, seenBefore: 0, older: 0, own: 0, automatic: 0, alreadyAnswered: 0, newTickets: 0, followUps: 0 }
+  try { await pollOnce(env, stats) } catch (e) { stats.ok = false; stats.error = String(e.message || e); throw e } finally {
+    try { await env.TICKETS.put('status', JSON.stringify(stats)) } catch { /* status is only for display */ }
+    if ((await env.TICKETS.get('lock')) === mine) await env.TICKETS.delete('lock')
+  }
 }
 
-async function pollOnce(env) {
+async function pollOnce(env, stats) {
   const floor = await startedAt(env)
+  stats.startedAt = new Date(floor).toISOString()
   const token = await accessToken(env)
   const me = env.BURNER_EMAIL.toLowerCase()
   const list = await gmail(env, token, 'messages?q=' + encodeURIComponent(`in:inbox after:${Math.floor(floor / 1000)}`) + '&maxResults=25')
+  stats.listed = (list.messages || []).length
   for (const { id: msgId } of (list.messages || []).reverse()) {
-    if (await env.TICKETS.get('seen:' + msgId)) continue
+    if (await env.TICKETS.get('seen:' + msgId)) { stats.seenBefore++; continue }
     const m = await gmail(env, token, `messages/${msgId}?format=full`)
     const from = header(m, 'from')
     await env.TICKETS.put('seen:' + msgId, '1', { expirationTtl: 60 * 60 * 24 * 30 })
-    if (+m.internalDate < floor) continue // older than the helper itself
-    if (from.toLowerCase().includes(me)) continue
+    if (+m.internalDate < floor) { stats.older++; continue } // older than the helper itself
+    if (from.toLowerCase().includes(me)) { stats.own++; continue }
     const auto = header(m, 'auto-submitted').toLowerCase()
-    if ((auto && auto !== 'no') || /^(bulk|junk|list)$/i.test(header(m, 'precedence'))) continue // out-of-office and bulk mail: never answer
+    if ((auto && auto !== 'no') || /^(bulk|junk|list)$/i.test(header(m, 'precedence'))) { stats.automatic++; continue } // out-of-office and bulk mail: never answer
     const entry = { inbound: true, from, text: stripQuote(bodyText(m.payload)) || m.snippet, at: new Date(+m.internalDate).toISOString(), messageId: header(m, 'message-id') }
     let t = await getTicket(env, m.threadId)
-    if (t) { t.replies.push(entry); if (t.status === 'Closed') t.status = 'Open' }
+    if (t) { t.replies.push(entry); stats.followUps++; if (t.status === 'Closed') t.status = 'Open' }
     else {
-      if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) continue // already answered by someone: leave it alone
+      if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) { stats.alreadyAnswered++; continue } // already answered by someone: leave it alone
+      stats.newTickets++
       t = { id: m.threadId, subject: header(m, 'subject') || '(no subject)', customer: from, status: 'Open', createdAt: entry.at, replies: [entry] }
       if (!/no-?reply|mailer-daemon/i.test(from)) {
         // New conversation: decide who answers, then send the automatic email.
@@ -138,6 +146,7 @@ export default {
         const ids = (await env.TICKETS.get('index', 'json')) || []
         return json((await Promise.all(ids.map((i) => getTicket(env, i)))).filter(Boolean))
       }
+      if (url.pathname === '/status' && req.method === 'GET') return json((await env.TICKETS.get('status', 'json')) || { never: true })
       const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)
       if (m && req.method === 'POST') {
         const { text, auto } = await req.json()

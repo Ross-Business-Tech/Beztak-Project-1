@@ -63,6 +63,11 @@ export default function App() {
         const cutoff = new Date(since).getTime() - 10 * 60000
         const remote = await helperCall(helper, '/tickets')
         let older = 0
+        let hidden = 0
+        // What the helper itself reports about its last look at Gmail (an older helper has no such page).
+        let mail
+        try { mail = await helperCall(helper, '/status'); if (mail.at) mail.mins = Math.round((Date.now() - new Date(mail.at)) / 60000) } catch (e) { mail = e.message === 'Not found' ? { oldHelper: true } : null }
+        const newest = remote.map((r) => ({ subject: r.subject, customer: r.customer, at: r.createdAt })).sort((a, b) => new Date(b.at) - new Date(a.at))[0] || null
         const cur = ticketsRef.current
         const created = []
         const follow = {}
@@ -76,7 +81,9 @@ export default function App() {
             if (fresh.length) follow[local.id] = fresh
           } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer) && new Date(inbound[0].at).getTime() < cutoff) {
             older++
-          } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer)) {
+          } else if (!inbound[0] || /no-?reply|mailer-daemon/i.test(r.customer)) {
+            hidden++
+          } else {
             const { name, email } = parse(r.customer)
             // The helper already decided and sent the automatic email. Tickets without that decision use
             // the simple rules here. The website never sends an automatic email itself: only the helper does.
@@ -93,7 +100,7 @@ export default function App() {
           }
         }
         const ids = Object.keys(follow)
-        setHelperStatus({ at: new Date().toISOString(), ok: true, remote: remote.length, imported: created.length, older })
+        setHelperStatus({ at: new Date().toISOString(), ok: true, remote: remote.length, imported: created.length, older, hidden, newest, mail })
         // An employee wrote back after the AI answered: a person gets it if they asked for one (or asked something new),
         // and the employee gets an email saying who will reply and when. A plain "thanks" leaves the ticket closed.
         const when = new Date()

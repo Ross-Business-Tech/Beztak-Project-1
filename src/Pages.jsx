@@ -230,6 +230,22 @@ export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets
                       </>
                     )
                   })()}
+                  {helperStatus.newest && <p className="small"><b>Newest conversation in the helper:</b> “{helperStatus.newest.subject}” from {helperStatus.newest.customer.replace(/\s*<.*>/, '')}, {ago(helperStatus.newest.at)}.</p>}
+                  {helperStatus.hidden > 0 && <p className="mute small">{helperStatus.hidden} conversation{helperStatus.hidden === 1 ? ' is' : 's are'} from automatic senders (no-reply, delivery notices) and {helperStatus.hidden === 1 ? 'is' : 'are'} not shown as tickets.</p>}
+                  {(() => {
+                    const m = helperStatus.mail
+                    if (!m) return null
+                    if (m.oldHelper) return <p className="small gr-prob"><b>The helper in Cloudflare is an old version</b> (it cannot report what it is doing). Paste the newest <code>worker.js</code> into Cloudflare and Deploy: that update is what stops it reading old mail.</p>
+                    if (m.never) return <p className="small gr-prob"><b>The helper has never checked Gmail yet.</b> In Cloudflare, open the worker, go to Settings, Triggers, and make sure the schedule (cron) “* * * * *” is there.</p>
+                    const mins = m.mins ?? 0
+                    return (
+                      <>
+                        <p className={`small ${m.ok ? '' : 'gr-prob'}`}><b>The helper last checked Gmail {mins < 1 ? 'less than a minute' : `${mins} minute${mins === 1 ? '' : 's'}`} ago</b>{m.ok ? '.' : <>, and it <b>failed</b>: {m.error}</>}</p>
+                        {m.ok && mins > 5 && <p className="small gr-prob">That is too long ago: it should check every minute. In Cloudflare, open the worker, go to Settings, Triggers, and check the schedule “* * * * *” is there.</p>}
+                        {m.ok && <p className="mute small">It only looks at email that arrived after {new Date(m.startedAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}. Last check: {m.listed} email{m.listed === 1 ? '' : 's'} in the inbox since then: {m.newTickets} new ticket{m.newTickets === 1 ? '' : 's'}, {m.followUps} follow-up{m.followUps === 1 ? '' : 's'}, {m.seenBefore} already handled{m.own + m.automatic + m.alreadyAnswered + m.older > 0 ? `, ${m.own + m.automatic + m.alreadyAnswered + m.older} skipped (${[m.own && `${m.own} sent by the inbox itself`, m.automatic && `${m.automatic} automatic`, m.alreadyAnswered && `${m.alreadyAnswered} already answered by someone`, m.older && `${m.older} older`].filter(Boolean).join(', ')})` : ''}.</p>}
+                      </>
+                    )
+                  })()}
                   {helperStatus.older > 0 && <p className="mute small">{helperStatus.older} older conversation{helperStatus.older === 1 ? ' was' : 's were'} not added because {helperStatus.older === 1 ? 'it' : 'they'} arrived before you connected.</p>}
                   {helperStatus.remote === 0 && <p className="mute small">The helper has not turned any email into a ticket yet. Check that the email went to the helper's inbox (not Spam) and was sent from a different address.</p>}
                 </>

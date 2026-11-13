@@ -30262,26 +30262,59 @@ async function pollInbox(env) {
 	await env.TICKETS.put("lock", mine, { expirationTtl: 60 });
 	await new Promise((r) => setTimeout(r, 200));
 	if (await env.TICKETS.get("lock") !== mine) return;
+	const stats = {
+		at: (/* @__PURE__ */ new Date()).toISOString(),
+		ok: true,
+		listed: 0,
+		seenBefore: 0,
+		older: 0,
+		own: 0,
+		automatic: 0,
+		alreadyAnswered: 0,
+		newTickets: 0,
+		followUps: 0
+	};
 	try {
-		await pollOnce(env);
+		await pollOnce(env, stats);
+	} catch (e) {
+		stats.ok = false;
+		stats.error = String(e.message || e);
+		throw e;
 	} finally {
+		try {
+			await env.TICKETS.put("status", JSON.stringify(stats));
+		} catch {}
 		if (await env.TICKETS.get("lock") === mine) await env.TICKETS.delete("lock");
 	}
 }
-async function pollOnce(env) {
+async function pollOnce(env, stats) {
 	const floor = await startedAt(env);
+	stats.startedAt = new Date(floor).toISOString();
 	const token = await accessToken(env);
 	const me = env.BURNER_EMAIL.toLowerCase();
 	const list = await gmail(env, token, "messages?q=" + encodeURIComponent(`in:inbox after:${Math.floor(floor / 1e3)}`) + "&maxResults=25");
+	stats.listed = (list.messages || []).length;
 	for (const { id: msgId } of (list.messages || []).reverse()) {
-		if (await env.TICKETS.get("seen:" + msgId)) continue;
+		if (await env.TICKETS.get("seen:" + msgId)) {
+			stats.seenBefore++;
+			continue;
+		}
 		const m = await gmail(env, token, `messages/${msgId}?format=full`);
 		const from = header(m, "from");
 		await env.TICKETS.put("seen:" + msgId, "1", { expirationTtl: 2592e3 });
-		if (+m.internalDate < floor) continue;
-		if (from.toLowerCase().includes(me)) continue;
+		if (+m.internalDate < floor) {
+			stats.older++;
+			continue;
+		}
+		if (from.toLowerCase().includes(me)) {
+			stats.own++;
+			continue;
+		}
 		const auto = header(m, "auto-submitted").toLowerCase();
-		if (auto && auto !== "no" || /^(bulk|junk|list)$/i.test(header(m, "precedence"))) continue;
+		if (auto && auto !== "no" || /^(bulk|junk|list)$/i.test(header(m, "precedence"))) {
+			stats.automatic++;
+			continue;
+		}
 		const entry = {
 			inbound: true,
 			from,
@@ -30292,9 +30325,14 @@ async function pollOnce(env) {
 		let t = await getTicket(env, m.threadId);
 		if (t) {
 			t.replies.push(entry);
+			stats.followUps++;
 			if (t.status === "Closed") t.status = "Open";
 		} else {
-			if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) continue;
+			if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) {
+				stats.alreadyAnswered++;
+				continue;
+			}
+			stats.newTickets++;
 			t = {
 				id: m.threadId,
 				subject: header(m, "subject") || "(no subject)",
@@ -30368,6 +30406,7 @@ var src_default = {
 				const ids = await env.TICKETS.get("index", "json") || [];
 				return json((await Promise.all(ids.map((i) => getTicket(env, i)))).filter(Boolean));
 			}
+			if (url.pathname === "/status" && req.method === "GET") return json(await env.TICKETS.get("status", "json") || { never: true });
 			const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/);
 			if (m && req.method === "POST") {
 				const { text, auto } = await req.json();
