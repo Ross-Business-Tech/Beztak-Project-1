@@ -259,7 +259,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                       : (
                         <>
                           <p>{suggestion.reason}</p>
-                          <div className="row"><button type="button" className="btn sm" onClick={() => setSuggestion(null)}>Dismiss</button></div>
+                          <div className="row"><button type="button" className="btn sm" onClick={() => suggest()}>Try again</button><button type="button" className="btn sm" onClick={() => setSuggestion(null)}>Dismiss</button></div>
                         </>
                       )}
                 </div>
