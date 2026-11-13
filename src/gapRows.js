@@ -29,7 +29,8 @@ export function ticketsToRows(tickets) {
     const lastHuman = humanReplies(t).slice(-1)[0]
     const firstAI = (t.replies || []).find((r) => r.ai)
     const policy = (t.tags || []).some((x) => POLICY_TAGS.includes(x))
-    const cited = ai ? citedSection(firstAI?.text) : null
+    const wasEscalated = Boolean(t.escalatedAt) // the AI answered, then the employee asked for a person
+    const cited = ai || wasEscalated ? citedSection(firstAI?.text) : null
     const row = {
       question_id: `HR-${t.id}`,
       conversation_id: `HR-${t.id}`,
@@ -38,15 +39,15 @@ export function ticketsToRows(tickets) {
       question_text: `${t.subject}. ${t.body}`.slice(0, 1900),
       response_text: ai ? (firstAI?.text || '') : '',
       resolution_status: ai ? 'Answered' : closed ? 'Ticket Closed' : 'Ticket Open',
-      answer_source: ai ? (cited?.source || 'HR answers list') : '',
-      manual_section: ai ? (cited?.section || `HR answers: ${TOPIC_LABELS[t.topic] || 'General'}`) : '',
+      answer_source: ai || wasEscalated ? (cited?.source || 'HR answers list') : '',
+      manual_section: ai || wasEscalated ? (cited?.section || `HR answers: ${TOPIC_LABELS[t.topic] || 'General'}`) : '',
       category: TOPIC_LABELS[t.topic] || 'General',
       theme: t.subject,
     }
     if (!ai) {
       row.ticket_id = String(t.id)
       row.ticket_status = STATUS[t.status] || (closed ? 'Closed' : 'Open')
-      row.escalation_reason = policy ? 'policy' : 'no-match'
+      row.escalation_reason = policy ? 'policy' : wasEscalated ? 'unclear' : 'no-match'
       if (closed) {
         const last = (t.replies || []).slice(-1)[0]
         row.resolution_timestamp = last?.at || t.createdAt

@@ -5,6 +5,7 @@ import GapTracker from './GapTracker'
 import Guardrails from './Guardrails'
 import { Detail, List, VIEW_NAMES } from './Tickets'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
+import { followUp } from './escalate'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
 
@@ -83,10 +84,20 @@ export default function App() {
           }
         }
         const ids = Object.keys(follow)
+        // An employee wrote back after the AI answered: a person gets it if they asked for one (or asked something new),
+        // and the employee gets an email saying who will reply and when. A plain "thanks" leaves the ticket closed.
+        const when = new Date()
+        for (const id of ids) {
+          const t = cur.find((x) => x.id === Number(id))
+          if (!t?.resolvedByAI) continue
+          const { confirmation } = followUp(t, follow[id], when)
+          if (confirmation && t.threadId) { try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text: confirmation }) }) } catch { /* the ticket is still escalated */ } }
+        }
         if (created.length || ids.length) {
           setTickets((p) => [...created.filter((c) => !p.some((x) => x.threadId === c.threadId)), ...p.map((t) => {
             const f = follow[t.id]
             if (!f) return t
+            if (t.resolvedByAI) return { ...t, ...followUp(t, f, when).patch }
             const reopen = t.status === 'Closed'
             return { ...t, status: reopen ? 'Open' : t.status, resolvedByAI: reopen ? false : t.resolvedByAI, tags: reopen ? t.tags.filter((g) => g !== 'ai-resolved') : t.tags,
               note: reopen ? 'The employee replied after the automatic answer, so a person needs to look at it.' : t.note,
@@ -105,6 +116,14 @@ export default function App() {
   const mine = tickets.filter((t) => canSee(t, me))
   const update = (id, patch) => setTickets((p) => p.map((t) => (t.id === id ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t)))
   const event = (t, text) => ({ event: true, text, at: new Date().toISOString() })
+
+  // The employee wrote back after the AI answered (the demo box on a ticket uses this too).
+  const employeeReply = (t, text) => {
+    const now = new Date()
+    const r = followUp(t, [{ text, at: now.toISOString() }], now)
+    update(t.id, (x) => followUp(x, [{ text, at: now.toISOString() }], now).patch)
+    setToast(r.kind === 'thanks' ? 'Noted. The ticket stays closed.' : `Sent to ${agentName(t.assignee)}'s list, and the employee is told a person will reply.`)
+  }
 
   const transfer = (t, to) => {
     update(t.id, (x) => ({ assignee: to, replies: [...x.replies, event(x, `${agentName(me)} transferred this ticket to ${agentName(to)}`)] }))
@@ -151,7 +170,7 @@ export default function App() {
         </header>
         <div className="content">
           {page === 'tickets' && (openId
-            ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
+            ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} onEmployeeReply={employeeReply} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} />}

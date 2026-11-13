@@ -29,6 +29,7 @@ export function priorityOf(t) {
   const left = t.dueAt ? new Date(t.dueAt) - Date.now() : Infinity
   if (tags.some((x) => SAFETY.includes(x))) return { level: 1, label: 'Critical', cls: 'crit', why: 'Safety or emergency: answer first' }
   if (t.urgent) return { level: 2, label: 'High', cls: 'red', why: 'Marked urgent (for example harassment or missing pay)' }
+  if (t.escalatedAt) return { level: 2, label: 'High', cls: 'red', why: 'The employee wanted a person after the automatic answer' }
   if (left < 0) return { level: 2, label: 'High', cls: 'red', why: 'Past its deadline' }
   if (tags.some((x) => SERIOUS.includes(x))) return { level: 3, label: 'Medium', cls: 'amber', why: 'Affects someone\'s pay, approvals, records or a confidential matter' }
   if (left < 4 * 3600000) return { level: 3, label: 'Medium', cls: 'amber', why: 'Due within 4 hours' }

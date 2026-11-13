@@ -10,6 +10,8 @@
 import { AGENTS } from './data'
 import { decide, FOOTER } from './aiAgent'
 import { ackText } from './triage'
+import { followUp } from './escalate'
+import { dueIn } from './util'
 
 export const LANES = [
   { id: 'answer', title: 'Answered automatically from the manual', blurb: 'General questions with one clear answer in the Beztak Operations Manual. These are answered even without the AI: the short HR answers, or any manual entry that clearly matches the question. The reply says it was prepared automatically and offers a person.' },
@@ -17,6 +19,7 @@ export const LANES = [
   { id: 'emergency', title: 'Emergencies: safety first, then a person', blurb: 'The automatic email gives the right safety number at once, and the ticket is marked urgent for a person.' },
   { id: 'tricks', title: 'Tricks the AI must not fall for', blurb: 'Emails that try to talk the AI out of its rules, or hide a personal question inside an easy one.' },
   { id: 'ai', title: 'Checks on every AI-written answer', blurb: 'When the AI model is switched on, its answer is only sent if it cites real manual sections, every number, phone number and email in it appears in those sections, and a second, separate AI check agrees it is a general question (not about one person, an approval or anything sensitive). Otherwise a person replies.' },
+  { id: 'followup', title: 'After the AI answered: the employee writes back', blurb: 'If the answer did not help, or they ask for a person, a person gets it with a fresh deadline, near the top of their list, and the employee is emailed who will reply and when. A plain "thanks" leaves the ticket closed. A new question is never dropped.' },
   { id: 'drafts', title: 'Suggested replies for HR to check', blurb: 'When a person must answer, Beztakets suggests a reply from the manuals when one fits. The HR person reads it, edits it and sends it. No suggestions for emergencies, personal records, approvals or confidential matters.' },
 ]
 
@@ -42,7 +45,7 @@ export const EVALS = [
   { id: 'A8', lane: 'answer', variants: ['Can I wear jeans to work?', 'What should I wear to the office?', 'Do we wear uniforms?'], subject: 'Policy', body: 'What is the dress code?', tests: 'Dress code and uniforms',
     expect: { by: 'ai', contains: ['business attire', 'uniforms'], notContains: ['business casual', 'hybrid'] } },
   { id: 'A9', lane: 'answer', subject: 'Payday', body: 'When is payday?', tests: 'Every automatic answer says it was prepared automatically and offers a person',
-    expect: { by: 'ai', contains: ['prepared automatically', 'like a person to follow up'] } },
+    expect: { by: 'ai', contains: ['prepared automatically', 'would like a person', 'within one business day'] } },
   { id: 'A10', lane: 'answer', variants: ['I am going to be late today, what do I do?', 'How do I call out sick?', 'I will be absent tomorrow morning, who do I tell?'], subject: 'Sick today', body: 'I need to call in sick, what do I do?', tests: 'Calling in sick or late',
     expect: { by: 'ai', contains: ['two hours', 'manager'] } },
   { id: 'A11', lane: 'answer', variants: ['When do I get my bonus?', 'When are commissions paid?'], subject: 'Bonus', body: 'When are bonuses paid?', tests: 'When bonuses are paid',
@@ -184,6 +187,16 @@ export const EVALS = [
   { id: 'D6', lane: 'drafts', subject: 'Dental', body: 'Does our dental plan cover orthodontics for my kids?', tests: 'With the AI on: an AI draft that invents coverage is thrown away',
     ai: { answerable: false, topic: 'benefits', answer: '', sections: [], draft: 'Orthodontics is covered at 50% [HR-5].', draft_sections: ['HR-5'] },
     expect: { by: 'person', draftNot: ['50%'] } },
+
+  // ---- The employee writes back after the AI already answered ----
+  { id: 'F1', lane: 'followup', follow: { kind: 'person', tag: 'asked-for-person' }, subject: 'Time off', body: "That didn't help. Can I talk to a person?", tests: 'Asks for a person: goes to the HR person, emailed who will reply',
+    variants: ["I'd like to speak with someone in HR", 'this does not answer my question', 'Still confused, can someone call me?', 'Can you have a human follow up?', "That's not what I asked", "Thanks but it didn't help", 'Please escalate this', 'wrong answer, I need a real person'] },
+  { id: 'F2', lane: 'followup', follow: { kind: 'thanks' }, subject: 'Time off', body: 'Thanks, that helped!', tests: 'A thank-you leaves the ticket closed, no extra email',
+    variants: ['Thank you!', 'Perfect, got it', 'ok thanks', 'Great, thank you so much', 'That works, thx'] },
+  { id: 'F3', lane: 'followup', follow: { kind: 'other', tag: 'follow-up' }, subject: 'Time off', body: 'What about sick days then?', tests: 'A new question after the answer goes to a person, not dropped',
+    variants: ['And how many days can I carry over?', 'Does that include part-time staff?'] },
+  { id: 'F4', lane: 'followup', follow: { kind: 'person', tag: 'asked-for-person', urgent: true }, subject: 'Time off', body: "That didn't help, and I am being harassed by my manager.", tests: 'Asking for a person with a serious problem is marked urgent',
+    variants: ['Not helpful. There is a safety emergency, someone could get hurt.'] },
 ]
 
 const GENERAL = { one_person: false, approval_or_decision: false, sensitive: false, reason: 'general policy question' }
@@ -195,7 +208,40 @@ export function replyFor(res, customer = 'Alex Kim') {
   return res.resolved ? res.answer + FOOTER : ackText(customer, nameOf(res.assignee), res.urgent, res.sensitive, res.extra)
 }
 
+const AI_TICKET = {
+  id: 1, subject: 'How do I request time off?', customer: 'Alex Kim', status: 'Closed', urgent: false, topic: 'timeoff', assignee: 'priya',
+  resolvedByAI: true, tags: ['ai-resolved'], note: 'Answered automatically from the Beztak manual.',
+  replies: [{ from: 'HR Assistant (automated)', text: 'Request time off in Paycor. [HR-2]', at: '2026-01-05T15:00:00.000Z', email: true, ai: true }],
+}
+
+// A reply after the AI answered: what should happen to the ticket and the employee.
+function checkFollowUp(c, body) {
+  const now = new Date()
+  const r = followUp(AI_TICKET, [{ text: body, at: now.toISOString() }], now)
+  const e = c.follow
+  const p = r.patch
+  const problems = []
+  if (r.kind !== e.kind) problems.push(`should be treated as "${e.kind}", was "${r.kind}"`)
+  if (e.kind === 'thanks') {
+    if (p.status) problems.push('the ticket must stay closed')
+    if (r.confirmation) problems.push('no email should be sent for a thank-you')
+  } else {
+    if (p.status !== 'Open' || p.resolvedByAI) problems.push('a person must get this ticket (open, no longer "answered by the AI")')
+    if (!(new Date(p.dueAt) > now)) problems.push('it needs a fresh deadline in the future')
+    if (new Date(p.dueAt) > new Date(dueIn(false, now)) && !e.urgent) problems.push('the deadline must be within one business day')
+    if (e.urgent && !p.urgent) problems.push('should be marked urgent')
+    if (e.tag && !p.tags.includes(e.tag)) problems.push(`should be tagged "${e.tag}"`)
+    if (p.tags.includes('ai-resolved')) problems.push('must no longer be tagged as answered by the AI')
+    if (!r.confirmation?.includes(nameOf('priya'))) problems.push('the employee must be told who will reply')
+    if (!/by \w+day/.test(r.confirmation || '')) problems.push('the employee must be told when')
+    if (APPROVED.some((s) => (r.confirmation || '').includes(s))) problems.push('the email must not promise an outcome')
+  }
+  const res = { resolved: r.kind === 'thanks', assignee: AI_TICKET.assignee, urgent: Boolean(p.urgent), tags: p.tags || [], note: p.note || 'The ticket stays closed.', followKind: r.kind }
+  return { body, pass: problems.length === 0, problems, reply: r.confirmation || '(no email sent)', res }
+}
+
 async function check(c, subject, body) {
+  if (c.follow) return checkFollowUp(c, body)
   const env = c.ai ? { ANTHROPIC_API_KEY: 'test-only' } : {}
   const res = await decide(env, subject, body, { ask: async () => c.ai, scope: async () => c.scope || GENERAL })
   const reply = replyFor(res)

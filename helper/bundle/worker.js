@@ -29751,7 +29751,7 @@ var init_sdk = __esmMin((() => {
 //#endregion
 //#region src/aiAgent.js
 var AI_MODEL = "claude-opus-5-5";
-var FOOTER = "\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. Reply to this email if you would like a person to follow up.";
+var FOOTER = "\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. If it did not help, reply to this email and say you would like a person: someone from HR will reply within one business day.";
 var HARD_STOPS = [
 	[
 		/suicid|kill myself|end my life|hurt myself|harm myself|self[- ]?harm|want to die|don'?t want to live|end(ing)? it all|no reason to live|better off dead/i,

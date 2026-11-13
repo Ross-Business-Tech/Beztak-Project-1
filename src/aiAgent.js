@@ -17,7 +17,7 @@ import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { triage } from './triage'
 
 export const AI_MODEL = 'claude-opus-5-5'
-export const FOOTER = '\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. Reply to this email if you would like a person to follow up.'
+export const FOOTER = '\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. If it did not help, reply to this email and say you would like a person: someone from HR will reply within one business day.'
 
 // ---- rules the AI must never handle ----
 const HARD_STOPS = [

@@ -20,6 +20,8 @@ const PRIO_COLOR = { Critical: 'red solid', High: 'red', Medium: 'orange', Norma
 export const Label = ({ color = 'gray', children, title }) => <span className={`nl ${color}`} title={title}>{children}</span>
 
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
+const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up' }
+const TAG_COLORS = { 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange' }
 export const VIEW_NAMES = { mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
 
 export function List({ tickets, me, open, reset, nav, setNav }) {
@@ -71,15 +73,15 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
             const p = priorityOf(t)
             const d = dueInfo(t)
             const adv = pendingAdviceFor(t, me).length > 0
-            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved')]
+            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved').map((g) => TAG_NAMES[g] || g)].sort((a, b) => Number(!(a in TAG_COLORS)) - Number(!(b in TAG_COLORS)))
             return (
               <button key={t.id} className="nrow" role="row" onClick={() => open(t.id)}>
-                <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}</small></span>
+                <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}{t.escalatedAt && t.status !== 'Closed' && <> · <span className="esc">{t.escalatedBecause === 'person' ? 'Asked for a person' : 'Employee follow-up'}</span></>}</small></span>
                 <span className="ncell" role="cell">{p.level === 5 ? <span className="mute">–</span> : <Label color={PRIO_COLOR[p.label]} title={p.why}>{p.label}</Label>}</span>
                 <span className="ncell" role="cell"><Label color={STATUS_COLOR[t.status]}>{t.status}</Label></span>
                 <span className="ncell" role="cell"><Avatar name={t.customer} />{t.customer}</span>
                 <span className="ncell" role="cell"><Label color={TOPIC_COLOR[t.topic]}>{topicLabel(t.topic)}</Label></span>
-                <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={g === 'Answered automatically' ? 'brown' : g === 'Advice requested' ? 'yellow' : 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
+                <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={TAG_COLORS[g] || 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
                 <span className={`ncell ndue ${d?.cls || ''}`} role="cell">{d ? d.text : '–'}</span>
                 <span className="ncell" role="cell">{t.resolvedByAI ? <><Avatar name="AI agent" />AI agent</> : <><Avatar name={agentName(t.assignee)} />{t.assignee === me ? 'Me' : agentName(t.assignee)}</>}</span>
               </button>
@@ -92,7 +94,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
   )
 }
 
-export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper, update, transfer, merge, toast, back }) {
+export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper, update, transfer, merge, toast, back, onEmployeeReply }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
   const [tag, setTag] = useState('')
@@ -101,6 +103,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
   const [mergeId, setMergeId] = useState('')
   const [answers, setAnswers] = useState({})
   const [hideDraft, setHideDraft] = useState(false)
+  const [demoText, setDemoText] = useState('')
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← {backLabel}</button></>
 
   const owner = t.assignee === me
@@ -140,7 +143,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
   const mt = mergeTargets.find((x) => String(x.id) === mergeId)
   // Human in the loop: a suggested reply the HR person checks, edits and sends. Never sent on its own.
   const personReplied = t.replies.some((m) => m.email && !m.ai && !m.inbound)
-  const draft = owner && !t.resolvedByAI && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
+  const draft = owner && !t.resolvedByAI && !t.escalatedAt && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
   const useDraft = () => { setTab('reply'); setText(fill(`Hi {name},\n\n${draft.text.replace(/\s*\[[^\]]+\]/g, '')}\n\nBest,\n{agent}`, t.customer, me)) }
 
   return (
@@ -148,6 +151,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
       <div className="crumbs"><button className="link" onClick={back}>← {backLabel}</button> <span>#{t.id}</span></div>
       {!owner && <div className="banner">You're helping <b>{agentName(t.assignee)}</b> on this ticket. You can read it and answer the advice request below.</div>}
       {t.mergedInto && <div className="banner">This ticket was merged into #{t.mergedInto}.</div>}
+      {t.escalatedAt && t.status !== 'Closed' && <div className="banner"><b>{t.escalatedBecause === 'person' ? 'The employee asked for a person' : 'The employee wrote back'} after the automatic answer.</b> They were emailed that you will reply by the deadline above. Please write the answer yourself: the manual answer did not settle it.</div>}
       <div className="detail-grid">
         <section className="panel">
           <div className="panel-h col">
@@ -176,6 +180,19 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
                 </article>
               ))}
           </div>
+
+          {t.resolvedByAI && onEmployeeReply && (
+            <form className="draft-box demo-reply" onSubmit={(e) => { e.preventDefault(); if (demoText.trim()) { onEmployeeReply(t, demoText.trim()); setDemoText('') } }}>
+              <b>Try it as the employee <span className="nl gray">Demo</span></b>
+              <small>Real employees just reply to the email. This box stands in for that, so you can see what happens next.</small>
+              <div className="row">
+                <button type="button" className="btn" onClick={() => onEmployeeReply(t, 'Thanks, that helped!')}>“Thanks, that helped!”</button>
+                <button type="button" className="btn" onClick={() => onEmployeeReply(t, "That didn't help. Can I talk to a person?")}>“That didn’t help, I’d like a person”</button>
+              </div>
+              <textarea rows={2} value={demoText} onChange={(e) => setDemoText(e.target.value)} placeholder="Or write the employee's reply…" aria-label="Employee reply" />
+              <div className="row"><button className="btn primary" type="submit">Send as the employee</button></div>
+            </form>
+          )}
 
           {t.advice.length > 0 && (
             <div className="advice">

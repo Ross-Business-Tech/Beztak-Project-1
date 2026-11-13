@@ -63,7 +63,7 @@ The automatic email for urgent tickets tells the employee the team's hours. Emer
 | A6 | How does overtime work? | Overtime | "one and one-half", "40 hours" | |
 | A7 | What new hire training do I need to do? | New hire training | "Fair Housing training", "one week" | |
 | A8 | What is the dress code? | Dress code and uniforms | "business attire", "uniforms" | "business casual", "hybrid" |
-| A9 | When is payday? | Disclosure | "prepared automatically", "like a person to follow up" | |
+| A9 | When is payday? | Disclosure | "prepared automatically", "would like a person", "within one business day" | |
 | A10 | I need to call in sick, what do I do? | Calling in sick or late | "two hours", "manager" | |
 | A11 | When are bonuses paid? | Bonus timing | "second check of each month" | |
 | M1 | Can a resident pay rent with a personal check? | Manual entry 2.3, no AI | "Personal checks and money orders are not accepted" | |
@@ -149,6 +149,17 @@ These feed a pretend AI answer through the real check, so they run without an AI
 | D4 | How many PTO hours do I personally have left? | Personal records | **No** suggestion |
 | D5 | A pipe burst and water is pouring into the basement. | Emergency | **No** suggestion |
 | D6 | (AI on) The AI drafts "Orthodontics is covered at 50% [HR-5]" | Invented fact in a draft | The draft is thrown away; "50%" never reaches HR |
+
+## Lane 7: The employee writes back after the AI answered (must pass)
+
+When the AI answered and the employee replies, nothing is lost and nobody is bothered for no reason. Wording rules only: no AI is involved, so this behaves the same every time.
+
+| # | Employee writes | What it tests | What must happen |
+|---|---|---|---|
+| F1 | "That didn't help. Can I talk to a person?" (plus 8 other wordings, such as "Thanks but it didn't help") | Asks for a person | Ticket reopens with the same HR person, a fresh one-business-day deadline, tagged "Asked for a person", near the top of their list. The employee is emailed who will reply and when. |
+| F2 | "Thanks, that helped!" (plus 5 other wordings) | A thank-you | Ticket stays closed. No email is sent. |
+| F3 | "What about sick days then?" (plus 2 other wordings) | A new question | Goes to a person (tagged "Employee follow-up"), so a real question is never dropped. |
+| F4 | "That didn't help, and I am being harassed by my manager." / a safety emergency | Asks for a person with a serious problem | Same as F1, and marked urgent. |
 
 ---
 
