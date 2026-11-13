@@ -13,12 +13,6 @@ lets the AI agent answer what it safely can (sent by email), and sends replies w
 and, to turn the AI on, `ANTHROPIC_API_KEY`. Without that last one the helper still works and uses the
 simple keyword answers.
 
-## The website uses the same AI
-The "Simulate email" button on the website calls the same AI through a here.now proxy route
-(`public/.herenow/proxy.json`). here.now adds the key on its server, so it never reaches the browser.
-Your instructor adds a variable named `ANTHROPIC_API_KEY` in here.now (on the workspace for the public site
-and on the account that hosts the dev sites). Until then the website uses the simple rules.
-
 ## Only new email is handled
 - The helper remembers when it was first switched on and ignores every email from before that, so the old inbox is never read or answered.
 - It never answers a conversation that already has a reply from the inbox address (a person already answered it), or out-of-office and bulk mail.

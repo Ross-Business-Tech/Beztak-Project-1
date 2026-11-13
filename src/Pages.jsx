@@ -1,63 +1,10 @@
 import { useState } from 'react'
-import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE, TOPIC_LABELS } from './data'
-import { ackText, topicLabel } from './triage'
-import { BROWSER_AI, decide, FOOTER } from './aiAgent'
+import { AGENTS, ESCALATIONS, KNOWLEDGE, TOPIC_LABELS } from './data'
+import { topicLabel } from './triage'
 import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { ago, agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
 
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
-
-export function Compose({ tickets, onClose, onCreate }) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
-  const [busy, setBusy] = useState(false)
-  const answerable = [
-    ['How does PTO work?', 'Hi, how many vacation days do I get per year?'],
-    ['When is payday?', 'When do I get paid this month? What is the pay schedule?'],
-    ['Paid holidays', 'Which holidays are paid?'],
-    ['Calling in sick', 'I need to call in sick tomorrow, what do I do?'],
-    ['Dress code', 'What is the dress code?'],
-  ]
-  const personal = ESCALATIONS.map((e) => [e.example, e.example])
-  const submit = async (e) => {
-    e.preventDefault()
-    // Same decision the email helper makes for real emails (safety rules, then answers or a person).
-    if (busy) return
-    setBusy(true)
-    const r = await decide(BROWSER_AI, subject, body)
-    setBusy(false)
-    const now = new Date().toISOString()
-    const text = r.resolved ? r.answer + FOOTER : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
-    onCreate({
-      id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body, customer: name || 'Employee',
-      email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,
-      topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note, draft: r.draft || undefined,
-      tags: [...(r.resolved ? ['ai-resolved'] : []), ...(r.tags || (r.sensitive ? ['sensitive'] : []))],
-      replies: [{ from: 'HR Assistant (automated)', text, at: now, email: true, ai: true }],
-    })
-  }
-  return (
-    <div className="overlay" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h2>Simulate an incoming email</h2>
-        <p className="mute small">Stands in for a real email arriving at the HR inbox ({HR_ADDRESS}). The automated assistant reads it, creates the ticket, replies when it can, and assigns it to the right person.</p>
-        <label>Load a sample question
-          <select value="" onChange={(e) => { const all = [...answerable, ...personal]; const x = all[Number(e.target.value)]; if (x) { setSubject(x[0]); setBody(x[1]) } }}>
-            <option value="">Choose a sample…</option>
-            <optgroup label="Assistant should answer">{answerable.map((x, i) => <option key={x[0]} value={i}>{x[0]}</option>)}</optgroup>
-            <optgroup label="Must go to a person">{personal.map((x, i) => <option key={x[0]} value={answerable.length + i}>{x[0]}</option>)}</optgroup>
-          </select></label>
-        <label>From (name)<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Kim" /></label>
-        <label>From (email)<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alex.kim@examplecompany.com" /></label>
-        <label>Subject<input required value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
-        <label>Message<textarea required rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></label>
-        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" type="submit" disabled={busy}>{busy ? 'The AI is reading the email…' : 'Create ticket'}</button></div>
-      </form>
-    </div>
-  )
-}
 
 export function Dashboard({ tickets, me }) {
   const owned = tickets.filter((t) => t.assignee === me)
@@ -146,7 +93,7 @@ export function Setup({ me, openGuardrails }) {
       </section>
       <section className="panel pad"><h2>Email connection</h2>
         <p><span className="badge red">Not connected</span></p>
-        <p>Right now tickets are created with the <b>Simulate email</b> button. A real HR inbox (for example a Gmail test account) can't be read by the website itself: it needs a small helper that runs on Google's side and hands each new email to this app. That is a setup step for your instructor.</p>
+        <p>Tickets are created from real emails. A small helper reads the HR inbox (for example a Gmail test account) and hands each new email to this app. Connect it in your profile.</p>
       </section>
     </>
   )

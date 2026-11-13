@@ -1,8 +1,6 @@
 // The AI agent's brain. The AI writes the answers (so wording varies from email to email), but
-// fixed rules decide what may be sent. It runs in two places with the same rules:
-//   - the email helper (Cloudflare), with the key stored as a Cloudflare secret;
-//   - the website ("Simulate email"), through a here.now proxy route that adds the key on
-//     here.now's server (public/.herenow/proxy.json), so the key never reaches the browser.
+// fixed rules decide what may be sent. It runs in the email helper (Cloudflare), with the key stored as
+// a Cloudflare secret. The website only runs the guardrail checks, with a pretend AI: it never holds a key.
 //
 // Order of decisions for every new email:
 //   1. Safety and privacy rules (fixed). Emergencies, personal records, pay disputes, approvals,
@@ -124,46 +122,29 @@ async function askModel(env, subject, body) {
   return callModel(env, { system: SYSTEM_PROMPT, schema: ANSWER_SCHEMA, effort: 'medium', maxTokens: 6000, cache: true }, subject, body)
 }
 
-// The website reaches the AI only through the here.now proxy route. If that route is missing
-// (local testing, a 24-hour anonymous link, or the key not added yet), stop trying for this visit.
-let proxyDown = false
-export const aiConnected = (env) => Boolean(env.ANTHROPIC_API_KEY || (env.proxyBase && !proxyDown))
-
-// The website reaches the AI through the here.now proxy route (public/.herenow/proxy.json).
-export const BROWSER_AI = { proxyBase: typeof location === 'undefined' ? '' : `${location.origin}/api/anthropic` }
+export const aiConnected = (env) => Boolean(env.ANTHROPIC_API_KEY)
 
 // The SDK is loaded only when the AI is actually used, so pages stay fast.
 let sdk = null
 const loadSdk = async () => (sdk ||= (await import('@anthropic-ai/sdk')).default)
 
-function clientFor(Anthropic, env) {
-  const common = { timeout: 30000, maxRetries: 1 }
-  if (env.ANTHROPIC_API_KEY) return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, ...common })
-  // The real key is added by here.now's server (public/.herenow/proxy.json); this placeholder is replaced there.
-  return new Anthropic({ apiKey: 'added-by-herenow-proxy', baseURL: env.proxyBase, dangerouslyAllowBrowser: true, ...common })
-}
+const clientFor = (Anthropic, env) => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 30000, maxRetries: 1 })
 
 async function callModel(env, { system, schema, effort, maxTokens, cache }, subject, body) {
   const Anthropic = await loadSdk()
-  try {
-    const response = await clientFor(Anthropic, env).beta.messages.create({
-      model: AI_MODEL,
-      max_tokens: maxTokens,
-      // If a safety filter declines, the API retries on a fallback model automatically.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort, format: { type: 'json_schema', schema } },
-      system: [{ type: 'text', text: system, ...(cache ? { cache_control: { type: 'ephemeral' } } : {}) }],
-      messages: [{ role: 'user', content: `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4000)}\n</email>` }],
-    })
-    if (response.stop_reason === 'refusal') return null // treated as "not answerable": a person replies
-    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('')
-    return JSON.parse(text)
-  } catch (e) {
-    const unreachable = e instanceof Anthropic.APIConnectionError || (e instanceof Anthropic.APIError && [401, 403, 404, 405].includes(e.status))
-    if (env.proxyBase && !env.ANTHROPIC_API_KEY && unreachable) proxyDown = true
-    throw e
-  }
+  const response = await clientFor(Anthropic, env).beta.messages.create({
+    model: AI_MODEL,
+    max_tokens: maxTokens,
+    // If a safety filter declines, the API retries on a fallback model automatically.
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+    output_config: { effort, format: { type: 'json_schema', schema } },
+    system: [{ type: 'text', text: system, ...(cache ? { cache_control: { type: 'ephemeral' } } : {}) }],
+    messages: [{ role: 'user', content: `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4000)}\n</email>` }],
+  })
+  if (response.stop_reason === 'refusal') return null // treated as "not answerable": a person replies
+  const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('')
+  return JSON.parse(text)
 }
 
 // Every fact in an AI answer (numbers, dollar amounts, percentages, times, phone numbers, emails)

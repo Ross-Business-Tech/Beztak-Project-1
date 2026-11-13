@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AGENTS, SEED_DOCS, SEED_TICKETS } from './data'
-import { Compose, Dashboard, Documents, Profile, Setup } from './Pages'
+import { Dashboard, Documents, Profile, Setup } from './Pages'
 import GapTracker from './GapTracker'
 import Guardrails from './Guardrails'
 import { Detail, List, VIEW_NAMES } from './Tickets'
@@ -33,7 +33,6 @@ export default function App() {
   const [page, setPage] = useState(() => (location.hash === '#guardrails' ? 'guardrails' : 'tickets'))
   useEffect(() => { if (page !== 'guardrails' && location.hash === '#guardrails') history.replaceState(null, '', location.pathname + location.search) }, [page])
   const [openId, setOpenId] = useState(null)
-  const [composing, setComposing] = useState(false)
   useEffect(() => { const f = () => { if (location.hash === '#guardrails') { setPage('guardrails'); setOpenId(null) } }; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f) }, [])
   const [toast, setToast] = useState('')
   useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v5', JSON.stringify(tickets)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v2', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, me, docs, prefs, helper])
@@ -153,13 +152,6 @@ export default function App() {
     setOpenId(target.id)
     setToast(`Ticket #${src.id} merged into #${target.id}.`)
   }
-  const onCreate = (t) => {
-    const full = { ...t, tags: t.tags || [], advice: [], dueAt: dueIn(t.urgent) }
-    setTickets((p) => [full, ...p])
-    setComposing(false)
-    if (full.assignee === me) { setOpenId(full.id); setPage('tickets') }
-    else setToast(`Ticket #${full.id} was created and assigned to ${agentName(full.assignee)}. You only see your own tickets, so sign in as them to view it.`)
-  }
   const go = (k) => { setPage(k); setOpenId(null) }
   const switchUser = (id) => { setMe(id); setOpenId(null); setPage('tickets'); setToast(`Now signed in as ${agentName(id)} (demo).`) }
 
@@ -179,7 +171,6 @@ export default function App() {
             <label className="me"><small>Signed in as</small>
               <select value={me} onChange={(e) => switchUser(e.target.value)}>{AGENTS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
             </label>
-            <button className="btn primary" onClick={() => setComposing(true)}>Simulate email</button>
           </div>
         </header>
         <div className="content">
@@ -194,7 +185,6 @@ export default function App() {
           {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
-      {composing && <Compose tickets={tickets} onClose={() => setComposing(false)} onCreate={onCreate} />}
       {toast && <div className="toast" role="status" onClick={() => setToast('')}>{toast}</div>}
     </div>
   )

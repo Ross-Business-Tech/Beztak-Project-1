@@ -29954,65 +29954,40 @@ async function askModel(env, subject, body) {
 		cache: true
 	}, subject, body);
 }
-var proxyDown = false;
-var aiConnected = (env) => Boolean(env.ANTHROPIC_API_KEY || env.proxyBase && !proxyDown);
-typeof location === "undefined" || `${location.origin}`;
+var aiConnected = (env) => Boolean(env.ANTHROPIC_API_KEY);
 var sdk = null;
 var loadSdk = async () => sdk ||= (await Promise.resolve().then(() => (init_sdk(), sdk_exports))).default;
-function clientFor(Anthropic, env) {
-	const common = {
-		timeout: 3e4,
-		maxRetries: 1
-	};
-	if (env.ANTHROPIC_API_KEY) return new Anthropic({
-		apiKey: env.ANTHROPIC_API_KEY,
-		...common
-	});
-	return new Anthropic({
-		apiKey: "added-by-herenow-proxy",
-		baseURL: env.proxyBase,
-		dangerouslyAllowBrowser: true,
-		...common
-	});
-}
+var clientFor = (Anthropic, env) => new Anthropic({
+	apiKey: env.ANTHROPIC_API_KEY,
+	timeout: 3e4,
+	maxRetries: 1
+});
 async function callModel(env, { system, schema, effort, maxTokens, cache }, subject, body) {
-	const Anthropic = await loadSdk();
-	try {
-		const response = await clientFor(Anthropic, env).beta.messages.create({
-			model: AI_MODEL,
-			max_tokens: maxTokens,
-			betas: ["server-side-fallback-2026-07-01"],
-			fallbacks: "default",
-			output_config: {
-				effort,
-				format: {
-					type: "json_schema",
-					schema
-				}
-			},
-			system: [{
-				type: "text",
-				text: system,
-				...cache ? { cache_control: { type: "ephemeral" } } : {}
-			}],
-			messages: [{
-				role: "user",
-				content: `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4e3)}\n</email>`
-			}]
-		});
-		if (response.stop_reason === "refusal") return null;
-		const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-		return JSON.parse(text);
-	} catch (e) {
-		const unreachable = e instanceof Anthropic.APIConnectionError || e instanceof Anthropic.APIError && [
-			401,
-			403,
-			404,
-			405
-		].includes(e.status);
-		if (env.proxyBase && !env.ANTHROPIC_API_KEY && unreachable) proxyDown = true;
-		throw e;
-	}
+	const response = await clientFor(await loadSdk(), env).beta.messages.create({
+		model: AI_MODEL,
+		max_tokens: maxTokens,
+		betas: ["server-side-fallback-2026-07-01"],
+		fallbacks: "default",
+		output_config: {
+			effort,
+			format: {
+				type: "json_schema",
+				schema
+			}
+		},
+		system: [{
+			type: "text",
+			text: system,
+			...cache ? { cache_control: { type: "ephemeral" } } : {}
+		}],
+		messages: [{
+			role: "user",
+			content: `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4e3)}\n</email>`
+		}]
+	});
+	if (response.stop_reason === "refusal") return null;
+	const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+	return JSON.parse(text);
 }
 var FACT_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\(\d{3}\)\s?\d{3}-\d{4}|\d+(?:[.,:]\d+)*/g;
 var ENTRY_TEXT = Object.fromEntries([...HR, ...OPS].map((x) => [x.ref, `${x.q}\n${x.a}`]));
