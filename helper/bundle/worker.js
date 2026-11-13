@@ -30240,16 +30240,21 @@ async function saveTicket(env, t) {
 	const index = await env.TICKETS.get("index", "json") || [];
 	if (!index.includes(t.id)) await env.TICKETS.put("index", JSON.stringify([t.id, ...index]));
 }
+var START_SLACK = 3e5;
 async function startedAt(env) {
 	let s = await env.TICKETS.get("startedAt");
 	if (!s) {
-		s = String(Date.now());
+		s = String(Date.now() - START_SLACK);
 		await env.TICKETS.put("startedAt", s);
 	}
 	return Number(s);
 }
 async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
-	return ((await gmail(env, token, `threads/${threadId}?format=metadata&metadataHeaders=From`)).messages || []).some((x) => +x.internalDate < internalDate && header(x, "from").toLowerCase().includes(me));
+	try {
+		return ((await gmail(env, token, `threads/${threadId}?format=metadata&metadataHeaders=From`)).messages || []).some((x) => +x.internalDate < internalDate && header(x, "from").toLowerCase().includes(me));
+	} catch {
+		return false;
+	}
 }
 async function pollInbox(env) {
 	if (await env.TICKETS.get("lock")) return;

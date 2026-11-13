@@ -43,18 +43,22 @@ async function saveTicket(env, t) {
 }
 
 // The helper only ever looks at email that arrives AFTER it was first switched on. The moment of its
-// first check is saved, and anything older is ignored, so the old inbox is never read or answered.
+// first check is saved (minus a few minutes, so an email sent right while it was being switched on
+// is not missed), and anything older is ignored, so the old inbox is never read or answered.
+const START_SLACK = 5 * 60 * 1000
 async function startedAt(env) {
   let s = await env.TICKETS.get('startedAt')
-  if (!s) { s = String(Date.now()); await env.TICKETS.put('startedAt', s) }
+  if (!s) { s = String(Date.now() - START_SLACK); await env.TICKETS.put('startedAt', s) }
   return Number(s)
 }
 
 // True when this address already wrote in the thread before `internalDate` (a person, or an earlier
 // automatic answer, already replied). The helper never answers those a second time.
 async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
-  const th = await gmail(env, token, `threads/${threadId}?format=metadata&metadataHeaders=From`)
-  return (th.messages || []).some((x) => +x.internalDate < internalDate && header(x, 'from').toLowerCase().includes(me))
+  try {
+    const th = await gmail(env, token, `threads/${threadId}?format=metadata&metadataHeaders=From`)
+    return (th.messages || []).some((x) => +x.internalDate < internalDate && header(x, 'from').toLowerCase().includes(me))
+  } catch { return false } // if Gmail will not say, treat it as a new question: better answered than dropped
 }
 
 export async function pollInbox(env) {
