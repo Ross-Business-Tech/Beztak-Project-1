@@ -3,7 +3,7 @@ import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE, TOPIC_LABELS } from './data
 import { ackText, topicLabel } from './triage'
 import { BROWSER_AI, decide, FOOTER } from './aiAgent'
 import { MANUAL, SECTIONS } from './data/beztakManual.js'
-import { agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
+import { ago, agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
 
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
 
@@ -217,6 +217,19 @@ export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets
               : helperStatus.ok
                 ? <>
                   <p className="small"><b>The helper answered</b> at {new Date(helperStatus.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}. It has {helperStatus.remote} email conversation{helperStatus.remote === 1 ? '' : 's'}; {helperStatus.imported} new here just now.</p>
+                  {(() => {
+                    const mail = tickets.filter((t) => t.threadId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                    if (!mail.length) return null
+                    const last = mail[0]
+                    const by = {}
+                    mail.forEach((t) => { by[agentName(t.assignee)] = (by[agentName(t.assignee)] || 0) + 1 })
+                    return (
+                      <>
+                        <p className="small"><b>Latest email ticket:</b> “{last.subject}” from {last.customer}, {ago(last.createdAt)}. {last.resolvedByAI ? 'Answered automatically.' : <>Assigned to <b>{agentName(last.assignee)}</b>{last.assignee === me ? ' (you).' : `. Switch “Signed in as” to ${agentName(last.assignee)} to see it.`}</>}</p>
+                        <p className="mute small">Email tickets on this site, by person: {Object.entries(by).map(([n, c]) => `${n} ${c}`).join(', ')}. You only see your own tickets.</p>
+                      </>
+                    )
+                  })()}
                   {helperStatus.older > 0 && <p className="mute small">{helperStatus.older} older conversation{helperStatus.older === 1 ? ' was' : 's were'} not added because {helperStatus.older === 1 ? 'it' : 'they'} arrived before you connected.</p>}
                   {helperStatus.remote === 0 && <p className="mute small">The helper has not turned any email into a ticket yet. Check that the email went to the helper's inbox (not Spam) and was sent from a different address.</p>}
                 </>
