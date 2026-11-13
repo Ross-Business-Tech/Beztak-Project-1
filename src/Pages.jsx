@@ -207,8 +207,8 @@ export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switc
       </section>
       <section className="panel pad"><h2>Email connection</h2>
         <p className="mute small">Connects Beztakets to the email helper so emails become tickets and replies go out by email. The password is saved only in this browser.</p>
-        <label className="field">Helper address<input value={helper.url} onChange={(e) => setHelper({ ...helper, url: e.target.value.trim() })} /></label>
-        <label className="field">Helper password<input type="password" autoComplete="off" value={helper.token} onChange={(e) => setHelper({ ...helper, token: e.target.value.trim() })} placeholder="Paste the helper password" /></label>
+        <label className="field">Helper address<input value={helper.url} onChange={(e) => setHelper({ ...helper, url: e.target.value.trim(), connectedAt: undefined })} /></label>
+        <label className="field">Helper password<input type="password" autoComplete="off" value={helper.token} onChange={(e) => setHelper({ ...helper, token: e.target.value.trim(), connectedAt: undefined })} placeholder="Paste the helper password" /></label>
         <p><span className={`badge ${helper.token ? 'violet' : 'red'}`}>{helper.token ? 'Connected: new emails become tickets' : 'Not connected'}</span></p>
       </section>
       <section className="panel pad"><h2>Account</h2>

@@ -54,6 +54,11 @@ export default function App() {
       if (syncing.current) return
       syncing.current = true
       try {
+        // Only emails that arrive after this browser was connected become tickets (with a few minutes of slack),
+        // so connecting never re-imports the old inbox. Reconnecting starts the clock again.
+        let since = helper.connectedAt
+        if (!since) { since = new Date().toISOString(); setHelper((h) => (h.connectedAt ? h : { ...h, connectedAt: since })) }
+        const cutoff = new Date(since).getTime() - 10 * 60000
         const remote = await helperCall(helper, '/tickets')
         const cur = ticketsRef.current
         const created = []
@@ -66,13 +71,12 @@ export default function App() {
             const known = new Set(local.replies.map((m) => m.messageId).filter(Boolean))
             const fresh = inbound.filter((m) => m.messageId !== local.firstMessageId && !known.has(m.messageId))
             if (fresh.length) follow[local.id] = fresh
-          } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer)) {
+          } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer) && new Date(inbound[0].at).getTime() >= cutoff) {
             const { name, email } = parse(r.customer)
-            // The helper already decided and sent the automatic email. Older tickets without that
-            // decision fall back to the simple rules here.
+            // The helper already decided and sent the automatic email. Tickets without that decision use
+            // the simple rules here. The website never sends an automatic email itself: only the helper does.
             const res = r.triage || triage(r.subject, inbound[0].text)
             const reply = r.triage?.replyText || (res.resolved ? res.answer : ackText(name, agentName(res.assignee), res.urgent, res.sensitive, res.extra))
-            if (!r.triage) { try { await helperCall(helper, `/tickets/${r.id}/reply`, { method: 'POST', body: JSON.stringify({ text: reply, auto: true }) }) } catch { /* ticket is still created */ } }
             const now = new Date().toISOString()
             created.unshift({
               id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,

@@ -27055,7 +27055,7 @@ var init_error_classes = __esmMin((() => {
 //#region node_modules/@anthropic-ai/sdk/internal/node.browser.mjs
 var node_browser_exports = /* @__PURE__ */ __exportAll({
 	child_process: () => child_process,
-	crypto: () => crypto,
+	crypto: () => crypto$1,
 	fs: () => fs,
 	os: () => os,
 	path: () => path,
@@ -27069,11 +27069,11 @@ function unavailable(module) {
 		throw new AnthropicError(`\`${module}.${property}\` is not available in this environment; it needs a Node.js-compatible runtime`);
 	} });
 }
-var child_process, crypto, fs, os, path, stream, util;
+var child_process, crypto$1, fs, os, path, stream, util;
 var init_node_browser = __esmMin((() => {
 	init_error$1();
 	child_process = /* @__PURE__ */ unavailable("child_process");
-	crypto = /* @__PURE__ */ unavailable("crypto");
+	crypto$1 = /* @__PURE__ */ unavailable("crypto");
 	fs = /* @__PURE__ */ unavailable("fs");
 	os = /* @__PURE__ */ unavailable("os");
 	path = /* @__PURE__ */ unavailable("path");
@@ -30240,16 +30240,43 @@ async function saveTicket(env, t) {
 	const index = await env.TICKETS.get("index", "json") || [];
 	if (!index.includes(t.id)) await env.TICKETS.put("index", JSON.stringify([t.id, ...index]));
 }
+async function startedAt(env) {
+	let s = await env.TICKETS.get("startedAt");
+	if (!s) {
+		s = String(Date.now());
+		await env.TICKETS.put("startedAt", s);
+	}
+	return Number(s);
+}
+async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
+	return ((await gmail(env, token, `threads/${threadId}?format=metadata&metadataHeaders=From`)).messages || []).some((x) => +x.internalDate < internalDate && header(x, "from").toLowerCase().includes(me));
+}
 async function pollInbox(env) {
+	if (await env.TICKETS.get("lock")) return;
+	const mine = crypto.randomUUID();
+	await env.TICKETS.put("lock", mine, { expirationTtl: 60 });
+	await new Promise((r) => setTimeout(r, 200));
+	if (await env.TICKETS.get("lock") !== mine) return;
+	try {
+		await pollOnce(env);
+	} finally {
+		if (await env.TICKETS.get("lock") === mine) await env.TICKETS.delete("lock");
+	}
+}
+async function pollOnce(env) {
+	const floor = await startedAt(env);
 	const token = await accessToken(env);
 	const me = env.BURNER_EMAIL.toLowerCase();
-	const list = await gmail(env, token, "messages?q=" + encodeURIComponent("in:inbox newer_than:7d") + "&maxResults=25");
+	const list = await gmail(env, token, "messages?q=" + encodeURIComponent(`in:inbox after:${Math.floor(floor / 1e3)}`) + "&maxResults=25");
 	for (const { id: msgId } of (list.messages || []).reverse()) {
 		if (await env.TICKETS.get("seen:" + msgId)) continue;
 		const m = await gmail(env, token, `messages/${msgId}?format=full`);
 		const from = header(m, "from");
-		await env.TICKETS.put("seen:" + msgId, "1", { expirationTtl: 1209600 });
+		await env.TICKETS.put("seen:" + msgId, "1", { expirationTtl: 2592e3 });
+		if (+m.internalDate < floor) continue;
 		if (from.toLowerCase().includes(me)) continue;
+		const auto = header(m, "auto-submitted").toLowerCase();
+		if (auto && auto !== "no" || /^(bulk|junk|list)$/i.test(header(m, "precedence"))) continue;
 		const entry = {
 			inbound: true,
 			from,
@@ -30262,6 +30289,7 @@ async function pollInbox(env) {
 			t.replies.push(entry);
 			if (t.status === "Closed") t.status = "Open";
 		} else {
+			if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) continue;
 			t = {
 				id: m.threadId,
 				subject: header(m, "subject") || "(no subject)",

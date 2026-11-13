@@ -19,6 +19,12 @@ The "Simulate email" button on the website calls the same AI through a here.now 
 Your instructor adds a variable named `ANTHROPIC_API_KEY` in here.now (on the workspace for the public site
 and on the account that hosts the dev sites). Until then the website uses the simple rules.
 
+## Only new email is handled
+- The helper remembers when it was first switched on and ignores every email from before that, so the old inbox is never read or answered.
+- It never answers a conversation that already has a reply from the inbox address (a person already answered it), or out-of-office and bulk mail.
+- Only one inbox check runs at a time, so the same email is never answered twice.
+- The website only turns emails into tickets if they arrived after that browser was connected (reconnecting starts the clock again), and the website never sends automatic emails itself.
+
 ## How an email is handled
 1. Safety rules first: emergencies, personal records, pay disputes, approvals, confidential matters,
    legal or medical questions, and anything containing passwords or ID numbers always go to a person.

@@ -42,20 +42,51 @@ async function saveTicket(env, t) {
   if (!index.includes(t.id)) await env.TICKETS.put('index', JSON.stringify([t.id, ...index]))
 }
 
+// The helper only ever looks at email that arrives AFTER it was first switched on. The moment of its
+// first check is saved, and anything older is ignored, so the old inbox is never read or answered.
+async function startedAt(env) {
+  let s = await env.TICKETS.get('startedAt')
+  if (!s) { s = String(Date.now()); await env.TICKETS.put('startedAt', s) }
+  return Number(s)
+}
+
+// True when this address already wrote in the thread before `internalDate` (a person, or an earlier
+// automatic answer, already replied). The helper never answers those a second time.
+async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
+  const th = await gmail(env, token, `threads/${threadId}?format=metadata&metadataHeaders=From`)
+  return (th.messages || []).some((x) => +x.internalDate < internalDate && header(x, 'from').toLowerCase().includes(me))
+}
+
 export async function pollInbox(env) {
+  // Only one check at a time: the schedule and the website can both ask, and two checks at once answered the same email twice.
+  // Each check writes its own tag on the lock, waits a moment, and carries on only if its tag is still the one there.
+  if (await env.TICKETS.get('lock')) return
+  const mine = crypto.randomUUID()
+  await env.TICKETS.put('lock', mine, { expirationTtl: 60 })
+  await new Promise((r) => setTimeout(r, 200))
+  if ((await env.TICKETS.get('lock')) !== mine) return
+  try { await pollOnce(env) } finally { if ((await env.TICKETS.get('lock')) === mine) await env.TICKETS.delete('lock') }
+}
+
+async function pollOnce(env) {
+  const floor = await startedAt(env)
   const token = await accessToken(env)
   const me = env.BURNER_EMAIL.toLowerCase()
-  const list = await gmail(env, token, 'messages?q=' + encodeURIComponent('in:inbox newer_than:7d') + '&maxResults=25')
+  const list = await gmail(env, token, 'messages?q=' + encodeURIComponent(`in:inbox after:${Math.floor(floor / 1000)}`) + '&maxResults=25')
   for (const { id: msgId } of (list.messages || []).reverse()) {
     if (await env.TICKETS.get('seen:' + msgId)) continue
     const m = await gmail(env, token, `messages/${msgId}?format=full`)
     const from = header(m, 'from')
-    await env.TICKETS.put('seen:' + msgId, '1', { expirationTtl: 60 * 60 * 24 * 14 })
+    await env.TICKETS.put('seen:' + msgId, '1', { expirationTtl: 60 * 60 * 24 * 30 })
+    if (+m.internalDate < floor) continue // older than the helper itself
     if (from.toLowerCase().includes(me)) continue
+    const auto = header(m, 'auto-submitted').toLowerCase()
+    if ((auto && auto !== 'no') || /^(bulk|junk|list)$/i.test(header(m, 'precedence'))) continue // out-of-office and bulk mail: never answer
     const entry = { inbound: true, from, text: stripQuote(bodyText(m.payload)) || m.snippet, at: new Date(+m.internalDate).toISOString(), messageId: header(m, 'message-id') }
     let t = await getTicket(env, m.threadId)
     if (t) { t.replies.push(entry); if (t.status === 'Closed') t.status = 'Open' }
     else {
+      if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) continue // already answered by someone: leave it alone
       t = { id: m.threadId, subject: header(m, 'subject') || '(no subject)', customer: from, status: 'Open', createdAt: entry.at, replies: [entry] }
       if (!/no-?reply|mailer-daemon/i.test(from)) {
         // New conversation: decide who answers, then send the automatic email.
