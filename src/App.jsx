@@ -45,6 +45,8 @@ export default function App() {
   const ticketsRef = useRef(tickets)
   useEffect(() => { ticketsRef.current = tickets }, [tickets])
   const syncing = useRef(false)
+  const runNow = useRef(null)
+  const [helperStatus, setHelperStatus] = useState(null) // what the last inbox check found, shown in the profile
   // Every 30 seconds: pull new emails from the helper, turn them into tickets, let the
   // AI agent answer what it can (sent by email), and attach customer follow-ups.
   useEffect(() => {
@@ -60,6 +62,7 @@ export default function App() {
         if (!since) { since = new Date().toISOString(); setHelper((h) => (h.connectedAt ? h : { ...h, connectedAt: since })) }
         const cutoff = new Date(since).getTime() - 10 * 60000
         const remote = await helperCall(helper, '/tickets')
+        let older = 0
         const cur = ticketsRef.current
         const created = []
         const follow = {}
@@ -71,7 +74,9 @@ export default function App() {
             const known = new Set(local.replies.map((m) => m.messageId).filter(Boolean))
             const fresh = inbound.filter((m) => m.messageId !== local.firstMessageId && !known.has(m.messageId))
             if (fresh.length) follow[local.id] = fresh
-          } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer) && new Date(inbound[0].at).getTime() >= cutoff) {
+          } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer) && new Date(inbound[0].at).getTime() < cutoff) {
+            older++
+          } else if (inbound[0] && !/no-?reply|mailer-daemon/i.test(r.customer)) {
             const { name, email } = parse(r.customer)
             // The helper already decided and sent the automatic email. Tickets without that decision use
             // the simple rules here. The website never sends an automatic email itself: only the helper does.
@@ -88,6 +93,7 @@ export default function App() {
           }
         }
         const ids = Object.keys(follow)
+        setHelperStatus({ at: new Date().toISOString(), ok: true, remote: remote.length, imported: created.length, older })
         // An employee wrote back after the AI answered: a person gets it if they asked for one (or asked something new),
         // and the employee gets an email saying who will reply and when. A plain "thanks" leaves the ticket closed.
         const when = new Date()
@@ -109,9 +115,10 @@ export default function App() {
           })])
           setToast(`${created.length ? `${created.length} new email ticket${created.length > 1 ? 's' : ''}` : ''}${created.length && ids.length ? ' and ' : ''}${ids.length ? `${ids.length} customer repl${ids.length > 1 ? 'ies' : 'y'}` : ''}.`)
         }
-      } catch { /* the helper may be offline; try again next time */ }
+      } catch (e) { setHelperStatus({ at: new Date().toISOString(), ok: false, error: e.message === 'Failed to fetch' ? 'Could not reach the helper. Check the helper address, and that the helper is deployed in Cloudflare.' : e.message }) /* try again next time */ }
       syncing.current = false
     }
+    runNow.current = run
     run()
     const id = setInterval(run, 30000)
     return () => clearInterval(id)
@@ -173,7 +180,7 @@ export default function App() {
           {page === 'guardrails' && <Guardrails />}
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
-          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
+          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.()} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
           {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>

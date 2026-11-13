@@ -216,3 +216,4 @@ textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px
 .bank{border-top:1px solid var(--line);padding:10px 0}.bank>summary{cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap;list-style-position:outside}
 .bank-sec{margin:6px 0 0 4px}.bank-sec>summary{cursor:pointer;font-weight:600;padding:6px 0}.bank .kb{padding-left:4px}
 .nfirst small .esc{color:#c4352b;font-weight:600}
+.helper-status{display:flex;flex-direction:column;gap:6px;align-items:flex-start;margin-top:8px}.helper-status p{margin:0}

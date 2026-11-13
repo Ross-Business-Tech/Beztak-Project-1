@@ -175,7 +175,7 @@ export function Setup({ me, openGuardrails }) {
   )
 }
 
-export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switchUser, reset, toast }) {
+export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets, prefs, setPrefs, switchUser, reset, toast }) {
   const a = agent(me)
   const mineAll = tickets.filter((t) => t.assignee === me)
   const open = mineAll.filter((t) => t.status !== 'Closed').length
@@ -210,6 +210,20 @@ export function Profile({ helper, setHelper, me, tickets, prefs, setPrefs, switc
         <label className="field">Helper address<input value={helper.url} onChange={(e) => setHelper({ ...helper, url: e.target.value.trim(), connectedAt: undefined })} /></label>
         <label className="field">Helper password<input type="password" autoComplete="off" value={helper.token} onChange={(e) => setHelper({ ...helper, token: e.target.value.trim(), connectedAt: undefined })} placeholder="Paste the helper password" /></label>
         <p><span className={`badge ${helper.token ? 'violet' : 'red'}`}>{helper.token ? 'Connected: new emails become tickets' : 'Not connected'}</span></p>
+        {helper.token && (
+          <div className="helper-status" role="status">
+            {!helperStatus
+              ? <p className="mute small">Checking the helper…</p>
+              : helperStatus.ok
+                ? <>
+                  <p className="small"><b>The helper answered</b> at {new Date(helperStatus.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}. It has {helperStatus.remote} email conversation{helperStatus.remote === 1 ? '' : 's'}; {helperStatus.imported} new here just now.</p>
+                  {helperStatus.older > 0 && <p className="mute small">{helperStatus.older} older conversation{helperStatus.older === 1 ? ' was' : 's were'} not added because {helperStatus.older === 1 ? 'it' : 'they'} arrived before you connected.</p>}
+                  {helperStatus.remote === 0 && <p className="mute small">The helper has not turned any email into a ticket yet. Check that the email went to the helper's inbox (not Spam) and was sent from a different address.</p>}
+                </>
+                : <p className="small gr-prob"><b>Problem:</b> {helperStatus.error}</p>}
+            <button type="button" className="btn" onClick={checkNow}>Check for new emails now</button>
+          </div>
+        )}
       </section>
       <section className="panel pad"><h2>Account</h2>
         <p className="mute small">Switch to another team member to see the desk from their point of view (demo).</p>
