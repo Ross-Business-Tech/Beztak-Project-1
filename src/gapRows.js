@@ -1,5 +1,5 @@
 import { KNOWLEDGE, TOPIC_LABELS } from './data'
-import { SECTIONS as OPS } from './data/beztakManual.js'
+import { sectionTitle } from './activeManual.js'
 
 // Turns the HR desk's tickets into the question records the Manual Gap Tracker reads.
 // This is the single place that defines how "what the AI agent handled" becomes "a question".
@@ -16,8 +16,8 @@ function citedSection(text) {
   const hr = /\[HR-(\d+)\]/.exec(text || '')
   if (hr && KNOWLEDGE[hr[1] - 1]) return { source: 'HR answers', section: `HR answers: ${TOPIC_LABELS[KNOWLEDGE[hr[1] - 1].topic]}, ${KNOWLEDGE[hr[1] - 1].keys[0]}` }
   const op = /\[§?\s?(\d+)\.(\d+)\]/.exec(text || '')
-  const sec = op && OPS.find((x) => x.n === Number(op[1]))
-  if (sec) return { source: 'Operations Manual', section: `Ops Manual §${sec.n} ${sec.title}` }
+  const title = op && sectionTitle(Number(op[1]))
+  if (title) return { source: 'Operations Manual', section: `Ops Manual §${Number(op[1])} ${title}` }
   return null
 }
 const humanReplies = (t) => (t.replies || []).filter((r) => !r.event && !r.ai && !r.inbound && r.text)

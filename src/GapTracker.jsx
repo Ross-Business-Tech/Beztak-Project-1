@@ -16,13 +16,13 @@ const themeMessage = () => {
   return { type: 'gap-tracker:theme', vars, scheme: lum < 128 ? 'dark' : 'light' }
 }
 
-export default function GapTracker({ tickets, theme }) {
+export default function GapTracker({ tickets, theme, manualAt }) {
   const frame = useRef(null)
   const [ready, setReady] = useState(false)
   const [source, setSource] = useState('live')
   const [st, setSt] = useState({ view: 'overview', has: false, fixes: 0, due: false })
   const sample = useMemo(() => sampleHistory(), [])
-  const live = useMemo(() => ticketsToRows(tickets), [tickets])
+  const live = useMemo(() => ticketsToRows(tickets), [tickets, manualAt]) // eslint-disable-line react-hooks/exhaustive-deps
   const send = (m) => frame.current?.contentWindow?.postMessage(m, location.origin)
 
   useEffect(() => {

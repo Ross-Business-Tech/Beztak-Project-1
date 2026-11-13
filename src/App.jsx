@@ -7,6 +7,7 @@ import { Detail, List, VIEW_NAMES } from './Tickets'
 import { clearFiles } from './fileStore'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
 import { followUp } from './escalate'
+import { setActiveManualTitles } from './activeManual'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
 
@@ -47,6 +48,7 @@ export default function App({ account, signOut }) {
   useEffect(() => { ticketsRef.current = tickets }, [tickets])
   const syncing = useRef(false)
   const runNow = useRef(null)
+  const [manualAt, setManualAt] = useState('') // changes when the assistant's manual changes, so the Manual gaps page names sections right
   const [helperStatus, setHelperStatus] = useState(null) // what the last inbox check found, shown in the profile
   // Every 30 seconds: pull new emails from the helper, turn them into tickets, let the
   // AI agent answer what it can (sent by email), and attach customer follow-ups.
@@ -69,6 +71,7 @@ export default function App({ account, signOut }) {
           try { const s = await helperCall(helper, '/status'); if (s.at) s.mins = Math.round((Date.now() - new Date(s.at)) / 60000); return s } catch (e) { return e.message === 'Not found' ? { oldHelper: true } : null }
         }
         let mail = await readStatus()
+        try { const mi = await helperCall(helper, '/manual'); setActiveManualTitles(mi.custom ? mi.sectionTitles : null); setManualAt(mi.custom ? mi.at : '') } catch { /* an older helper has no manual page */ }
         // The helper checks Gmail by itself every minute. If it has gone quiet (its schedule is missing in Cloudflare, say),
         // or the button was pressed, ask it to check right now. A failure is then shown in the profile instead of staying hidden.
         const quiet = !mail || mail.never || (mail.mins ?? 0) > 3
@@ -176,9 +179,9 @@ export default function App({ account, signOut }) {
             ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
-          {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} />}
+          {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} manualAt={manualAt} />}
           {page === 'guardrails' && <Guardrails />}
-          {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
+          {page === 'kb' && <Documents docs={docs} setDocs={setDocs} helper={helper} />}
           {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} account={account} linked={Boolean(linked)} signOut={signOut} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}); setToast('Sample data reset.') }} />}
           {page === 'settings' && <Setup me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
         </div>

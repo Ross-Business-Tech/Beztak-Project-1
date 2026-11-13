@@ -1,17 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { loadPdfLib } from './pdfLib'
 
 // Shows a PDF page by page inside the app. Many phones cannot show a PDF inside a web page directly,
 // so each page is drawn here instead. The PDF library is only downloaded when someone opens a PDF.
-let lib = null
-async function loadLib() {
-  if (!lib) {
-    // The "legacy" build also works on older phones.
-    const [pdfjs, worker] = await Promise.all([import('pdfjs-dist/legacy/build/pdf.mjs'), import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')])
-    pdfjs.GlobalWorkerOptions.workerSrc = worker.default
-    lib = pdfjs
-  }
-  return lib
-}
 
 // One page. It is only drawn when it is close to the screen, so a 50-page document opens quickly.
 function Page({ doc, num, width, aspect }) {
@@ -72,7 +63,7 @@ export default function PdfViewer({ file, url, name }) {
     let task
     ;(async () => {
       try {
-        const pdfjs = await loadLib()
+        const pdfjs = await loadPdfLib()
         let bytes
         if (file) bytes = new Uint8Array(await file.arrayBuffer())
         else {
@@ -83,7 +74,7 @@ export default function PdfViewer({ file, url, name }) {
         // isEvalSupported off: a PDF is never allowed to run code in the page.
         task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false })
         const d = await task.promise
-        if (dead) { d.destroy(); return }
+        if (dead) { task.destroy(); return }
         const first = await d.getPage(1)
         const v = first.getViewport({ scale: 1 })
         setAspect(v.height / v.width)

@@ -2,6 +2,9 @@ import SharedFiles from './SharedFiles'
 import { useEffect, useState } from 'react'
 import PdfViewer from './PdfViewer'
 import { deleteFile, getFile, putFile } from './fileStore'
+import { helperCall } from './helper'
+import { readPdfPages, manualFromPages } from './manualFromPdf'
+import { setActiveManualTitles } from './activeManual'
 import { AGENTS, ESCALATIONS, KNOWLEDGE, TOPIC_LABELS } from './data'
 import { topicLabel } from './triage'
 import { MANUAL, SECTIONS } from './data/beztakManual.js'
@@ -34,7 +37,7 @@ const BUILTIN_PDFS = { 1: { file: 'docs/beztak-operations-manual.pdf', note: 'Th
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
 
 // Opens one document: a real PDF page by page, or the plain text of a text file.
-function DocView({ doc }) {
+function DocView({ doc, onUseAsManual, busy }) {
   const builtin = BUILTIN_PDFS[doc.id]
   const [file, setFile] = useState(undefined) // undefined = looking, null = not found, otherwise the saved PDF
   useEffect(() => {
@@ -45,13 +48,67 @@ function DocView({ doc }) {
   if (doc.kind === 'pdf') {
     if (file === undefined) return <p className="mute">Opening…</p>
     if (file === null) return <p className="pdf-err">This PDF is no longer saved in this browser (browsers can clear saved files). Please upload it again.</p>
-    return <PdfViewer key={doc.id} file={file} name={doc.name} />
+    return <><div className="row manual-use"><button type="button" className="btn sm" disabled={busy} onClick={() => onUseAsManual(doc.name, file)}>Use as the assistant's manual</button></div><PdfViewer key={doc.id} file={file} name={doc.name} /></>
   }
   if (builtin) return <><PdfViewer key={doc.id} url={`${import.meta.env.BASE_URL}${builtin.file}`} name={doc.name} /><p className="mute small">{builtin.note}</p></>
   return <pre>{doc.text}</pre>
 }
 
-export function Documents({ docs, setDocs }) {
+// Which Operations Manual the assistant reads, and the button to choose a PDF as that manual. The assistant runs in the email
+// helper, so the PDF's text is read here in the browser, split into sections, and sent there.
+function useAssistantManual(helper) {
+  const [info, setInfo] = useState(null) // null = checking, { custom: false } = built-in, { custom: true, ... } = a PDF
+  const [busy, setBusy] = useState('')
+  const [msg, setMsg] = useState('')
+  const connected = Boolean(helper?.token && helper?.url)
+  useEffect(() => {
+    if (!connected) return undefined
+    let dead = false
+    helperCall(helper, '/manual').then((i) => { if (!dead) { setInfo(i); setActiveManualTitles(i.custom ? i.sectionTitles : null) } })
+      .catch((e) => { if (!dead) setInfo({ error: e.message === 'Not found' ? 'Your email helper in Cloudflare is an older version. Paste the newest worker.js into Cloudflare and Deploy, then reload this page.' : e.message }) })
+    return () => { dead = true }
+  }, [helper?.url, helper?.token, connected]) // eslint-disable-line react-hooks/exhaustive-deps
+  const use = async (name, blob) => {
+    if (!connected) { setMsg('Connect the email helper in your profile first: the assistant runs there.'); return }
+    setMsg(''); setBusy('Opening the PDF…')
+    try {
+      const pagesRead = await readPdfPages(blob, (n, total) => setBusy(`Reading page ${n} of ${total}…`))
+      const manual = manualFromPages(pagesRead, name)
+      setBusy('Sending it to the assistant…')
+      const i = await helperCall(helper, '/manual', { method: 'POST', body: JSON.stringify(manual) })
+      setInfo(i); setActiveManualTitles(i.sectionTitles)
+      setMsg(`The assistant is now reading "${name}": ${i.pages} pages, ${i.sections} sections, ${i.entries} passages. New emails and "Suggest AI reply" use it right away.`)
+    } catch (e) { setMsg(`That PDF could not be used. ${e.message}`) } finally { setBusy('') }
+  }
+  const reset = async () => {
+    setMsg(''); setBusy('Switching back…')
+    try { const i = await helperCall(helper, '/manual', { method: 'DELETE' }); setInfo(i); setActiveManualTitles(null); setMsg('The assistant is back on the built-in manual.') } catch (e) { setMsg(e.message) } finally { setBusy('') }
+  }
+  return { info, busy, msg, connected, use, reset }
+}
+
+function AssistantManual({ am }) {
+  const { info, busy, msg, connected, reset } = am
+  return (
+    <section className="panel pad"><h2>The assistant's manual</h2>
+      <p className="mute">The assistant answers employees from an Operations Manual and cites the sections it used. To make it read your own manual, open a PDF below (in Shared files or Documents) and click <b>Use as the assistant's manual</b>.</p>
+      {!connected
+        ? <p className="mute">Connect the email helper in your profile first: the assistant runs there.</p>
+        : !info ? <p className="mute">Checking…</p>
+          : info.error ? <p className="pdf-err">{info.error}</p>
+            : info.custom
+              ? <p><span className="badge violet">Your PDF</span> The assistant is reading <b>{info.name}</b> ({info.pages} pages, {info.sections} sections), set {new Date(info.at).toLocaleString()}.</p>
+              : <p><span className="badge grey">Built-in</span> The assistant is reading the built-in Beztak Operations Manual ({MANUAL.version}, {SECTIONS.reduce((n, x) => n + x.items.length, 0)} answers).</p>}
+      {busy && <p role="status" className="mute">{busy}</p>}
+      {msg && <p className="note-line" role="status">{msg}</p>}
+      {info?.custom && <button type="button" className="btn sm" disabled={Boolean(busy)} onClick={reset}>Go back to the built-in manual</button>}
+      <p className="mute small">The PDF's text is stored in the email helper and sent to the AI together with each question, so use sample documents only. The same safety checks apply: the assistant can only repeat what the manual says, and personal, approval and safety questions still go to a person.</p>
+    </section>
+  )
+}
+
+export function Documents({ docs, setDocs, helper }) {
+  const am = useAssistantManual(helper)
   const [msg, setMsg] = useState('')
   const [viewing, setViewing] = useState(null)
   const upload = async (e) => {
@@ -83,7 +140,8 @@ export function Documents({ docs, setDocs }) {
   const open = docs.find((d) => d.id === viewing)
   return (
     <>
-      <SharedFiles />
+      <AssistantManual am={am} />
+      <SharedFiles onUseAsManual={am.use} busy={Boolean(am.busy)} />
       <section className="panel pad"><div className="row between"><h2>Documents</h2>
         <label className="btn primary upload">Upload document<input type="file" multiple accept=".pdf,application/pdf,.txt,.md,.csv" onChange={upload} hidden /></label></div>
         <p className="mute">Policy documents the HR team keeps for reference. PDFs open right here. Uploaded files are kept in this browser only, so use sample documents.</p>
@@ -95,7 +153,7 @@ export function Documents({ docs, setDocs }) {
             <div key={d.id} className="tr"><button className="linkish" onClick={() => setViewing(d.id)}>{d.name}</button><span>{d.source}</span><span>{new Date(d.addedAt).toLocaleDateString()}</span><span>{fmtSize(d.size)}</span><button className="link" onClick={() => remove(d)}>Delete</button></div>
           ))}
         </div>
-        {open && <div className="docview"><div className="row between"><b>{open.name}</b><button className="link" onClick={() => setViewing(null)}>Close</button></div><DocView key={open.id} doc={open} /></div>}
+        {open && <div className="docview"><div className="row between"><b>{open.name}</b><button className="link" onClick={() => setViewing(null)}>Close</button></div><DocView key={open.id} doc={open} onUseAsManual={am.use} busy={Boolean(am.busy)} /></div>}
       </section>
       <section className="panel pad"><h3>Egnyte</h3>
         <p><span className="badge red">Not connected</span></p>

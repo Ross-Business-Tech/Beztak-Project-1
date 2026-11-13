@@ -187,6 +187,20 @@ HR can ask the AI for a reply on a ticket: either a **draft with blanks** (thing
 
 ---
 
+## Lane 9: Answering from an uploaded manual PDF (must pass)
+
+A team member can choose a PDF on the Documents page ("Use as the assistant's manual"). The assistant then reads that PDF instead of the built-in manual, with exactly the same rules. A pretend two-section manual is used for these checks.
+
+| # | Situation | What must happen |
+|---|---|---|
+| U1 | The AI answers a parking question and cites section 1.1 of the uploaded manual | The answer is sent, with the manual's own facts (14 spaces, $25) |
+| U2 | The AI says "20 spaces" (not in the uploaded section) | Blocked; a person answers |
+| U3 | The AI cites section 13.4 (it exists in the old built-in manual, not in the uploaded one) | Blocked; a person answers |
+| U4 | No AI, a clear question about package lockers (plus 2 wordings) | Answered from the uploaded manual, naming it |
+| U5 | A manual question with a personal vacation-balance question hidden inside (plus 1 wording) | Goes to a person |
+
+---
+
 ## How to run this
 
 - **In the app:** open **Guardrails** in the menu. Every promise runs and shows Pass or Fail. Tap one to see the exact email the employee would get, the suggested reply for HR, and every other wording with its result.

@@ -25,6 +25,13 @@ It needs the newest `worker.js` and the `ANTHROPIC_API_KEY` secret. Without them
 manual answer or a template with [blanks] instead of an AI-written reply. Personal, approval and safety emails are never
 sent to the AI.
 
+## The assistant's manual (PDF)
+On the website's Documents page, open a PDF and click "Use as the assistant's manual". The website reads the PDF's text, splits it into
+sections and sends them here (`POST /manual`, saved in Cloudflare KV). From then on every answer and suggestion uses that PDF in place of
+the built-in Operations Manual, with the same safety checks (facts must appear in the cited section, personal/approval/safety emails still
+go to a person). `GET /manual` says which manual is active and `DELETE /manual` goes back to the built-in one. Scanned PDFs (pictures of
+pages) have no text and cannot be read. The text is stored here and sent to the AI with each question, so use sample documents only.
+
 ## How an email is handled
 1. Safety rules first: emergencies, personal records, pay disputes, approvals, confidential matters,
    legal or medical questions, and anything containing passwords or ID numbers always go to a person.

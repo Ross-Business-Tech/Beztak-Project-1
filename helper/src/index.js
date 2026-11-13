@@ -1,11 +1,11 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
+import { buildCorpus, decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
 import { ackText } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
 
-const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
+const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS' }
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...cors } })
 const b64u = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const unb64u = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)))
@@ -61,6 +61,37 @@ async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
   } catch { return false } // if Gmail will not say, treat it as a new question: better answered than dropped
 }
 
+// ---- The Operations Manual the assistant reads ----
+// Normally the built-in manual. A team member can instead choose a PDF on the Documents page: the website reads its text,
+// splits it into sections and sends them here (POST /manual), and every answer and suggestion then uses it, with the same
+// safety checks. DELETE /manual goes back to the built-in manual.
+const MANUAL_MAX_CHARS = 350000
+let manualCache = { at: null, corpus: null }
+async function activeCorpus(env) {
+  const m = await env.TICKETS.get('manual', 'json')
+  if (!m) return undefined // the built-in manual
+  if (manualCache.at !== m.at) manualCache = { at: m.at, corpus: buildCorpus(m) }
+  return manualCache.corpus
+}
+function cleanManual(input) {
+  if (!input || typeof input !== 'object') throw new Error('No manual was sent.')
+  const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
+  const block = (x, n) => String(x ?? '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, n)
+  let chars = 0
+  const sections = (Array.isArray(input.sections) ? input.sections : []).slice(0, 400)
+    .map((s) => ({ title: line(s?.title, 200), items: (Array.isArray(s?.items) ? s.items : []).slice(0, 600).map((it) => ({ q: line(it?.q, 300), a: block(it?.a, 4000) })).filter((it) => it.q && it.a) }))
+    .filter((s) => s.title && s.items.length)
+    .map((s, i) => ({ n: i + 1, title: s.title, items: s.items }))
+  for (const s of sections) for (const it of s.items) chars += it.q.length + it.a.length
+  if (!sections.length) throw new Error('The manual had no readable sections.')
+  if (chars > MANUAL_MAX_CHARS) throw new Error(`The manual is too long for the assistant (about ${Math.round(chars / 1000)},000 characters; the limit is ${MANUAL_MAX_CHARS / 1000},000).`)
+  const name = line(input.name, 200) || 'Uploaded manual'
+  return { title: line(input.title, 120) || name.replace(/\.pdf$/i, ''), version: line(input.version, 80) || 'uploaded PDF', name, pages: Math.max(0, Math.floor(Number(input.pages) || 0)), sections, at: new Date().toISOString() }
+}
+const manualInfo = (m) => (m
+  ? { custom: true, title: m.title, version: m.version, name: m.name, pages: m.pages, at: m.at, sections: m.sections.length, entries: m.sections.reduce((n, s) => n + s.items.length, 0), sectionTitles: m.sections.map((s) => ({ n: s.n, title: s.title })) }
+  : { custom: false })
+
 export async function pollInbox(env) {
   // Only one check at a time: the schedule and the website can both ask, and two checks at once answered the same email twice.
   // Each check writes its own tag on the lock, waits a moment, and carries on only if its tag is still the one there.
@@ -79,6 +110,7 @@ export async function pollInbox(env) {
 
 async function pollOnce(env, stats) {
   const floor = await startedAt(env)
+  const corpus = await activeCorpus(env)
   stats.startedAt = new Date(floor).toISOString()
   const token = await accessToken(env)
   const me = env.BURNER_EMAIL.toLowerCase()
@@ -102,7 +134,7 @@ async function pollOnce(env, stats) {
       t = { id: m.threadId, subject: header(m, 'subject') || '(no subject)', customer: from, status: 'Open', createdAt: entry.at, replies: [entry] }
       if (!/no-?reply|mailer-daemon/i.test(from)) {
         // New conversation: decide who answers, then send the automatic email.
-        const res = await decide(env, t.subject, entry.text)
+        const res = await decide(env, t.subject, entry.text, { corpus })
         const name = (from.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || from
         const agent = AGENTS.find((a) => a.id === res.assignee)
         const reply = res.resolved ? res.answer + FOOTER : ackText(name, agent.name, res.urgent, res.sensitive, res.extra)
@@ -150,7 +182,17 @@ export default {
       if (url.pathname === '/suggest' && req.method === 'POST') {
         const input = await req.json()
         if (!input || typeof input !== 'object') return json({ error: 'Nothing to suggest a reply for' }, 400)
-        return json(await suggestReply(env, input))
+        return json(await suggestReply(env, input, { corpus: await activeCorpus(env) }))
+      }
+      if (url.pathname === '/manual') {
+        if (req.method === 'GET') return json(manualInfo(await env.TICKETS.get('manual', 'json')))
+        if (req.method === 'DELETE') { await env.TICKETS.delete('manual'); return json({ custom: false }) }
+        if (req.method === 'POST') {
+          let m
+          try { m = cleanManual(await req.json()) } catch (e) { return json({ error: e.message }, 400) }
+          await env.TICKETS.put('manual', JSON.stringify(m))
+          return json(manualInfo(m))
+        }
       }
       if (url.pathname === '/status' && req.method === 'GET') return json((await env.TICKETS.get('status', 'json')) || { never: true })
       const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)

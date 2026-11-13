@@ -246,3 +246,4 @@ mark.blank{background:#fff3bf;color:inherit;padding:0 3px;border-radius:3px;box-
 .auth-btn{width:100%;padding:10px}.btn:disabled,.upload.disabled{opacity:.6;cursor:default}
 .files .tr{grid-template-columns:minmax(0,2.5fr) 1fr .7fr auto auto}
 @media(max-width:820px){.files .tr{grid-template-columns:1fr auto auto}.files .tr.th{display:none}.files .tr>span{display:none}}
+.manual-use{margin:6px 0}

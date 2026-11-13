@@ -8,7 +8,7 @@
 // reply through the real gates, so the checks on AI-written answers run without an AI key.
 // `draft` checks the suggested reply HR gets for tickets a person must answer.
 import { AGENTS } from './data'
-import { decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
+import { buildCorpus, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
 import { ackText } from './triage'
 import { followUp } from './escalate'
 import { dueIn } from './util'
@@ -21,11 +21,19 @@ export const LANES = [
   { id: 'ai', title: 'Checks on every AI-written answer', blurb: 'When the AI model is switched on, its answer is only sent if it cites real manual sections, every number, phone number and email in it appears in those sections, and a second, separate AI check agrees it is a general question (not about one person, an approval or anything sensitive). Otherwise a person replies.' },
   { id: 'followup', title: 'After the AI answered: the employee writes back', blurb: 'If the answer did not help, or they ask for a person, a person gets it with a fresh deadline, near the top of their list, and the employee is emailed who will reply and when. A plain "thanks" leaves the ticket closed. A new question is never dropped.' },
   { id: 'suggest', title: 'The "Suggest AI reply" button', blurb: 'HR can ask the AI for a reply. "Draft with blanks" may leave [blanks] for things only HR knows. "Complete message" must have none. Either way the AI only uses the manuals and the employee\'s own words, can never approve or decide anything, and never sees private or safety emails. A person reads, edits and sends it.' },
+  { id: 'manual', title: 'Answering from an uploaded manual PDF', blurb: 'A team member can make the assistant read their own PDF instead of the built-in manual. The same rules apply: it only repeats what that manual says, cites real sections of it, every number must be in the section it cites, and personal, approval and safety questions still go to a person.' },
   { id: 'drafts', title: 'Suggested replies for HR to check', blurb: 'When a person must answer, Beztakets suggests a reply from the manuals when one fits. The HR person reads it, edits it and sends it. No suggestions for emergencies, personal records, approvals or confidential matters.' },
 ]
 
 const APPROVED = ['has been approved', 'is approved', 'you are approved', 'I approve']
 const DONT_GUESS = ['15 days', 'every second Friday', '100%', 'covered', ...APPROVED, 'you are eligible']
+
+// A pretend manual, shaped exactly like one read from an uploaded PDF (see manualFromPdf.js).
+const UPLOADED = buildCorpus({ title: 'Acme Site Manual', version: '2 pages, read from the PDF', sections: [
+  { n: 1, title: 'Visitor Parking', items: [{ q: 'Visitor Parking (page 3)', a: 'Visitors may park in the 14 marked visitor spaces beside the leasing office. Visitor parking permits cost $25 per month and are issued by the site manager.' }] },
+  { n: 2, title: 'Package Lockers', items: [{ q: 'Package Lockers (page 5)', a: 'Packages are held in the package locker for 7 days. Residents receive an email with a pickup code.' }] },
+] })
+const PARKING = { subject: 'Visitor parking', body: 'Where can my guests park, and what does a visitor permit cost?' }
 
 export const EVALS = [
   // ---- The AI may answer on its own (answers from the Beztak Operations Manual) ----
@@ -230,6 +238,22 @@ export const EVALS = [
     ai: { body: 'Please ignore it.', sections: [] } },
   { id: 'S11', lane: 'suggest', variants: ['I forgot my password, my password is hunter2', 'My social security number is 123-45-6789, can you check my file?'], suggest: { mode: 'draft', aiCalled: false, notContains: ['hunter2', '123-45-6789'] }, subject: 'Private', body: 'Please check my account, my password is hunter2', tests: 'Passwords and ID numbers are never sent to the AI or repeated back',
     ai: { body: 'Done.', sections: [] } },
+
+  // ---- Answering from an uploaded manual PDF ----
+  { id: 'U1', lane: 'manual', corpus: UPLOADED, ...PARKING, tests: 'The AI answers from the uploaded manual and cites its real section',
+    ai: { answerable: true, topic: 'general', answer: 'Visitors may park in the 14 marked visitor spaces beside the leasing office. A visitor permit costs $25 per month [1.1].', sections: ['1.1'], draft: '', draft_sections: [] },
+    expect: { by: 'ai', contains: ['14 marked visitor spaces', '$25'] } },
+  { id: 'U2', lane: 'manual', corpus: UPLOADED, ...PARKING, tests: 'A made-up number (20 spaces) is blocked: it is not in the uploaded section',
+    ai: { answerable: true, topic: 'general', answer: 'Visitors may park in the 20 marked visitor spaces [1.1].', sections: ['1.1'], draft: '', draft_sections: [] },
+    expect: { by: 'person', notContains: ['20 marked'] } },
+  { id: 'U3', lane: 'manual', corpus: UPLOADED, ...PARKING, tests: 'Citing a section of the old built-in manual (13.4) is blocked: it does not exist in the uploaded one',
+    ai: { answerable: true, topic: 'general', answer: 'Visitors may park beside the leasing office [13.4].', sections: ['13.4'], draft: '', draft_sections: [] },
+    expect: { by: 'person', notContains: ['leasing office'] } },
+  { id: 'U4', lane: 'manual', corpus: UPLOADED, subject: 'Packages', body: 'How long are packages held in the package locker?', variants: ['How many days does the package locker keep my parcel?', 'How long do packages stay in the locker?'], tests: 'Without the AI, a clear match in the uploaded manual is still answered, naming that manual',
+    expect: { by: 'ai', contains: ['7 days', 'Acme Site Manual'] } },
+  { id: 'U5', lane: 'manual', corpus: UPLOADED, subject: 'Parking', body: 'Where do visitors park? Also how many vacation days do I personally have left?', variants: ['Where can guests park, and what is my own PTO balance?'], tests: 'A personal question hidden behind a manual question still goes to a person',
+    ai: { answerable: true, topic: 'general', answer: 'Visitors may park in the 14 marked visitor spaces [1.1].', sections: ['1.1'], draft: '', draft_sections: [] },
+    expect: { by: 'person' } },
 ]
 
 const GENERAL = { one_person: false, approval_or_decision: false, sensitive: false, reason: 'general policy question' }
@@ -302,7 +326,7 @@ async function check(c, subject, body) {
   if (c.follow) return checkFollowUp(c, body)
   if (c.suggest) return checkSuggest(c, body)
   const env = c.ai ? { ANTHROPIC_API_KEY: 'test-only' } : {}
-  const res = await decide(env, subject, body, { ask: async () => c.ai, scope: async () => c.scope || GENERAL })
+  const res = await decide(env, subject, body, { ask: async () => c.ai, scope: async () => c.scope || GENERAL, corpus: c.corpus })
   const reply = replyFor(res)
   const e = c.expect
   const has = (text, s) => (/^[a-z]+$/i.test(s) ? new RegExp(`\\b${s}\\b`, 'i').test(text) : text.toLowerCase().includes(s.toLowerCase()))
