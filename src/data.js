@@ -96,13 +96,6 @@ export const SEED_TICKETS = [
   T(1009, 'Dental coverage for my kids', 'Does our dental plan cover orthodontics for my two kids?', 'Lena Park', 'Open', false, 'benefits', 'dana', 30, 'No ready answer. Routed to Benefits. Not urgent.', [ai('Hi Lena, thanks for contacting HR. We passed your message to Dana Whitfield. You can expect a reply within one business day.', d(29))], { tags: ['dental'] }),
 ]
 
-export const CANNED = [
-  { id: 1, name: 'Acknowledge receipt', text: "Hi {name},\n\nThanks for reaching out. I'm looking into this and will get back to you by the end of the next business day.\n\nBest,\n{agent}" },
-  { id: 2, name: 'Need more information', text: 'Hi {name},\n\nTo help with this I need a little more detail. Could you tell me the dates this applies to and any reference numbers you have?\n\nThanks,\n{agent}' },
-  { id: 3, name: 'Sent to payroll', text: 'Hi {name},\n\nI have asked our payroll team to review this. You will receive an update within two business days, and any correction will appear in your next paycheck.\n\nBest,\n{agent}' },
-  { id: 4, name: 'Resolved, closing', text: 'Hi {name},\n\nI am glad we could sort this out. I am closing this ticket, but reply to this email any time if you need anything else.\n\nBest,\n{agent}' },
-]
-
 export const SEED_DOCS = [
   { id: 1, name: 'Beztak Operations Manual (updated 09.28.2026).pdf', size: 4600000, addedAt: new Date().toISOString(), source: 'Beztak', text: 'Beztak Operations Manual, 56 pages: Management (rent collections, renewals, move-out, deposits, purchasing, petty cash, timecards, bonuses), Leasing & Marketing, Maintenance and Human Resources. Its policies are loaded into the assistant\'s answer bank, listed further down this page.' },
 ]

@@ -133,29 +133,6 @@ export function Documents({ docs, setDocs }) {
   )
 }
 
-export function Canned({ canned, setCanned }) {
-  const [name, setName] = useState('')
-  const [text, setText] = useState('')
-  const add = (e) => {
-    e.preventDefault()
-    setCanned([...canned, { id: Date.now(), name, text }])
-    setName(''); setText('')
-  }
-  return (
-    <section className="panel pad"><h2>Canned replies</h2>
-      <p className="mute">Saved replies you can insert into any ticket. <code>{'{name}'}</code> becomes the employee's first name and <code>{'{agent}'}</code> becomes your name.</p>
-      {canned.map((c) => (
-        <div key={c.id} className="kb"><div className="row between grow"><b>{c.name}</b><button className="link" onClick={() => setCanned(canned.filter((x) => x.id !== c.id))}>Delete</button></div><p className="pre">{c.text}</p></div>
-      ))}
-      <form className="kb" onSubmit={add}><b>Add a canned reply</b>
-        <input required placeholder="Name, e.g. Interview scheduling" value={name} onChange={(e) => setName(e.target.value)} />
-        <textarea required rows={4} placeholder="Hi {name}, …" value={text} onChange={(e) => setText(e.target.value)} />
-        <button className="btn primary" type="submit">Save reply</button>
-      </form>
-    </section>
-  )
-}
-
 export function Setup({ me, openGuardrails }) {
   return (
     <>

@@ -94,7 +94,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
   )
 }
 
-export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper, update, transfer, merge, toast, back }) {
+export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update, transfer, merge, toast, back }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
   const [tag, setTag] = useState('')
@@ -204,10 +204,6 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
                   <button type="button" className={tab === 'reply' ? 'on' : ''} onClick={() => setTab('reply')}>Reply</button>
                   <button type="button" className={tab === 'note' ? 'on' : ''} onClick={() => setTab('note')}>Private note</button>
                 </div>
-                <select className="canned" value="" onChange={(e) => { const c = canned.find((x) => String(x.id) === e.target.value); if (c) { setTab('reply'); setText(fill(c.text, t.customer, me)) } }}>
-                  <option value="">Insert canned reply…</option>
-                  {canned.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
               </div>
               <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer} (sent by email)…` : 'Only your team can see this…'} />
               <div className="row between">
