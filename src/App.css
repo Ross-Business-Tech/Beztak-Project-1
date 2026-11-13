@@ -199,7 +199,7 @@ textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px
 .ntools .search{width:200px}.tagfilter{width:auto}
 .nwrap{overflow-x:auto;border-top:1px solid var(--ngrid);background:var(--surface);-webkit-overflow-scrolling:touch}
 .ntable{min-width:1080px}
-.nrow{display:grid;grid-template-columns:minmax(240px,1fr) 96px 110px 150px 140px 190px 130px 140px;width:100%;background:var(--surface);border:0;border-bottom:1px solid var(--ngrid);padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.nrow{display:grid;align-items:stretch;grid-template-columns:minmax(240px,1fr) 96px 110px 150px 140px 190px 130px 140px;width:100%;background:var(--surface);border:0;border-bottom:1px solid var(--ngrid);padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;box-sizing:border-box}
 .nrow:hover:not(.nhead){background:var(--soft)}
 .nrow>span{display:flex;align-items:center;gap:6px;min-width:0;padding:7px 8px;border-right:1px solid var(--ngrid);font-size:14px;overflow:hidden;white-space:nowrap}
 .nrow>span:last-child{border-right:0}

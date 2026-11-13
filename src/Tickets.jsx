@@ -75,7 +75,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
             const adv = pendingAdviceFor(t, me).length > 0
             const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved').map((g) => TAG_NAMES[g] || g)].sort((a, b) => Number(!(a in TAG_COLORS)) - Number(!(b in TAG_COLORS)))
             return (
-              <button key={t.id} className="nrow" role="row" onClick={() => open(t.id)}>
+              <div key={t.id} className="nrow" role="row" tabIndex={0} onClick={() => open(t.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(t.id) } }}>
                 <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}{t.escalatedAt && t.status !== 'Closed' && <> · <span className="esc">{t.escalatedBecause === 'person' ? 'Asked for a person' : 'Employee follow-up'}</span></>}</small></span>
                 <span className="ncell" role="cell">{p.level === 5 ? <span className="mute">–</span> : <Label color={PRIO_COLOR[p.label]} title={p.why}>{p.label}</Label>}</span>
                 <span className="ncell" role="cell"><Label color={STATUS_COLOR[t.status]}>{t.status}</Label></span>
@@ -84,7 +84,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
                 <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={TAG_COLORS[g] || 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
                 <span className={`ncell ndue ${d?.cls || ''}`} role="cell">{d ? d.text : '–'}</span>
                 <span className="ncell" role="cell">{t.resolvedByAI ? <><Avatar name="AI agent" />AI agent</> : <><Avatar name={agentName(t.assignee)} />{t.assignee === me ? 'Me' : agentName(t.assignee)}</>}</span>
-              </button>
+              </div>
             )
           })}
         </div>
