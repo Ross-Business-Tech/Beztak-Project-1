@@ -151,10 +151,10 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
   const draft = owner && !t.resolvedByAI && !t.escalatedAt && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
   // "Suggest AI reply": the AI (through the email helper, which holds the key) writes a reply from the manuals for the HR
   // person to check. Without the helper it falls back to the closest manual answer. Nothing is ever sent automatically.
-  const suggest = async () => {
-    setSuggesting(true); setSuggestion(null)
+  const suggest = async (mode = suggestMode) => {
+    setSuggestMode(mode); setSuggesting(true)
     const input = {
-      subject: t.subject, body: t.body || '', mode: suggestMode, customer: t.customer, agent: agentName(me),
+      subject: t.subject, body: t.body || '', mode, customer: t.customer, agent: agentName(me),
       thread: t.replies.filter((m) => !m.event && !m.note && m.text).map((m) => ({ from: m.inbound ? 'employee' : 'hr', text: m.text })), // private notes are never included
     }
     let r = null
@@ -232,33 +232,36 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                   <button type="button" className={tab === 'note' ? 'on' : ''} onClick={() => setTab('note')}>Private note</button>
                 </div>
               </div>
-              {tab === 'reply' && (
+              {tab === 'reply' && !suggestion && !suggesting && (
                 <div className="suggest-bar">
-                  <div className="seg" role="group" aria-label="What kind of reply to suggest">
-                    <button type="button" className={suggestMode === 'draft' ? 'on' : ''} onClick={() => setSuggestMode('draft')}>Draft with blanks</button>
-                    <button type="button" className={suggestMode === 'complete' ? 'on' : ''} onClick={() => setSuggestMode('complete')}>Complete message</button>
-                  </div>
-                  <button type="button" className="btn" disabled={suggesting} onClick={suggest}>{suggesting ? 'The AI is writing…' : 'Suggest AI reply'}</button>
+                  <button type="button" className="btn sm" onClick={() => suggest()}>Suggest AI reply</button>
                 </div>
               )}
-              {suggestion && (
+              {(suggestion || suggesting) && (
                 <div className="draft-box suggest-box" role="status">
-                  {suggestion.ok
-                    ? (
-                      <>
-                        <b>AI suggestion: check it before sending</b>
-                        <small>{suggestion.note}</small>
-                        <p className="suggest-text">{suggestion.text.split(/(\[[^\]\n]{1,120}\])/).map((p, i) => (/^\[[^\]\n]+\]$/.test(p) ? <mark key={i} className="blank">{p}</mark> : p))}</p>
-                        <div className="row"><button type="button" className="btn primary" onClick={useSuggestion}>Use this</button><button type="button" className="btn" disabled={suggesting} onClick={suggest}>Try again</button><button type="button" className="btn" onClick={() => setSuggestion(null)}>Dismiss</button></div>
-                      </>
-                    )
-                    : (
-                      <>
-                        <b>No suggestion</b>
-                        <p>{suggestion.reason}</p>
-                        <div className="row">{suggestMode === 'complete' && <button type="button" className="btn" onClick={() => { setSuggestMode('draft'); setSuggestion(null) }}>Switch to “Draft with blanks”</button>}<button type="button" className="btn" onClick={() => setSuggestion(null)}>Dismiss</button></div>
-                      </>
-                    )}
+                  <div className="row between suggest-head">
+                    <b>AI suggestion: check it before sending</b>
+                    <div className="seg sm" role="group" aria-label="What kind of reply">
+                      <button type="button" disabled={suggesting} className={suggestMode === 'draft' ? 'on' : ''} onClick={() => suggestMode !== 'draft' && suggest('draft')}>Draft with blanks</button>
+                      <button type="button" disabled={suggesting} className={suggestMode === 'complete' ? 'on' : ''} onClick={() => suggestMode !== 'complete' && suggest('complete')}>Complete message</button>
+                    </div>
+                  </div>
+                  {suggesting
+                    ? <p className="mute">The AI is writing…</p>
+                    : suggestion.ok
+                      ? (
+                        <>
+                          <small>{suggestion.note}</small>
+                          <p className="suggest-text">{suggestion.text.split(/(\[[^\]\n]{1,120}\])/).map((p, i) => (/^\[[^\]\n]+\]$/.test(p) ? <mark key={i} className="blank">{p}</mark> : p))}</p>
+                          <div className="row"><button type="button" className="btn primary sm" onClick={useSuggestion}>Use this</button><button type="button" className="btn sm" onClick={() => suggest()}>Try again</button><button type="button" className="btn sm" onClick={() => setSuggestion(null)}>Dismiss</button></div>
+                        </>
+                      )
+                      : (
+                        <>
+                          <p>{suggestion.reason}</p>
+                          <div className="row"><button type="button" className="btn sm" onClick={() => setSuggestion(null)}>Dismiss</button></div>
+                        </>
+                      )}
                 </div>
               )}
               <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer} (sent by email)…` : 'Only your team can see this…'} />
