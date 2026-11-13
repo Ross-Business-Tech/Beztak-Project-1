@@ -17,7 +17,7 @@ export const FILES_BUCKET = 'team-files'
 // Turn Supabase errors into plain-language messages.
 export function friendlyError(error) {
   const m = (error?.message || '').toLowerCase()
-  if (m.includes('invalid login credentials')) return 'That email or password isn\'t right. Check with your team for the shared demo login.'
+  if (m.includes('invalid login credentials')) return 'That email or password isn\'t right. Check them again, or ask your team lead.'
   if (m.includes('email not confirmed')) return 'This account hasn\'t been confirmed yet. In Supabase, open the user and confirm it.'
   if (m.includes('failed to fetch') || m.includes('network')) return 'Can\'t reach the sign-in service. Check your internet connection, or the Supabase project may be paused (free projects pause after about a week without use).'
   if (m.includes('bucket not found')) return 'File storage isn\'t set up yet. Someone with access to Supabase needs to run supabase/setup.sql once.'

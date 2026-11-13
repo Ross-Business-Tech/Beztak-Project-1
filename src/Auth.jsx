@@ -41,7 +41,7 @@ function SignIn() {
         <label className="field">Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="btn primary auth-btn" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-        <p className="mute small">Demo: use the shared team login. New accounts can't be created from this page.</p>
+        <p className="mute small">Sign in with your own HR team account. New accounts can't be created from this page, so ask your team lead if you don't have one.</p>
       </form>
     </div>
   )

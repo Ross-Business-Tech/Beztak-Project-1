@@ -3,6 +3,14 @@ import { dueFrom } from './hours'
 // All sample data is made up.
 export const HR_ADDRESS = 'hr@examplecompany.com'
 
+// A login belongs to the HR person whose id or full name matches the start of the sign-in email:
+// dana@..., omar@... or dana.whitfield@... Anyone else (for example the old shared team login) has no desk of their own.
+export const agentForAccount = (email) => {
+  const local = String(email || '').toLowerCase().split('@')[0]
+  const letters = (x) => x.replace(/[^a-z]/g, '')
+  return AGENTS.find((a) => local === a.id || letters(local) === letters(a.name.toLowerCase())) || null
+}
+
 export const AGENTS = [
   { id: 'dana', name: 'Dana Whitfield', skill: 'Benefits', topics: ['benefits'] },
   { id: 'omar', name: 'Omar Haddad', skill: 'Payroll', topics: ['payroll'] },

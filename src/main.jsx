@@ -7,6 +7,6 @@ import AuthGate from './Auth.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthGate>{(auth) => <App {...auth} />}</AuthGate>
+    <AuthGate>{(auth) => <App key={auth.account} {...auth} />}</AuthGate>
   </StrictMode>,
 )

@@ -122,16 +122,16 @@ export function Documents({ docs, setDocs }) {
   )
 }
 
-export function Setup({ me, account, openGuardrails }) {
+export function Setup({ me, account, linked, openGuardrails }) {
   return (
     <>
       <section className="panel pad"><h2>For the project team: AI guardrails</h2>
         <p>The checks that prove the AI assistant only answers what it safely can, and hands everything else to a person. This is a back-office page, so it is not in the main menu.</p>
         <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>
       </section>
-      <section className="panel pad"><h2>Signing in (demo)</h2>
-        <p>You signed in with the shared demo account <b>{account}</b> (Supabase). Inside the desk you are acting as <b>{agentName(me)}</b>. The "Signed in as" menu at the top lets you try the team from each person's point of view, and each person only sees their own tickets and any ticket they were asked to advise on.</p>
-        <p className="mute small">Login and shared files use the team's demo Supabase project. Tickets are still stored only in this browser. Team members: {AGENTS.map((a) => a.name).join(', ')}.</p>
+      <section className="panel pad"><h2>Signing in</h2>
+        <p>You signed in as <b>{account}</b>, so you are <b>{agentName(me)}</b>{linked ? '' : ' (this login is not linked to an HR team member, so the desk is shown from the first team member\'s point of view)'}. Each person only sees their own tickets and any ticket they were asked to advise on.</p>
+        <p className="mute small">A login belongs to an HR team member when the start of the email matches their name (for example <b>omar@…</b> or <b>omar.haddad@…</b>). Team members: {AGENTS.map((a) => a.name).join(', ')}. Tickets are still stored only in this browser.</p>
       </section>
       <section className="panel pad"><h2>Email connection</h2>
         <p><span className="badge red">Not connected</span></p>
@@ -141,7 +141,7 @@ export function Setup({ me, account, openGuardrails }) {
   )
 }
 
-export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets, prefs, setPrefs, switchUser, account, signOut, reset, toast }) {
+export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets, prefs, setPrefs, account, linked, signOut, reset, toast }) {
   const a = agent(me)
   const mineAll = tickets.filter((t) => t.assignee === me)
   const open = mineAll.filter((t) => t.status !== 'Closed').length
@@ -221,9 +221,7 @@ export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets
         )}
       </section>
       <section className="panel pad"><h2>Account</h2>
-        <div className="setrow"><div><b>Signed in</b><p className="mute small">{account} (shared demo login)</p></div><button className="btn" onClick={signOut}>Sign out</button></div>
-        <p className="mute small">Switch to another team member to see the desk from their point of view (demo).</p>
-        <div className="choice">{AGENTS.filter((x) => x.id !== me).map((x) => <button key={x.id} onClick={() => switchUser(x.id)}>{x.name}</button>)}</div>
+        <div className="setrow"><div><b>Signed in as {account}</b><p className="mute small">You are {agentName(me)}{linked ? '' : '. This login is not linked to an HR team member, so you see the desk as the first team member. Sign in with your own account to see your own tickets.'}</p></div><button className="btn" onClick={signOut}>Sign out</button></div>
         <div className="setrow"><div><b>Reset sample data</b><p className="mute small">Puts tickets, replies and documents back to the starting examples.</p></div><button className="btn" onClick={reset}>Reset</button></div>
       </section>
     </>

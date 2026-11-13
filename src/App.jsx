@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AGENTS, SEED_DOCS, SEED_TICKETS } from './data'
+import { AGENTS, SEED_DOCS, SEED_TICKETS, agentForAccount } from './data'
 import { Dashboard, Documents, Profile, Setup } from './Pages'
 import GapTracker from './GapTracker'
 import Guardrails from './Guardrails'
@@ -24,9 +24,12 @@ const NAV = [
 ]
 
 export default function App({ account, signOut }) {
+  // Who you are comes from the account you signed in with. A login that is not linked to an HR person (the shared team login)
+  // views the desk as the first team member, and Profile says so.
+  const linked = agentForAccount(account)
+  const me = (linked || AGENTS[0]).id
   const [tickets, setTickets] = useState(() => store('hr-desk-tickets-v5', SEED_TICKETS))
   const [docs, setDocs] = useState(() => store('hr-desk-docs-v2', SEED_DOCS))
-  const [me, setMe] = useState(() => store('hr-desk-me', 'dana'))
   const [prefs, setPrefs] = useState(() => ({ theme: 'light', notify: true, ooo: false, ...store('hr-desk-prefs', {}) }))
   const [helper, setHelper] = useState(() => ({ url: DEFAULT_HELPER_URL, token: '', ...store('hr-desk-helper', {}) }))
   const [nav, setNav] = useState({ view: 'mine' })
@@ -36,7 +39,7 @@ export default function App({ account, signOut }) {
   const [openId, setOpenId] = useState(null)
   useEffect(() => { const f = () => { if (location.hash === '#guardrails') { setPage('guardrails'); setOpenId(null) } }; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f) }, [])
   const [toast, setToast] = useState('')
-  useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v5', JSON.stringify(tickets)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v2', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, me, docs, prefs, helper])
+  useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v5', JSON.stringify(tickets)); localStorage.setItem('hr-desk-docs-v2', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, docs, prefs, helper])
   useEffect(() => { document.documentElement.dataset.theme = prefs.theme }, [prefs.theme])
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 4500); return () => clearTimeout(id) }, [toast])
 
@@ -154,7 +157,6 @@ export default function App({ account, signOut }) {
     setToast(`Ticket #${src.id} merged into #${target.id}.`)
   }
   const go = (k) => { setPage(k); setOpenId(null) }
-  const switchUser = (id) => { setMe(id); setOpenId(null); setPage('tickets'); setToast(`Now signed in as ${agentName(id)} (demo).`) }
 
   return (
     <div className="shell">
@@ -168,11 +170,6 @@ export default function App({ account, signOut }) {
         <header className="topbar">
           <button className="profile-top" onClick={() => go('profile')} aria-label="My profile">{initials(agentName(me))}</button>
           <b className="title">Beztakets</b>
-          <div className="row">
-            <label className="me"><small>Signed in as</small>
-              <select value={me} onChange={(e) => switchUser(e.target.value)}>{AGENTS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
-            </label>
-          </div>
         </header>
         <div className="content">
           {page === 'tickets' && (openId
@@ -182,8 +179,8 @@ export default function App({ account, signOut }) {
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} />}
           {page === 'guardrails' && <Guardrails />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
-          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} account={account} signOut={signOut} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}); setToast('Sample data reset.') }} />}
-          {page === 'settings' && <Setup me={me} account={account} openGuardrails={() => go('guardrails')} />}
+          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} account={account} linked={Boolean(linked)} signOut={signOut} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}); setToast('Sample data reset.') }} />}
+          {page === 'settings' && <Setup me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
       {toast && <div className="toast" role="status" onClick={() => setToast('')}>{toast}</div>}
