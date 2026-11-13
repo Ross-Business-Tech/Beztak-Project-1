@@ -1,6 +1,5 @@
-import { URGENT_WORDS } from './data'
+import { mustGoToPerson } from './aiAgent'
 import { WORK } from './hours'
-import { triage } from './triage'
 import { agentName, dueIn } from './util'
 
 // What happens when an employee writes back after the AI already answered their question.
@@ -48,8 +47,9 @@ export function followUp(t, msgs, now = new Date()) {
   if (kind === 'thanks') return { kind, patch: { replies: [...t.replies, ...incoming] }, confirmation: null }
 
   const text = msgs.map((m) => m.text).join('\n')
-  const safety = triage(t.subject, text) // the same safety words as for a new email
-  const urgent = Boolean(t.urgent || safety.urgent || (!safety.resolved && safety.sensitive) || URGENT_WORDS.some((w) => clean(text).includes(w)))
+  // The same safety rules as for a new email decide whether this is urgent. Saying "urgent" or "asap" does not count.
+  const safety = mustGoToPerson(t.subject, text) || { resolved: true }
+  const urgent = Boolean(t.urgent || safety.urgent)
   const at = now.toISOString()
   const dueAt = dueIn(urgent, now)
   const who = agentName(t.assignee)

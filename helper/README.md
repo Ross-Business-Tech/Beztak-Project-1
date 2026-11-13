@@ -19,6 +19,12 @@ simple keyword answers.
 - Only one inbox check runs at a time, so the same email is never answered twice.
 - The website only turns emails into tickets if they arrived after that browser was connected (reconnecting starts the clock again), and the website never sends automatic emails itself.
 
+## Suggest AI reply
+The website's "Suggest AI reply" button on a ticket calls the helper at `/suggest`, because the AI key lives here.
+It needs the newest `worker.js` and the `ANTHROPIC_API_KEY` secret. Without them the button still works but offers the closest
+manual answer or a template with [blanks] instead of an AI-written reply. Personal, approval and safety emails are never
+sent to the AI.
+
 ## How an email is handled
 1. Safety rules first: emergencies, personal records, pay disputes, approvals, confidential matters,
    legal or medical questions, and anything containing passwords or ID numbers always go to a person.

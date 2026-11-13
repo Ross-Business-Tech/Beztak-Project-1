@@ -1,7 +1,7 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { decide, FOOTER } from '../../src/aiAgent.js'
+import { decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
 import { ackText } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
 
@@ -145,6 +145,12 @@ export default {
         if (url.searchParams.get('refresh')) await pollInbox(env)
         const ids = (await env.TICKETS.get('index', 'json')) || []
         return json((await Promise.all(ids.map((i) => getTicket(env, i)))).filter(Boolean))
+      }
+      // "Suggest AI reply" on a ticket: the website sends the ticket text, the AI (key kept here) writes a suggestion for HR to check.
+      if (url.pathname === '/suggest' && req.method === 'POST') {
+        const input = await req.json()
+        if (!input || typeof input !== 'object') return json({ error: 'Nothing to suggest a reply for' }, 400)
+        return json(await suggestReply(env, input))
       }
       if (url.pathname === '/status' && req.method === 'GET') return json((await env.TICKETS.get('status', 'json')) || { never: true })
       const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)

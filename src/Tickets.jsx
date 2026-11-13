@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
-import { manualDraft } from './aiAgent'
+import { manualDraft, suggestReply } from './aiAgent'
 import { WORK } from './hours'
 import { helperCall } from './helper'
 import { agentName, ago, byUrgency, dueInfo, fill, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
@@ -20,6 +20,8 @@ const PRIO_COLOR = { Critical: 'red solid', High: 'red', Medium: 'orange', Norma
 export const Label = ({ color = 'gray', children, title }) => <span className={`nl ${color}`} title={title}>{children}</span>
 
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
+// Blanks left in a reply: [like this], {like this} or TBD. A reply with blanks cannot be sent.
+const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
 const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up' }
 const TAG_COLORS = { 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange' }
 export const VIEW_NAMES = { mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
@@ -103,6 +105,9 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
   const [mergeId, setMergeId] = useState('')
   const [answers, setAnswers] = useState({})
   const [hideDraft, setHideDraft] = useState(false)
+  const [suggestMode, setSuggestMode] = useState('draft') // 'draft' (with [blanks]) or 'complete' (no blanks)
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestion, setSuggestion] = useState(null)
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← {backLabel}</button></>
 
   const owner = t.assignee === me
@@ -114,6 +119,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
   const send = async (e) => {
     e.preventDefault()
     if (!text.trim()) return
+    if (tab === 'reply' && BLANKS_LEFT.test(text)) { toast('Fill in every [blank] before sending. The blanks are the parts in square brackets.'); return }
     if (tab === 'reply' && t.threadId && helper?.token) {
       try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text }) }) } catch (err) { toast(`Email not sent: ${err.message}`); return }
     }
@@ -143,6 +149,27 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
   // Human in the loop: a suggested reply the HR person checks, edits and sends. Never sent on its own.
   const personReplied = t.replies.some((m) => m.email && !m.ai && !m.inbound)
   const draft = owner && !t.resolvedByAI && !t.escalatedAt && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
+  // "Suggest AI reply": the AI (through the email helper, which holds the key) writes a reply from the manuals for the HR
+  // person to check. Without the helper it falls back to the closest manual answer. Nothing is ever sent automatically.
+  const suggest = async () => {
+    setSuggesting(true); setSuggestion(null)
+    const input = {
+      subject: t.subject, body: t.body || '', mode: suggestMode, customer: t.customer, agent: agentName(me),
+      thread: t.replies.filter((m) => !m.event && !m.note && m.text).map((m) => ({ from: m.inbound ? 'employee' : 'hr', text: m.text })), // private notes are never included
+    }
+    let r = null
+    if (helper?.token && helper?.url) { try { r = await helperCall(helper, '/suggest', { method: 'POST', body: JSON.stringify(input) }) } catch { r = null } }
+    if (!r || typeof r.ok !== 'boolean') {
+      r = await suggestReply({}, input)
+      const why = 'The AI is not available right now (the email helper is not connected, or it needs updating).'
+      if (r.ok) r.note = `${why} ${r.note}`; else r.reason = `${why} ${r.reason}`
+    }
+    setSuggestion(r); setSuggesting(false)
+  }
+  const useSuggestion = () => {
+    if (text.trim() && !window.confirm('Replace what you have written so far?')) return
+    setTab('reply'); setText(suggestion.text); setSuggestion(null)
+  }
   const useDraft = () => { setTab('reply'); setText(fill(`Hi {name},\n\n${draft.text.replace(/\s*\[[^\]]+\]/g, '')}\n\nBest,\n{agent}`, t.customer, me)) }
 
   return (
@@ -205,6 +232,35 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                   <button type="button" className={tab === 'note' ? 'on' : ''} onClick={() => setTab('note')}>Private note</button>
                 </div>
               </div>
+              {tab === 'reply' && (
+                <div className="suggest-bar">
+                  <div className="seg" role="group" aria-label="What kind of reply to suggest">
+                    <button type="button" className={suggestMode === 'draft' ? 'on' : ''} onClick={() => setSuggestMode('draft')}>Draft with blanks</button>
+                    <button type="button" className={suggestMode === 'complete' ? 'on' : ''} onClick={() => setSuggestMode('complete')}>Complete message</button>
+                  </div>
+                  <button type="button" className="btn" disabled={suggesting} onClick={suggest}>{suggesting ? 'The AI is writing…' : 'Suggest AI reply'}</button>
+                </div>
+              )}
+              {suggestion && (
+                <div className="draft-box suggest-box" role="status">
+                  {suggestion.ok
+                    ? (
+                      <>
+                        <b>AI suggestion: check it before sending</b>
+                        <small>{suggestion.note}</small>
+                        <p className="suggest-text">{suggestion.text.split(/(\[[^\]\n]{1,120}\])/).map((p, i) => (/^\[[^\]\n]+\]$/.test(p) ? <mark key={i} className="blank">{p}</mark> : p))}</p>
+                        <div className="row"><button type="button" className="btn primary" onClick={useSuggestion}>Use this</button><button type="button" className="btn" disabled={suggesting} onClick={suggest}>Try again</button><button type="button" className="btn" onClick={() => setSuggestion(null)}>Dismiss</button></div>
+                      </>
+                    )
+                    : (
+                      <>
+                        <b>No suggestion</b>
+                        <p>{suggestion.reason}</p>
+                        <div className="row">{suggestMode === 'complete' && <button type="button" className="btn" onClick={() => { setSuggestMode('draft'); setSuggestion(null) }}>Switch to “Draft with blanks”</button>}<button type="button" className="btn" onClick={() => setSuggestion(null)}>Dismiss</button></div>
+                      </>
+                    )}
+                </div>
+              )}
               <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer} (sent by email)…` : 'Only your team can see this…'} />
               <div className="row between">
                 <small className="mute">{tab === 'reply' ? `To: ${t.email}` : 'Not sent to the employee'}</small>

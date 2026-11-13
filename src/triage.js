@@ -1,4 +1,4 @@
-import { AGENTS, ESCALATIONS, KNOWLEDGE, SENSITIVE_WORDS, TOPIC_LABELS, TOPIC_WORDS, URGENT_WORDS } from './data'
+import { AGENTS, ESCALATIONS, KNOWLEDGE, SELF_URGENT, SENSITIVE_WORDS, TOPIC_LABELS, TOPIC_WORDS, URGENT_WORDS } from './data'
 
 // Stand-in for the AI agent. It reads an incoming HR email and decides:
 // 1) can I answer this myself? 2) if not, who should handle it? 3) is it urgent?
@@ -9,13 +9,15 @@ export function triage(subject, body) {
   const sensitive = SENSITIVE_WORDS.find((w) => text.includes(w))
   const urgentHits = URGENT_WORDS.filter((w) => text.includes(w))
   const urgent = urgentHits.length > 0
+  // A sender calling their own email urgent changes nothing; HR is only told that they said it.
+  const claim = !urgent && SELF_URGENT.test(text) ? ' The sender called it urgent, but urgency is set by our rules, not by the sender.' : ''
 
   // 1. Questions that must always go to a person, with the reason why.
   const esc = ESCALATIONS.find((e) => e.test.test(text))
   if (esc) {
     const agent = AGENTS.find((a) => a.topics.includes(esc.topic))
     return { resolved: false, topic: esc.topic, urgent, assignee: agent.id, sensitive: true, reason: esc.reason, extra: esc.extra, tags: [esc.tag],
-      note: `Not answered automatically: ${esc.reason}. Routed to ${agent.skill}. ` + (urgent ? `Marked urgent: "${urgentHits[0]}".` : 'Not urgent.') }
+      note: `Not answered automatically: ${esc.reason}. Routed to ${agent.skill}. ` + (urgent ? `Marked urgent: "${urgentHits[0]}".` : 'Not urgent.') + claim }
   }
 
   const hit = !sensitive && KNOWLEDGE.find((k) => k.keys.some((w) => text.includes(w)))
@@ -37,7 +39,7 @@ export function triage(subject, body) {
     ? `Sensitive subject ("${sensitive}"): the assistant never answers these, a person handles it. `
     : `No ready answer. `) +
     `Routed to ${agent.skill}${best || sensitive ? '' : ' (no clear topic)'}. ` +
-    (urgent ? `Marked urgent: "${urgentHits[0]}".` : 'Not urgent.')
+    (urgent ? `Marked urgent: "${urgentHits[0]}".` : 'Not urgent.') + claim
   return { resolved: false, topic, urgent, assignee: agent.id, note, sensitive: Boolean(sensitive) }
 }
 

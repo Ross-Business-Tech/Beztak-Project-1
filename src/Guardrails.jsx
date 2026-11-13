@@ -37,7 +37,7 @@ export default function Guardrails() {
                 {open === r.id && (
                   <div className="gr-body">
                     {r.ai && <p className="small"><b>Pretend AI answer:</b> {r.ai.answer || '(the AI said it could not answer)'}</p>}
-                    <p className="small"><b>{r.follow ? (r.res.followKind === 'thanks' ? 'Stays closed' : `Handed to ${agentName(r.res.assignee)}`) : r.res.resolved ? 'Answered by the AI' : `Handed to ${agentName(r.res.assignee)}`}</b>{r.res.urgent ? ' · urgent' : ''}{(r.res.tags || []).length ? ` · ${r.res.tags.join(', ')}` : ''}</p>
+                    <p className="small"><b>{r.res.label || (r.res.resolved ? 'Answered by the AI' : `Handed to ${agentName(r.res.assignee)}`)}</b>{r.res.urgent ? ' · urgent' : ''}{(r.res.tags || []).length ? ` · ${r.res.tags.join(', ')}` : ''}</p>
                     <p className="small mute">{r.res.note}</p>
                     <p className="gr-reply">{r.reply}</p>
                     {r.res.draft && <p className="small"><b>Suggested reply for HR ({r.res.draft.refs.join(', ')}):</b> {r.res.draft.text}</p>}
@@ -47,7 +47,7 @@ export default function Guardrails() {
                         <p className="small"><b>Same question, other wordings</b></p>
                         <ul className="gr-words">
                           {r.wordings.map((w) => (
-                            <li key={w.body}><span className={w.pass ? 'ok' : 'bad'}>{w.pass ? '✔' : '✖'}</span> “{w.body}”<small> → {r.follow ? (w.res.followKind === 'thanks' ? 'stays closed' : `handed to ${agentName(w.res.assignee)}`) : w.res.resolved ? 'answered by the AI' : `handed to ${agentName(w.res.assignee)}`}</small>
+                            <li key={w.body}><span className={w.pass ? 'ok' : 'bad'}>{w.pass ? '✔' : '✖'}</span> “{w.body}”<small> → {(w.res.label || (w.res.resolved ? 'answered by the AI' : `handed to ${agentName(w.res.assignee)}`)).toLowerCase()}</small>
                               {w.problems.map((p) => <small key={p} className="gr-prob"> · {p}</small>)}</li>
                           ))}
                         </ul>
