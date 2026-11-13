@@ -1,5 +1,5 @@
 import { KNOWLEDGE, TOPIC_LABELS } from './data'
-import { SECTIONS as OPS } from './data/opsManual.js'
+import { SECTIONS as OPS } from './data/beztakManual.js'
 
 // Turns the HR desk's tickets into the question records the Manual Gap Tracker reads.
 // This is the single place that defines how "what the AI agent handled" becomes "a question".

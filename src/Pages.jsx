@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { AGENTS, ESCALATIONS, HR_ADDRESS, KNOWLEDGE, TOPIC_LABELS } from './data'
-import { ackText, topicLabel, triage } from './triage'
+import { ackText, topicLabel } from './triage'
+import { BROWSER_AI, decide, FOOTER } from './aiAgent'
+import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
 
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
@@ -10,23 +12,28 @@ export function Compose({ tickets, onClose, onCreate }) {
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [busy, setBusy] = useState(false)
   const answerable = [
-    ['How many vacation days do I get?', 'Hi, how many vacation days do I get per year?'],
+    ['How does PTO work?', 'Hi, how many vacation days do I get per year?'],
     ['When is payday?', 'When do I get paid this month? What is the pay schedule?'],
-    ['401(k) match', 'Does the company match 401k contributions?'],
-    ['Open enrollment dates', 'When is open enrollment for health insurance?'],
-    ['Dress code', 'What is the dress code and the work from home policy?'],
+    ['Paid holidays', 'Which holidays are paid?'],
+    ['Calling in sick', 'I need to call in sick tomorrow, what do I do?'],
+    ['Dress code', 'What is the dress code?'],
   ]
   const personal = ESCALATIONS.map((e) => [e.example, e.example])
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    const r = triage(subject, body)
+    // Same decision the email helper makes for real emails (safety rules, then answers or a person).
+    if (busy) return
+    setBusy(true)
+    const r = await decide(BROWSER_AI, subject, body)
+    setBusy(false)
     const now = new Date().toISOString()
-    const text = r.resolved ? r.answer : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
+    const text = r.resolved ? r.answer + FOOTER : ackText(name, agentName(r.assignee), r.urgent, r.sensitive, r.extra)
     onCreate({
       id: Math.max(1000, ...tickets.map((x) => x.id)) + 1, subject, body, customer: name || 'Employee',
       email: email || 'employee@examplecompany.com', status: r.resolved ? 'Closed' : 'Open', urgent: r.urgent,
-      topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note,
+      topic: r.topic, assignee: r.assignee, createdAt: now, resolvedByAI: r.resolved, channel: 'Email', note: r.note, draft: r.draft || undefined,
       tags: [...(r.resolved ? ['ai-resolved'] : []), ...(r.tags || (r.sensitive ? ['sensitive'] : []))],
       replies: [{ from: 'HR Assistant (automated)', text, at: now, email: true, ai: true }],
     })
@@ -46,7 +53,7 @@ export function Compose({ tickets, onClose, onCreate }) {
         <label>From (email)<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="alex.kim@examplecompany.com" /></label>
         <label>Subject<input required value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
         <label>Message<textarea required rows={4} value={body} onChange={(e) => setBody(e.target.value)} /></label>
-        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" type="submit">Create ticket</button></div>
+        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" type="submit" disabled={busy}>{busy ? 'The AI is reading the email…' : 'Create ticket'}</button></div>
       </form>
     </div>
   )
@@ -103,14 +110,24 @@ export function Documents({ docs, setDocs }) {
       </section>
       <section className="panel pad"><h3>Egnyte</h3>
         <p><span className="badge red">Not connected</span></p>
-        <p className="mute">Documents stored in Egnyte will be listed here once the connection is set up. Until then the assistant does not read uploaded documents: its replies come from the fixed answers below.</p>
+        <p className="mute">Documents stored in Egnyte will be listed here once the connection is set up. The assistant does not read uploaded documents yet: it answers only from the answer bank below.</p>
       </section>
       <section className="panel pad"><h3>Never answered automatically</h3>
         <p className="mute">These always go to a person, with the reason recorded on the ticket.</p>
         {ESCALATIONS.map((e) => <div key={e.id} className="kb"><b>{e.example}</b><span className="mute small">{e.reason}</span></div>)}
       </section>
-      <section className="panel pad"><h3>Fixed answers used for automatic replies</h3>
-        {KNOWLEDGE.map((k) => <div key={k.keys[0]} className="kb"><span className="badge grey">{topicLabel(k.topic)}</span><b>Triggers on: {k.keys.join(', ')}</b><p>{k.answer}</p></div>)}
+      <section className="panel pad"><h3>What the assistant answers from</h3>
+        <p className="mute">The assistant only answers from these, and cites the entry it used. Anything else goes to a person.</p>
+        <details className="bank" open><summary><b>HR answers</b> <span className="nl blue">{KNOWLEDGE.length} answers</span> <span className="mute small">Short answers to common questions, used even when the AI is not connected</span></summary>
+          {KNOWLEDGE.map((k, i) => <div key={k.keys[0]} className="kb"><span className="nl gray">HR-{i + 1} · {topicLabel(k.topic)}</span><p>{k.answer}</p></div>)}
+        </details>
+        <details className="bank"><summary><b>{MANUAL.title}</b> <span className="nl purple">{SECTIONS.reduce((n, x) => n + x.items.length, 0)} answers</span> <span className="mute small">{MANUAL.version}. Used when the AI is connected, and for suggested replies</span></summary>
+          {SECTIONS.map((sec) => (
+            <details key={sec.n} className="bank-sec"><summary>{sec.n}. {sec.title} <span className="mute small">({sec.items.length})</span></summary>
+              {sec.items.map((it, i) => <div key={it.q} className="kb"><span className="nl gray">{sec.n}.{i + 1}</span><b>{it.q}</b><p className="pre">{it.a}</p></div>)}
+            </details>
+          ))}
+        </details>
       </section>
     </>
   )
@@ -139,9 +156,13 @@ export function Canned({ canned, setCanned }) {
   )
 }
 
-export function Setup({ me }) {
+export function Setup({ me, openGuardrails }) {
   return (
     <>
+      <section className="panel pad"><h2>For the project team: AI guardrails</h2>
+        <p>The checks that prove the AI assistant only answers what it safely can, and hands everything else to a person. This is a back-office page, so it is not in the main menu.</p>
+        <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>
+      </section>
       <section className="panel pad"><h2>Signing in (demo)</h2>
         <p>You are signed in as <b>{agentName(me)}</b>. The "Signed in as" menu at the top lets you try the team from each person's point of view, and each person only sees their own tickets and any ticket they were asked to advise on.</p>
         <p className="mute small">This is a demo: there are no real accounts or passwords yet, and tickets are stored only in this browser. Real private logins and shared tickets need a server, which is a setup step for your instructor. Team members: {AGENTS.map((a) => a.name).join(', ')}.</p>

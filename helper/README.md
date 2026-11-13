@@ -13,9 +13,17 @@ lets the AI agent answer what it safely can (sent by email), and sends replies w
 and, to turn the AI on, `ANTHROPIC_API_KEY`. Without that last one the helper still works and uses the
 simple keyword answers.
 
+## The website uses the same AI
+The "Simulate email" button on the website calls the same AI through a here.now proxy route
+(`public/.herenow/proxy.json`). here.now adds the key on its server, so it never reaches the browser.
+Your instructor adds a variable named `ANTHROPIC_API_KEY` in here.now (on the workspace for the public site
+and on the account that hosts the dev sites). Until then the website uses the simple rules.
+
 ## How an email is handled
 1. Safety rules first: emergencies, personal records, pay disputes, approvals, confidential matters,
    legal or medical questions, and anything containing passwords or ID numbers always go to a person.
 2. With an AI key: the AI answers only from the HR answers plus the Operations Manual and must cite sections.
-   If unsure, a person takes over.
+   Every number, phone number and email in the answer must appear in the cited sections, and a second AI
+   check must agree it is a general question (not about one person, an approval, or anything sensitive).
+   If not, a person takes over and gets a suggested reply to check, edit and send.
 3. Everything else gets a short "we passed this to ..." email.

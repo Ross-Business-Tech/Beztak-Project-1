@@ -4,7 +4,7 @@ import { sampleHistory, ticketsToRows } from './gapRows'
 // "Manual gaps": the Manual Gap Tracker, fed live by this desk's tickets.
 // The tracker is a separate page (public/gap-tracker) shown seamlessly in this page: it has no frame,
 // header or sidebar of its own, it uses this app's colours, and its tabs are the tabs below.
-const VIEWS = [['overview', 'Overview'], ['fixes', 'Fix list'], ['results', 'Results'], ['manual', 'Manual health'], ['reports', 'Reports']]
+const VIEWS = [['overview', 'Overview'], ['fixes', 'Fix list'], ['results', 'Results'], ['manual', 'Manual health'], ['reports', 'Monthly report']]
 const TOKENS = { '--bg': '--bg', '--surface': '--surface', '--surface-2': '--soft', '--line': '--line', '--ink': '--ink', '--ink-3': '--mute', '--accent': '--prim', '--brand': '--prim' }
 
 const themeMessage = () => {

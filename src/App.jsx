@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { AGENTS, CANNED, SEED_DOCS, SEED_TICKETS } from './data'
 import { Canned, Compose, Dashboard, Documents, Profile, Setup } from './Pages'
 import GapTracker from './GapTracker'
-import { Detail, List } from './Tickets'
+import Guardrails from './Guardrails'
+import { Detail, List, VIEW_NAMES } from './Tickets'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
@@ -22,18 +23,21 @@ const NAV = [
 ]
 
 export default function App() {
-  const [tickets, setTickets] = useState(() => store('hr-desk-tickets-v4', SEED_TICKETS))
+  const [tickets, setTickets] = useState(() => store('hr-desk-tickets-v5', SEED_TICKETS))
   const [canned, setCanned] = useState(() => store('hr-desk-canned-v1', CANNED))
-  const [docs, setDocs] = useState(() => store('hr-desk-docs-v1', SEED_DOCS))
+  const [docs, setDocs] = useState(() => store('hr-desk-docs-v2', SEED_DOCS))
   const [me, setMe] = useState(() => store('hr-desk-me', 'dana'))
   const [prefs, setPrefs] = useState(() => ({ theme: 'light', notify: true, ooo: false, ...store('hr-desk-prefs', {}) }))
   const [helper, setHelper] = useState(() => ({ url: DEFAULT_HELPER_URL, token: '', ...store('hr-desk-helper', {}) }))
-  const [nav, setNav] = useState({ tab: 'human', view: 'mine' })
-  const [page, setPage] = useState('tickets')
+  const [nav, setNav] = useState({ view: 'mine' })
+  // Guardrails is a back-office page for the project team: not in the menu, opened from Setup or /#guardrails.
+  const [page, setPage] = useState(() => (location.hash === '#guardrails' ? 'guardrails' : 'tickets'))
+  useEffect(() => { if (page !== 'guardrails' && location.hash === '#guardrails') history.replaceState(null, '', location.pathname + location.search) }, [page])
   const [openId, setOpenId] = useState(null)
   const [composing, setComposing] = useState(false)
+  useEffect(() => { const f = () => { if (location.hash === '#guardrails') { setPage('guardrails'); setOpenId(null) } }; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f) }, [])
   const [toast, setToast] = useState('')
-  useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v4', JSON.stringify(tickets)); localStorage.setItem('hr-desk-canned-v1', JSON.stringify(canned)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v1', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, canned, me, docs, prefs, helper])
+  useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v5', JSON.stringify(tickets)); localStorage.setItem('hr-desk-canned-v1', JSON.stringify(canned)); localStorage.setItem('hr-desk-me', JSON.stringify(me)); localStorage.setItem('hr-desk-docs-v2', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, canned, me, docs, prefs, helper])
   useEffect(() => { document.documentElement.dataset.theme = prefs.theme }, [prefs.theme])
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 4500); return () => clearTimeout(id) }, [toast])
 
@@ -71,8 +75,8 @@ export default function App() {
             const now = new Date().toISOString()
             created.unshift({
               id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,
-              status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent),
-              resolvedByAI: res.resolved, channel: 'Email', note: res.note, advice: [],
+              status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent, inbound[0].at),
+              resolvedByAI: res.resolved, channel: 'Email', note: res.note, advice: [], draft: res.draft || undefined,
               tags: [...(res.resolved ? ['ai-resolved'] : []), ...(res.tags || (res.sensitive ? ['sensitive'] : []))],
               replies: [{ from: 'HR Assistant (automated)', text: reply, at: now, email: true, ai: true }, ...inbound.slice(1).map((m) => ({ inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId }))],
             })
@@ -147,14 +151,15 @@ export default function App() {
         </header>
         <div className="content">
           {page === 'tickets' && (openId
-            ? <Detail backLabel={{ human: 'Tickets', ai: 'AI answered', all: 'All tickets' }[nav.tab]} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
+            ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} />}
+          {page === 'guardrails' && <Guardrails />}
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
           {page === 'profile' && <Profile helper={helper} setHelper={setHelper} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
-          {page === 'settings' && <Setup me={me} />}
+          {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
       {composing && <Compose tickets={tickets} onClose={() => setComposing(false)} onCreate={onCreate} />}

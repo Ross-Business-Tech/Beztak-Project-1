@@ -1,90 +1,93 @@
 import { useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
+import { manualDraft } from './aiAgent'
+import { WORK } from './hours'
 import { helperCall } from './helper'
-import { agentName, ago, dueInfo, fill, initials, pendingAdviceFor, toLocalInput } from './util'
+import { agentName, ago, byUrgency, dueInfo, fill, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
 
 const STATUSES = ['Open', 'In progress', 'On hold', 'Closed']
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
 
-export const Prio = ({ urgent }) => <span className={`badge ${urgent ? 'red' : 'grey'}`}>{urgent ? 'Urgent' : 'Normal'}</span>
-export const Status = ({ s }) => <span className={`badge st-${s.replace(' ', '')}`}>{s}</span>
+export const Prio = ({ t }) => { const p = priorityOf(t); return <span className={`nl ${({ Critical: 'red solid', High: 'red', Medium: 'orange' })[p.label] || 'gray'}`} title={p.why}>{p.label}</span> }
+export const Status = ({ s }) => <span className={`nl ${({ Open: 'blue', 'In progress': 'yellow', 'On hold': 'gray', Closed: 'green' })[s] || 'gray'}`}>{s}</span>
 export const Avatar = ({ name }) => <span className="avatar">{initials(name)}</span>
 const Due = ({ t }) => { const d = dueInfo(t); return d ? <span className={`badge ${d.cls}`}>{d.text}</span> : <span className="mute">–</span> }
 
+const TOPIC_COLOR = { benefits: 'purple', payroll: 'green', timeoff: 'blue', onboarding: 'orange', relations: 'pink', general: 'gray' }
+const STATUS_COLOR = { Open: 'blue', 'In progress': 'yellow', 'On hold': 'gray', Closed: 'green' }
+const PRIO_COLOR = { Critical: 'red solid', High: 'red', Medium: 'orange', Normal: 'gray', Closed: 'gray' }
+export const Label = ({ color = 'gray', children, title }) => <span className={`nl ${color}`} title={title}>{children}</span>
+
+// The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
+export const VIEW_NAMES = { mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
+
 export function List({ tickets, me, open, reset, nav, setNav }) {
-  // The tab and view live in App so they survive opening a ticket and coming back.
-  const { tab, view } = nav
-  const setTab = (t) => setNav({ ...nav, tab: t })
+  // The view lives in App so it survives opening a ticket and coming back.
+  const { view } = nav
   const setView = (v) => setNav({ ...nav, view: v })
+  const [tag, setTag] = useState('')
   const [q, setQ] = useState('')
   const live = (t) => t.status !== 'Closed'
   const human = tickets.filter((t) => !t.resolvedByAI)
-  const aiDone = tickets.filter((t) => t.resolvedByAI)
   const owned = human.filter((t) => t.assignee === me)
-  const tags = [...new Set(human.flatMap((t) => t.tags || []))].sort()
-  const views = [
-    ['mine', 'My open tickets', owned.filter(live)],
-    ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length)],
-    ['due', 'Due soon / overdue', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls))],
-    ['urgent', 'Urgent', owned.filter((t) => live(t) && t.urgent)],
-    ['closed', 'Closed', owned.filter((t) => !live(t))],
-    ['all', 'All my tickets', human],
+  const tags = [...new Set(tickets.flatMap((t) => t.tags || []))].sort()
+  const VIEWS = [
+    ['mine', 'My open tickets', owned.filter(live), 'Tickets a person needs to answer, most urgent first.'],
+    ['due', 'Due soon', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)), 'Overdue or due within 4 work hours.'],
+    ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length), 'Teammates asked for your advice on these.'],
+    ['closed', 'Closed', owned.filter((t) => !live(t)), 'Tickets you have closed.'],
+    ['ai', 'Answered automatically', tickets.filter((t) => t.resolvedByAI), 'Answered automatically from the Beztak manual (by the AI when it is connected) and closed. Open one to read the reply that was sent.'],
+    ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
-  const tagView = view.startsWith('tag:') ? view.slice(4) : null
-  const found = views.find((v) => v[0] === view)
-  const current = tab === 'ai' ? aiDone : tab === 'all' ? tickets : tagView ? human.filter((t) => (t.tags || []).includes(tagView)) : (found || views[0])[2]
-  const label = tab === 'ai' ? 'AI answered tickets' : tab === 'all' ? 'All tickets' : tagView ? `Tag: ${tagView}` : (found || views[0])[1]
+  const [, , list, note] = VIEWS.find((v) => v[0] === view) || VIEWS[0]
   const text = q.trim().toLowerCase()
-  const byNewest = (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  const rows = current.filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort(tab === 'human' ? (a, b) => new Date(a.dueAt) - new Date(b.dueAt) || b.id - a.id : byNewest)
-    .sort(tab === 'human' ? (a, b) => Number(live(b)) - Number(live(a)) : () => 0)
-  const TABS = [['human', 'Tickets', human.filter(live).length], ['ai', 'AI answered', aiDone.length], ['all', 'All tickets', tickets.length]]
+  const rows = list
+    .filter((t) => !tag || (t.tags || []).includes(tag))
+    .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
+    .sort(view === 'ai' || view === 'all' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
 
   return (
     <>
-      <div className="tabs bigtabs" role="tablist">
-        {TABS.map(([k, n, c]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}<em>{c}</em></button>)}
+      <div className="nviews" role="tablist" aria-label="Views">
+        {VIEWS.map(([k, n, l]) => <button key={k} role="tab" aria-selected={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{l.length}</em></button>)}
       </div>
-      {tab === 'human' && <p className="mute small tabnote">Tickets that need a person to answer.</p>}
-      {tab === 'ai' && <p className="mute small tabnote">Answered by the AI agent and closed. Open one to read the reply that was sent.</p>}
-      {tab === 'all' && <p className="mute small tabnote">Everything: tickets a person needs to answer and tickets the AI agent answered.</p>}
-      <div className={tab === 'human' ? 'split' : 'split one'}>
-        {tab === 'human' && (
-          <nav className="views">
-            <div className="views-h">My views</div>
-            {views.map(([k, n, list]) => <button key={k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{list.length}</em></button>)}
-            {tags.length > 0 && <div className="views-h">Tags</div>}
-            {tags.map((g) => <button key={g} className={view === `tag:${g}` ? 'on' : ''} onClick={() => setView(`tag:${g}`)}># {g}</button>)}
-            <button className="reset" onClick={reset}>Reset sample data</button>
-          </nav>
-        )}
-        <section className="panel grow">
-          <div className="panel-h">
-            <h2>{label} <span className="count">{rows.length}</span></h2>
-            <input className="search" placeholder="Search tickets…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
-          <div className="table">
-            <div className="tr th"><span>Ticket</span><span>Contact</span><span>Status</span><span>Priority</span><span>Deadline</span><span>Owner</span></div>
-            {rows.length === 0 && <p className="empty">{tab === 'ai' ? 'No tickets have been answered by the AI agent yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
-            {rows.map((t) => {
-              const adv = pendingAdviceFor(t, me).length > 0
-              return (
-                <button key={t.id} className="tr" onClick={() => open(t.id)}>
-                  <span className="subj"><b>{t.subject}</b>
-                    <small>#{t.id} · {topicLabel(t.topic)}{t.resolvedByAI ? ' · AI answered' : ''}{adv ? ' · Advice requested' : ''}{(t.tags || []).map((g) => ` #${g}`).join('')}</small></span>
-                  <span className="contact"><Avatar name={t.customer} />{t.customer}</span>
-                  <span><Status s={t.status} /></span>
-                  <span><Prio urgent={t.urgent} /></span>
-                  <span className="duecol"><Due t={t} /></span>
-                  <span className="owner">{t.resolvedByAI ? 'AI agent' : t.assignee === me ? 'Me' : agentName(t.assignee)}</span>
-                </button>
-              )
-            })}
-          </div>
-        </section>
+      <div className="ntools">
+        <p className="mute small">{note}{view !== 'ai' && view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
+        <div className="row">
+          <select className="tagfilter" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filter by tag">
+            <option value="">All tags</option>{tags.map((g) => <option key={g} value={g}>#{g}</option>)}
+          </select>
+          <input className="search" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search tickets" />
+        </div>
       </div>
+      <div className="nwrap">
+        <div className="ntable" role="table" aria-label="Tickets">
+          <div className="nrow nhead" role="row">
+            {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
+          </div>
+          {rows.length === 0 && <p className="empty">{view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+          {rows.map((t) => {
+            const p = priorityOf(t)
+            const d = dueInfo(t)
+            const adv = pendingAdviceFor(t, me).length > 0
+            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved')]
+            return (
+              <button key={t.id} className="nrow" role="row" onClick={() => open(t.id)}>
+                <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}</small></span>
+                <span className="ncell" role="cell">{p.level === 5 ? <span className="mute">–</span> : <Label color={PRIO_COLOR[p.label]} title={p.why}>{p.label}</Label>}</span>
+                <span className="ncell" role="cell"><Label color={STATUS_COLOR[t.status]}>{t.status}</Label></span>
+                <span className="ncell" role="cell"><Avatar name={t.customer} />{t.customer}</span>
+                <span className="ncell" role="cell"><Label color={TOPIC_COLOR[t.topic]}>{topicLabel(t.topic)}</Label></span>
+                <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={g === 'Answered automatically' ? 'brown' : g === 'Advice requested' ? 'yellow' : 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
+                <span className={`ncell ndue ${d?.cls || ''}`} role="cell">{d ? d.text : '–'}</span>
+                <span className="ncell" role="cell">{t.resolvedByAI ? <><Avatar name="AI agent" />AI agent</> : <><Avatar name={agentName(t.assignee)} />{t.assignee === me ? 'Me' : agentName(t.assignee)}</>}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span><button className="link small" onClick={reset}>Reset sample data</button></p>
     </>
   )
 }
@@ -97,6 +100,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
   const [adviceQ, setAdviceQ] = useState('')
   const [mergeId, setMergeId] = useState('')
   const [answers, setAnswers] = useState({})
+  const [hideDraft, setHideDraft] = useState(false)
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← {backLabel}</button></>
 
   const owner = t.assignee === me
@@ -134,6 +138,10 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
     update(t.id, (x) => ({ advice: x.advice.map((y) => (y.id === a.id ? { ...y, answer: v, answeredAt: stamp() } : y)) }))
   }
   const mt = mergeTargets.find((x) => String(x.id) === mergeId)
+  // Human in the loop: a suggested reply the HR person checks, edits and sends. Never sent on its own.
+  const personReplied = t.replies.some((m) => m.email && !m.ai && !m.inbound)
+  const draft = owner && !t.resolvedByAI && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
+  const useDraft = () => { setTab('reply'); setText(fill(`Hi {name},\n\n${draft.text.replace(/\s*\[[^\]]+\]/g, '')}\n\nBest,\n{agent}`, t.customer, me)) }
 
   return (
     <div className="detail">
@@ -144,9 +152,17 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
         <section className="panel">
           <div className="panel-h col">
             <h2>{t.subject}</h2>
-            <div className="row"><Status s={t.status} /><Prio urgent={t.urgent} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">AI answered</span>}</div>
+            <div className="row"><Status s={t.status} /><Prio t={t} /><span className="badge grey">{topicLabel(t.topic)}</span><Due t={t} />{t.resolvedByAI && <span className="badge violet">AI answered</span>}</div>
           </div>
-          <div className="ai-box"><b>{t.resolvedByAI ? 'AI agent' : 'Automated triage'}</b><p>{t.note}</p></div>
+          <div className="ai-box"><b>{t.resolvedByAI ? 'AI agent' : 'Automated triage'}</b><p>{t.note}</p>{!t.resolvedByAI && t.status !== 'Closed' && <p className="small"><b>Priority: {priorityOf(t).label}.</b> {priorityOf(t).why}.</p>}</div>
+          {draft && (
+            <div className="draft-box">
+              <b>Suggested reply: check it before sending</b>
+              <small>{draft.source === 'AI' ? 'Written by the AI' : 'Closest answer'} from the manuals ({draft.refs.join(', ')}{draft.title ? `: ${draft.title}` : ''}). Nothing is sent until you send it. Make sure it fits this person's question.</small>
+              <p>{draft.text}</p>
+              <div className="row"><button className="btn primary" onClick={useDraft}>Use this draft</button><button className="btn" onClick={() => setHideDraft(true)}>Dismiss</button></div>
+            </div>
+          )}
           <div className="thread">
             {thread.map((m, i) => m.event
               ? <div key={i} className="event">{m.text} · {ago(m.at)}</div>
