@@ -23,7 +23,7 @@ const NAV = [
   ['settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z', 'Setup'],
 ]
 
-export default function App() {
+export default function App({ account, signOut }) {
   const [tickets, setTickets] = useState(() => store('hr-desk-tickets-v5', SEED_TICKETS))
   const [docs, setDocs] = useState(() => store('hr-desk-docs-v2', SEED_DOCS))
   const [me, setMe] = useState(() => store('hr-desk-me', 'dana'))
@@ -182,8 +182,8 @@ export default function App() {
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} />}
           {page === 'guardrails' && <Guardrails />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
-          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}); setToast('Sample data reset.') }} />}
-          {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} />}
+          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} account={account} signOut={signOut} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}); setToast('Sample data reset.') }} />}
+          {page === 'settings' && <Setup me={me} account={account} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
       {toast && <div className="toast" role="status" onClick={() => setToast('')}>{toast}</div>}

@@ -1,3 +1,4 @@
+import SharedFiles from './SharedFiles'
 import { useEffect, useState } from 'react'
 import PdfViewer from './PdfViewer'
 import { deleteFile, getFile, putFile } from './fileStore'
@@ -82,6 +83,7 @@ export function Documents({ docs, setDocs }) {
   const open = docs.find((d) => d.id === viewing)
   return (
     <>
+      <SharedFiles />
       <section className="panel pad"><div className="row between"><h2>Documents</h2>
         <label className="btn primary upload">Upload document<input type="file" multiple accept=".pdf,application/pdf,.txt,.md,.csv" onChange={upload} hidden /></label></div>
         <p className="mute">Policy documents the HR team keeps for reference. PDFs open right here. Uploaded files are kept in this browser only, so use sample documents.</p>
@@ -120,7 +122,7 @@ export function Documents({ docs, setDocs }) {
   )
 }
 
-export function Setup({ me, openGuardrails }) {
+export function Setup({ me, account, openGuardrails }) {
   return (
     <>
       <section className="panel pad"><h2>For the project team: AI guardrails</h2>
@@ -128,8 +130,8 @@ export function Setup({ me, openGuardrails }) {
         <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>
       </section>
       <section className="panel pad"><h2>Signing in (demo)</h2>
-        <p>You are signed in as <b>{agentName(me)}</b>. The "Signed in as" menu at the top lets you try the team from each person's point of view, and each person only sees their own tickets and any ticket they were asked to advise on.</p>
-        <p className="mute small">This is a demo: there are no real accounts or passwords yet, and tickets are stored only in this browser. Real private logins and shared tickets need a server, which is a setup step for your instructor. Team members: {AGENTS.map((a) => a.name).join(', ')}.</p>
+        <p>You signed in with the shared demo account <b>{account}</b> (Supabase). Inside the desk you are acting as <b>{agentName(me)}</b>. The "Signed in as" menu at the top lets you try the team from each person's point of view, and each person only sees their own tickets and any ticket they were asked to advise on.</p>
+        <p className="mute small">Login and shared files use the team's demo Supabase project. Tickets are still stored only in this browser. Team members: {AGENTS.map((a) => a.name).join(', ')}.</p>
       </section>
       <section className="panel pad"><h2>Email connection</h2>
         <p><span className="badge red">Not connected</span></p>
@@ -139,7 +141,7 @@ export function Setup({ me, openGuardrails }) {
   )
 }
 
-export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets, prefs, setPrefs, switchUser, reset, toast }) {
+export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets, prefs, setPrefs, switchUser, account, signOut, reset, toast }) {
   const a = agent(me)
   const mineAll = tickets.filter((t) => t.assignee === me)
   const open = mineAll.filter((t) => t.status !== 'Closed').length
@@ -219,6 +221,7 @@ export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets
         )}
       </section>
       <section className="panel pad"><h2>Account</h2>
+        <div className="setrow"><div><b>Signed in</b><p className="mute small">{account} (shared demo login)</p></div><button className="btn" onClick={signOut}>Sign out</button></div>
         <p className="mute small">Switch to another team member to see the desk from their point of view (demo).</p>
         <div className="choice">{AGENTS.filter((x) => x.id !== me).map((x) => <button key={x.id} onClick={() => switchUser(x.id)}>{x.name}</button>)}</div>
         <div className="setrow"><div><b>Reset sample data</b><p className="mute small">Puts tickets, replies and documents back to the starting examples.</p></div><button className="btn" onClick={reset}>Reset</button></div>
