@@ -117,14 +117,6 @@ export default function App() {
   const update = (id, patch) => setTickets((p) => p.map((t) => (t.id === id ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t)))
   const event = (t, text) => ({ event: true, text, at: new Date().toISOString() })
 
-  // The employee wrote back after the AI answered (the demo box on a ticket uses this too).
-  const employeeReply = (t, text) => {
-    const now = new Date()
-    const r = followUp(t, [{ text, at: now.toISOString() }], now)
-    update(t.id, (x) => followUp(x, [{ text, at: now.toISOString() }], now).patch)
-    setToast(r.kind === 'thanks' ? 'Noted. The ticket stays closed.' : `Sent to ${agentName(t.assignee)}'s list, and the employee is told a person will reply.`)
-  }
-
   const transfer = (t, to) => {
     update(t.id, (x) => ({ assignee: to, replies: [...x.replies, event(x, `${agentName(me)} transferred this ticket to ${agentName(to)}`)] }))
     setOpenId(null)
@@ -170,7 +162,7 @@ export default function App() {
         </header>
         <div className="content">
           {page === 'tickets' && (openId
-            ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} onEmployeeReply={employeeReply} toast={setToast} back={() => setOpenId(null)} />
+            ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} />}

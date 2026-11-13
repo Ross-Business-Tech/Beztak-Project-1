@@ -94,7 +94,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
   )
 }
 
-export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper, update, transfer, merge, toast, back, onEmployeeReply }) {
+export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper, update, transfer, merge, toast, back }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
   const [tag, setTag] = useState('')
@@ -103,7 +103,6 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
   const [mergeId, setMergeId] = useState('')
   const [answers, setAnswers] = useState({})
   const [hideDraft, setHideDraft] = useState(false)
-  const [demoText, setDemoText] = useState('')
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← {backLabel}</button></>
 
   const owner = t.assignee === me
@@ -180,19 +179,6 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, canned, helper,
                 </article>
               ))}
           </div>
-
-          {t.resolvedByAI && onEmployeeReply && (
-            <form className="draft-box demo-reply" onSubmit={(e) => { e.preventDefault(); if (demoText.trim()) { onEmployeeReply(t, demoText.trim()); setDemoText('') } }}>
-              <b>Try it as the employee <span className="nl gray">Demo</span></b>
-              <small>Real employees just reply to the email. This box stands in for that, so you can see what happens next.</small>
-              <div className="row">
-                <button type="button" className="btn" onClick={() => onEmployeeReply(t, 'Thanks, that helped!')}>“Thanks, that helped!”</button>
-                <button type="button" className="btn" onClick={() => onEmployeeReply(t, "That didn't help. Can I talk to a person?")}>“That didn’t help, I’d like a person”</button>
-              </div>
-              <textarea rows={2} value={demoText} onChange={(e) => setDemoText(e.target.value)} placeholder="Or write the employee's reply…" aria-label="Employee reply" />
-              <div className="row"><button className="btn primary" type="submit">Send as the employee</button></div>
-            </form>
-          )}
 
           {t.advice.length > 0 && (
             <div className="advice">
