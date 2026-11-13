@@ -52,7 +52,7 @@ export default function App() {
   useEffect(() => {
     if (!helper.token || !helper.url) return
     const parse = (from) => { const m = from.match(/^\s*"?([^"<]*?)"?\s*<(.+)>\s*$/); return m ? { name: m[1] || m[2], email: m[2] } : { name: from, email: from } }
-    const run = async () => {
+    const run = async (force) => {
       if (syncing.current) return
       syncing.current = true
       try {
@@ -61,12 +61,18 @@ export default function App() {
         let since = helper.connectedAt
         if (!since) { since = new Date().toISOString(); setHelper((h) => (h.connectedAt ? h : { ...h, connectedAt: since })) }
         const cutoff = new Date(since).getTime() - 10 * 60000
-        const remote = await helperCall(helper, '/tickets')
         let older = 0
         let hidden = 0
         // What the helper itself reports about its last look at Gmail (an older helper has no such page).
-        let mail
-        try { mail = await helperCall(helper, '/status'); if (mail.at) mail.mins = Math.round((Date.now() - new Date(mail.at)) / 60000) } catch (e) { mail = e.message === 'Not found' ? { oldHelper: true } : null }
+        const readStatus = async () => {
+          try { const s = await helperCall(helper, '/status'); if (s.at) s.mins = Math.round((Date.now() - new Date(s.at)) / 60000); return s } catch (e) { return e.message === 'Not found' ? { oldHelper: true } : null }
+        }
+        let mail = await readStatus()
+        // The helper checks Gmail by itself every minute. If it has gone quiet (its schedule is missing in Cloudflare, say),
+        // or the button was pressed, ask it to check right now. A failure is then shown in the profile instead of staying hidden.
+        const quiet = !mail || mail.never || (mail.mins ?? 0) > 3
+        const remote = await helperCall(helper, force || quiet ? '/tickets?refresh=1' : '/tickets')
+        if (force || quiet) mail = (await readStatus()) || mail
         const newest = remote.map((r) => ({ subject: r.subject, customer: r.customer, at: r.createdAt })).sort((a, b) => new Date(b.at) - new Date(a.at))[0] || null
         const cur = ticketsRef.current
         const created = []
@@ -127,7 +133,7 @@ export default function App() {
     }
     runNow.current = run
     run()
-    const id = setInterval(run, 30000)
+    const id = setInterval(() => run(), 30000)
     return () => clearInterval(id)
   }, [helper])
 
@@ -187,7 +193,7 @@ export default function App() {
           {page === 'guardrails' && <Guardrails />}
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
-          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.()} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
+          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
           {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
