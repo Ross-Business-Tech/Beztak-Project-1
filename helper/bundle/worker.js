@@ -30349,7 +30349,26 @@ async function chatAnswer(env, input = {}, opts = {}) {
 	};
 	const prev = [...history].reverse().find((m) => m?.role === "user" && typeof m.text === "string")?.text?.slice(0, 500);
 	const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message));
-	const related = rankManual("", followUp ? `${prev} ${message}` : message, corpus).slice(0, 3).filter((x) => x.score >= 2).map((x) => ({
+	const GENERIC = new Set([
+		"process",
+		"procedur",
+		"policy",
+		"polic",
+		"work",
+		"rule",
+		"standard",
+		"happen",
+		"step",
+		"way",
+		"type",
+		"thing",
+		"resident",
+		"employee",
+		"apartment",
+		"property"
+	].map(stem));
+	const askedWords = words(followUp ? `${prev} ${message}` : message).filter((w) => !GENERIC.has(w));
+	const related = rankManual("", followUp ? `${prev} ${message}` : message, corpus).slice(0, 5).filter((x) => x.score >= 2 && askedWords.some((w) => x.e.qw.has(w))).slice(0, 3).map((x) => ({
 		ref: x.e.ref,
 		title: x.e.title
 	}));
@@ -30404,7 +30423,7 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		related,
 		topic: res.topic,
 		assignee: res.assignee,
-		text: personal ? `This needs a person${res.reason ? `: ${res.reason}` : ", because it is about one person's situation, an approval, or a sensitive matter"}. I can pass it to the HR and Ops team.` : "I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. You can try one of the related topics below, or I can pass your question to a person."
+		text: personal ? `This needs a person${res.reason ? `: ${res.reason}` : ", because it is about one person's situation, an approval, or a sensitive matter"}. I can pass it to the HR and Ops team.` : `I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. ${related.length ? "You can try one of the related topics below, or I can pass your question to a person." : "I can pass your question to a person."}`
 	};
 }
 //#endregion

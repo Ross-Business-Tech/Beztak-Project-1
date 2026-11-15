@@ -88,8 +88,14 @@ export default function Chat({ mode = 'employee', user, onUseInReply, compact = 
   )
 }
 
+// In the desk the people asking ARE the people tickets go to, so the chat never offers to "pass it to a person" there.
+const forStaff = (text) => text
+  .replace(/,? or I can pass your question to a person\./, '.')
+  .replace(/I can pass your question to a person\./, 'This looks like a gap in the manual: check with your manager or the Operations team, and consider adding it to the Manual gaps list.')
+  .replace(/ I can pass it to the HR and Ops team\./, ' Handle it as a ticket rather than a manual look-up.')
+
 function Answer({ m, mode, onAsk, onUseInReply, onHandOff, isLast }) {
-  const lines = m.text.split('\n').map((l) => l.trim()).filter(Boolean)
+  const lines = (mode === 'staff' ? forStaff(m.text) : m.text).split('\n').map((l) => l.trim()).filter(Boolean)
   const bullets = lines.filter((l) => /^[-•]\s/.test(l))
   return (
     <div className={`cm cm-bot cm-${m.kind}${m.urgent ? ' cm-urgent' : ''}`}>
