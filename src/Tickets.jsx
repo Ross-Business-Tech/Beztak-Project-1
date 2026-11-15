@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
-import { manualDraft } from './aiAgent'
+import { CONFIDENCE, draftFor, hasBlanks, isSensitive, needsCheck, toLearned } from './drafts'
 import { WORK } from './hours'
 import { helperCall } from './helper'
 import { agentName, ago, byUrgency, dueInfo, fill, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
@@ -21,7 +21,7 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
 export function List({ tickets, me, open, reset }) {
-  const [view, setView] = useState('mine')
+  const [view, setView] = useState('check')
   const [tag, setTag] = useState('')
   const [q, setQ] = useState('')
   const live = (t) => t.status !== 'Closed'
@@ -29,6 +29,7 @@ export function List({ tickets, me, open, reset }) {
   const owned = human.filter((t) => t.assignee === me)
   const tags = [...new Set(tickets.flatMap((t) => t.tags || []))].sort()
   const VIEWS = [
+    ['check', 'Needs your check', owned.filter(needsCheck), 'The AI already wrote a reply for each of these. Open one, check the reply, then send it or edit it. Nothing is sent until you do.'],
     ['mine', 'My open tickets', owned.filter(live), 'Tickets a person needs to answer, most urgent first.'],
     ['due', 'Due soon', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)), 'Overdue or due within 4 work hours.'],
     ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length), 'Teammates asked for your advice on these.'],
@@ -62,12 +63,12 @@ export function List({ tickets, me, open, reset }) {
           <div className="nrow nhead" role="row">
             {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
           </div>
-          {rows.length === 0 && <p className="empty">{view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+          {rows.length === 0 && <p className="empty">{view === 'check' ? 'All caught up: no AI replies are waiting for your check.' : view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
           {rows.map((t) => {
             const p = priorityOf(t)
             const d = dueInfo(t)
             const adv = pendingAdviceFor(t, me).length > 0
-            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved')]
+            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(t.assignee === me && needsCheck(t) ? ['AI draft: check'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved')]
             return (
               <button key={t.id} className="nrow" role="row" onClick={() => open(t.id)}>
                 <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}</small></span>
@@ -75,7 +76,7 @@ export function List({ tickets, me, open, reset }) {
                 <span className="ncell" role="cell"><Label color={STATUS_COLOR[t.status]}>{t.status}</Label></span>
                 <span className="ncell" role="cell"><Avatar name={t.customer} />{t.customer}</span>
                 <span className="ncell" role="cell"><Label color={TOPIC_COLOR[t.topic]}>{topicLabel(t.topic)}</Label></span>
-                <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={g === 'Answered automatically' ? 'brown' : g === 'Advice requested' ? 'yellow' : 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
+                <span className="ncell ntags" role="cell">{tg.slice(0, 2).map((g) => <Label key={g} color={g === 'AI draft: check' ? 'orange' : g === 'Answered automatically' ? 'brown' : g === 'Advice requested' ? 'yellow' : 'gray'}>{g}</Label>)}{tg.length > 2 && <small className="mute">+{tg.length - 2}</small>}</span>
                 <span className={`ncell ndue ${d?.cls || ''}`} role="cell">{d ? d.text : '–'}</span>
                 <span className="ncell" role="cell">{t.resolvedByAI ? <><Avatar name="AI agent" />AI agent</> : <><Avatar name={agentName(t.assignee)} />{t.assignee === me ? 'Me' : agentName(t.assignee)}</>}</span>
               </button>
@@ -88,7 +89,7 @@ export function List({ tickets, me, open, reset }) {
   )
 }
 
-export function Detail({ ticket: t, all, me, canned, helper, update, transfer, merge, toast, back }) {
+export function Detail({ ticket: t, all, me, canned, helper, update, transfer, merge, toast, back, learned = [], learn }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
   const [tag, setTag] = useState('')
@@ -97,6 +98,9 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
   const [mergeId, setMergeId] = useState('')
   const [answers, setAnswers] = useState({})
   const [hideDraft, setHideDraft] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const [sending, setSending] = useState(false)
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← Back to tickets</button></>
 
   const owner = t.assignee === me
@@ -105,14 +109,20 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
   const mergeTargets = all.filter((x) => x.id !== t.id && x.assignee === me && x.status !== 'Closed')
   const stamp = () => new Date().toISOString()
 
+  // Sends an email reply (through the email helper when this ticket came from a real inbox).
+  const deliver = async (body) => {
+    if (t.threadId && helper?.token) {
+      try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text: body }) }) } catch (err) { toast(`Email not sent: ${err.message}`); return false }
+    }
+    update(t.id, (x) => ({ replies: [...x.replies, { from: agentName(me), text: body, at: stamp(), email: true }], status: x.status === 'Open' ? 'In progress' : x.status }))
+    return true
+  }
   const send = async (e) => {
     e.preventDefault()
     if (!text.trim()) return
-    if (tab === 'reply' && t.threadId && helper?.token) {
-      try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text }) }) } catch (err) { toast(`Email not sent: ${err.message}`); return }
-    }
-    const m = { from: agentName(me), text, at: stamp(), ...(tab === 'note' ? { note: true } : { email: true }) }
-    update(t.id, (x) => ({ replies: [...x.replies, m], status: tab === 'reply' && x.status === 'Open' ? 'In progress' : x.status }))
+    if (tab === 'note') {
+      update(t.id, (x) => ({ replies: [...x.replies, { from: agentName(me), text, at: stamp(), note: true }] }))
+    } else if (!(await deliver(text))) return
     setText('')
   }
   const addTag = (e) => {
@@ -134,10 +144,24 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
     update(t.id, (x) => ({ advice: x.advice.map((y) => (y.id === a.id ? { ...y, answer: v, answeredAt: stamp() } : y)) }))
   }
   const mt = mergeTargets.find((x) => String(x.id) === mergeId)
-  // Human in the loop: a suggested reply the HR person checks, edits and sends. Never sent on its own.
-  const personReplied = t.replies.some((m) => m.email && !m.ai && !m.inbound)
-  const draft = owner && !t.resolvedByAI && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
-  const useDraft = () => { setTab('reply'); setText(fill(`Hi {name},\n\n${draft.text.replace(/\s*\[[^\]]+\]/g, '')}\n\nBest,\n{agent}`, t.customer, me)) }
+  // Human in the loop: the AI always prepares a reply, flagged until a person checks it.
+  // "Ready to send" sends it as is; "Edit" lets the person fix it first. Either way the reply is
+  // remembered (unless confidential) so the next similar question starts from this answer.
+  const draft = owner && needsCheck(t) && !hideDraft ? draftFor(t, me, learned) : null
+  const conf = draft && CONFIDENCE[draft.kind]
+  const approve = async (body) => {
+    if (hasBlanks(body)) { toast('Fill in the part in [square brackets] first.'); setEditing(true); setEditText(body); return }
+    setSending(true)
+    const ok = await deliver(body)
+    setSending(false)
+    if (!ok) return
+    const entry = toLearned(t, me, body, draft.email)
+    if (!isSensitive(t) && learn) {
+      learn(entry)
+      toast(entry.edited ? 'Sent. The AI saved your edits and will suggest your version for similar questions.' : 'Sent. The AI will remember that this answer was right.')
+    } else toast('Sent. Confidential replies are not saved for the AI.')
+    setEditing(false)
+  }
 
   return (
     <div className="detail">
@@ -152,11 +176,34 @@ export function Detail({ ticket: t, all, me, canned, helper, update, transfer, m
           </div>
           <div className="ai-box"><b>{t.resolvedByAI ? 'AI agent' : 'Automated triage'}</b><p>{t.note}</p>{!t.resolvedByAI && t.status !== 'Closed' && <p className="small"><b>Priority: {priorityOf(t).label}.</b> {priorityOf(t).why}.</p>}</div>
           {draft && (
-            <div className="draft-box">
-              <b>Suggested reply: check it before sending</b>
-              <small>{draft.source === 'AI' ? 'Written by the AI' : 'Closest answer'} from the manuals ({draft.refs.join(', ')}{draft.title ? `: ${draft.title}` : ''}). Nothing is sent until you send it. Make sure it fits this person's question.</small>
-              <p>{draft.text}</p>
-              <div className="row"><button className="btn primary" onClick={useDraft}>Use this draft</button><button className="btn" onClick={() => setHideDraft(true)}>Dismiss</button></div>
+            <div className="verify-box">
+              <div className="verify-h">
+                <span className="verify-flag">⚑ Needs verification</span>
+                <Label color={conf.color}>AI confidence: {conf.label}</Label>
+              </div>
+              <p className="small mute">
+                The AI wrote this reply but did not send it. Read it closely, then send it or edit it.
+                {draft.kind === 'learned' && <> Based on a reply {agentName(draft.from.by)} {draft.from.edited ? 'corrected' : 'approved'} for “{draft.from.subject}”.</>}
+                {draft.refs.length > 0 && <> Source: manual {draft.refs.join(', ')}{draft.title ? ` (${draft.title})` : ''}.</>}
+                {draft.sensitive && <> Confidential topic: the AI only wrote a careful opening. Add the next step yourself.</>}
+                {!draft.sensitive && hasBlanks(draft.email) && <> Fill in the parts in [square brackets]: the AI did not know them and will not guess.</>}
+              </p>
+              {editing
+                ? <textarea className="verify-edit" rows={10} value={editText} onChange={(e) => setEditText(e.target.value)} aria-label="Edit the AI reply" autoFocus />
+                : <div className="verify-email"><small className="mute">To: {t.email}</small><p>{draft.email}</p></div>}
+              <div className="row">
+                {editing
+                  ? <>
+                    <button className="btn primary" disabled={sending || !editText.trim()} onClick={() => approve(editText)}>{sending ? 'Sending…' : 'Send edited reply'}</button>
+                    <button className="btn" onClick={() => setEditing(false)}>Cancel</button>
+                  </>
+                  : <>
+                    <button className="btn ok" disabled={sending} onClick={() => approve(draft.email)}>{sending ? 'Sending…' : '✓ Ready to send'}</button>
+                    <button className="btn" onClick={() => { setEditText(draft.email); setEditing(true) }}>✎ Edit</button>
+                    <button className="link small" onClick={() => setHideDraft(true)}>Write my own instead</button>
+                  </>}
+              </div>
+              {!isSensitive(t) && <small className="mute">When you send, the AI remembers this answer and suggests it next time someone asks something similar.</small>}
             </div>
           )}
           <div className="thread">

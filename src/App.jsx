@@ -26,6 +26,9 @@ export default function App() {
   const [tickets, setTickets] = useState(() => store('hr-desk-tickets-v5', SEED_TICKETS))
   const [canned, setCanned] = useState(() => store('hr-desk-canned-v1', CANNED))
   const [docs, setDocs] = useState(() => store('hr-desk-docs-v2', SEED_DOCS))
+  // Replies HR approved or corrected. The AI suggests them again for similar questions.
+  const [learned, setLearned] = useState(() => store('hr-desk-learned-v1', []))
+  useEffect(() => { try { localStorage.setItem('hr-desk-learned-v1', JSON.stringify(learned)) } catch { /* ignore */ } }, [learned])
   const [me, setMe] = useState(() => store('hr-desk-me', 'dana'))
   const [prefs, setPrefs] = useState(() => ({ theme: 'light', notify: true, ooo: false, ...store('hr-desk-prefs', {}) }))
   const [helper, setHelper] = useState(() => ({ url: DEFAULT_HELPER_URL, token: '', ...store('hr-desk-helper', {}) }))
@@ -150,7 +153,7 @@ export default function App() {
         </header>
         <div className="content">
           {page === 'tickets' && (openId
-            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
+            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} learned={learned} learn={(e) => setLearned((p) => [e, ...p.filter((x) => x.ticket !== e.ticket)].slice(0, 200))} />
             : <List tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'gaps' && <GapTracker tickets={tickets} />}
@@ -158,7 +161,7 @@ export default function App() {
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
           {page === 'profile' && <Profile helper={helper} setHelper={setHelper} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
-          {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} />}
+          {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} learned={learned} forget={(id) => setLearned((p) => p.filter((x) => x.id !== id))} />}
         </div>
       </div>
       {composing && <Compose tickets={tickets} onClose={() => setComposing(false)} onCreate={onCreate} />}

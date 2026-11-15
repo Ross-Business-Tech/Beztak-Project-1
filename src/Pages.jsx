@@ -156,9 +156,21 @@ export function Canned({ canned, setCanned }) {
   )
 }
 
-export function Setup({ me, openGuardrails }) {
+export function Setup({ me, openGuardrails, learned = [], forget }) {
   return (
     <>
+      <section className="panel pad"><h2>What the AI has learned</h2>
+        <p>Every time someone on the team sends an AI reply, with or without edits, the AI remembers it. When a similar question comes in, it suggests that reply first. It is still flagged for a person to check. Confidential topics are never saved.</p>
+        {learned.length === 0 && <p className="mute small">Nothing yet. Open a ticket under "Needs your check" and send or edit the AI's reply.</p>}
+        {learned.map((l) => (
+          <div key={l.id} className="kb">
+            <b>{l.subject}</b>
+            <small className="mute">{l.edited ? 'Corrected' : 'Approved'} by {agentName(l.by)} on ticket #{l.ticket}</small>
+            <p className="pre small">{l.template.replaceAll('{name}', '[name]').replaceAll('{agent}', '[your name]')}</p>
+            <button className="link small" onClick={() => forget(l.id)}>Forget this answer</button>
+          </div>
+        ))}
+      </section>
       <section className="panel pad"><h2>For the project team: AI guardrails</h2>
         <p>The checks that prove the AI assistant only answers what it safely can, and hands everything else to a person. This is a back-office page, so it is not in the main menu.</p>
         <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>
