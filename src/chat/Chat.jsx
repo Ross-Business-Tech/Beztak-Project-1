@@ -3,7 +3,8 @@ import { askChat, handToPerson } from './chatClient'
 import { HR_ADDRESS } from '../data'
 import './chat.css'
 
-const STARTERS = ['When do I get paid?', 'How do I request time off?', 'Which holidays are paid?', 'What is the dress code?']
+// Starter questions show what the chat is for: day-to-day operations from the Beztak Operations Manual.
+const STARTERS = ['When is rent due?', 'How fast must work orders be completed?', 'When do I need a purchase order?', 'How fast must on-call respond to an emergency?']
 
 // One chat, used everywhere: the "Ask Beztak" page, the bubble on other sites, the employee view after sign-in,
 // and (with mode="staff") the look-up bubble inside the HR desk.
