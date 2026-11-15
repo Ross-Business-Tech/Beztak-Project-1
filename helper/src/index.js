@@ -1,7 +1,8 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { buildCorpus, decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
+import { BUILTIN_MANUAL, buildCorpus, decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
+import { checkLesson } from '../../src/lessons.js'
 import { ackText } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
 
@@ -66,13 +67,80 @@ async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
 // splits it into sections and sends them here (POST /manual), and every answer and suggestion then uses it, with the same
 // safety checks. DELETE /manual goes back to the built-in manual.
 const MANUAL_MAX_CHARS = 350000
-let manualCache = { at: null, corpus: null }
+let corpusCache = { key: null, corpus: undefined }
+// The manual the AI reads: the built-in one or an uploaded PDF, plus the team lessons that are approved.
 async function activeCorpus(env) {
   const m = await env.TICKETS.get('manual', 'json')
-  if (!m) return undefined // the built-in manual
-  if (manualCache.at !== m.at) manualCache = { at: m.at, corpus: buildCorpus(m) }
-  return manualCache.corpus
+  const lessons = ((await env.TICKETS.get('lessons', 'json')) || []).filter((l) => l.status === 'approved')
+  if (!m && !lessons.length) return undefined // the built-in manual alone
+  const key = `${m?.at || 'built-in'}|${lessons.map((l) => `${l.id}:${l.changedAt}`).join(',')}`
+  if (corpusCache.key !== key) corpusCache = { key, corpus: buildCorpus(m || BUILTIN_MANUAL, lessons) }
+  return corpusCache.corpus
 }
+
+// ---- team lessons and feedback (kept here so the whole team shares them) ----
+const getLessons = async (env) => (await env.TICKETS.get('lessons', 'json')) || []
+const putLessons = (env, list) => env.TICKETS.put('lessons', JSON.stringify(list))
+const who = (x) => String(x ?? '').replace(/[^\p{L}\p{N} .'-]/gu, '').trim().slice(0, 60) || 'Someone on the team'
+// Remember which lessons the AI used, so the team can see which ones matter. refs are citations like "L-3".
+async function noteUses(env, refs) {
+  const ids = (refs || []).filter((r) => /^L-\d+$/.test(r)).map((r) => Number(r.slice(2)))
+  if (!ids.length) return
+  const list = await getLessons(env)
+  let changed = false
+  for (const l of list) if (ids.includes(l.id)) { l.uses = (l.uses || 0) + 1; l.lastUsedAt = new Date().toISOString(); changed = true }
+  if (changed) await putLessons(env, list)
+}
+async function lessonRoute(env, req, url) {
+  const parts = url.pathname.split('/').filter(Boolean) // ['lessons'] or ['lessons', id] or ['feedback', id]
+  if (parts[0] === 'lessons') {
+    const list = await getLessons(env)
+    if (parts.length === 1 && req.method === 'GET') return json({ lessons: list, feedback: (await env.TICKETS.get('feedback', 'json')) || [] })
+    if (parts.length === 1 && req.method === 'POST') {
+      const b = await req.json()
+      const c = checkLesson(b)
+      if (!c.ok) return json({ error: c.error }, 400)
+      if (list.length >= 300) return json({ error: 'There are already 300 lessons. Delete some first.' }, 400)
+      const now = new Date().toISOString()
+      const lesson = { id: Math.max(0, ...list.map((l) => l.id)) + 1, question: c.question, answer: c.answer, status: 'pending', addedBy: who(b.by), addedAt: now, changedAt: now, ticketId: Number(b.ticketId) || null, uses: 0 }
+      await putLessons(env, [...list, lesson])
+      return json(lesson)
+    }
+    const l = list.find((x) => String(x.id) === parts[1])
+    if (!l) return json({ error: 'Lesson not found' }, 404)
+    if (parts.length === 2 && req.method === 'DELETE') { await putLessons(env, list.filter((x) => x !== l)); return json({ deleted: l.id }) }
+    if (parts.length === 2 && req.method === 'POST') {
+      const { action, by } = await req.json()
+      const name = who(by)
+      if (action === 'approve') {
+        if (l.status !== 'pending') return json({ error: 'That lesson is not waiting for approval.' }, 400)
+        if (name === l.addedBy) return json({ error: 'A second person has to approve it: you wrote this lesson.' }, 400)
+        Object.assign(l, { status: 'approved', approvedBy: name, approvedAt: new Date().toISOString() })
+      } else if (action === 'off') {
+        if (l.status !== 'approved') return json({ error: 'That lesson is not in use.' }, 400)
+        l.status = 'off'
+      } else if (action === 'on') {
+        if (l.status !== 'off') return json({ error: 'That lesson is not turned off.' }, 400)
+        l.status = 'approved'
+      } else return json({ error: 'Unknown action' }, 400)
+      l.changedAt = new Date().toISOString()
+      await putLessons(env, list)
+      return json(l)
+    }
+  }
+  if (parts[0] === 'feedback') {
+    const list = (await env.TICKETS.get('feedback', 'json')) || []
+    if (parts.length === 1 && req.method === 'POST') {
+      const b = await req.json()
+      const f = { id: Date.now(), kind: b.kind === 'auto' ? 'auto' : 'suggest', ticketId: Number(b.ticketId) || null, up: Boolean(b.up), note: String(b.note ?? '').trim().slice(0, 500), text: String(b.text ?? '').trim().slice(0, 600), by: who(b.by), at: new Date().toISOString() }
+      await env.TICKETS.put('feedback', JSON.stringify([f, ...list].slice(0, 300)))
+      return json(f)
+    }
+    if (parts.length === 2 && req.method === 'DELETE') { await env.TICKETS.put('feedback', JSON.stringify(list.filter((x) => String(x.id) !== parts[1]))); return json({ deleted: parts[1] }) }
+  }
+  return json({ error: 'Not found' }, 404)
+}
+
 function cleanManual(input) {
   if (!input || typeof input !== 'object') throw new Error('No manual was sent.')
   const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
@@ -135,6 +203,7 @@ async function pollOnce(env, stats) {
       if (!/no-?reply|mailer-daemon/i.test(from)) {
         // New conversation: decide who answers, then send the automatic email.
         const res = await decide(env, t.subject, entry.text, { corpus })
+        await noteUses(env, res.refs)
         const name = (from.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || from
         const agent = AGENTS.find((a) => a.id === res.assignee)
         const reply = res.resolved ? res.answer + FOOTER : ackText(name, agent.name, res.urgent, res.sensitive, res.extra)
@@ -207,7 +276,9 @@ export default {
       if (url.pathname === '/suggest' && req.method === 'POST') {
         const input = await req.json()
         if (!input || typeof input !== 'object') return json({ error: 'Nothing to suggest a reply for' }, 400)
-        return json(await suggestReply(env, input, { corpus: await activeCorpus(env) }))
+        const out = await suggestReply(env, input, { corpus: await activeCorpus(env) })
+        await noteUses(env, out.refs)
+        return json(out)
       }
       if (url.pathname === '/manual') {
         if (req.method === 'GET') return json(manualInfo(await env.TICKETS.get('manual', 'json')))
@@ -219,6 +290,7 @@ export default {
           return json(manualInfo(m))
         }
       }
+      if (/^\/(lessons|feedback)(\/|$)/.test(url.pathname)) return lessonRoute(env, req, url)
       if (url.pathname === '/status' && req.method === 'GET') return json((await env.TICKETS.get('status', 'json')) || { never: true })
       if (url.pathname === '/tickets/new' && req.method === 'POST') {
         try { return json(await startConversation(env, await req.json())) } catch (e) { return json({ error: e.message }, e.status || 500) }

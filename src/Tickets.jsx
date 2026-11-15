@@ -4,6 +4,7 @@ import { topicLabel } from './triage'
 import { manualDraft, suggestReply } from './aiAgent'
 import { WORK } from './hours'
 import { helperCall } from './helper'
+import { FeedbackBar, LessonModal } from './Lessons'
 import { agentName, ago, byUrgency, dueInfo, fill, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
 
 const STATUSES = ['Open', 'In progress', 'On hold', 'Closed']
@@ -145,6 +146,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
   const [suggestMode, setSuggestMode] = useState('draft') // 'draft' (with [blanks]) or 'complete' (no blanks)
   const [suggesting, setSuggesting] = useState(false)
   const [suggestion, setSuggestion] = useState(null)
+  const [lessonDraft, setLessonDraft] = useState(null)
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← {backLabel}</button></>
 
   const owner = t.assignee === me
@@ -246,6 +248,8 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                   <div>
                     <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? (t.threadId ? 'Received by email' : 'Opened by HR') : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : (m.emailed || (t.threadId && m.emailed === undefined) ? 'Sent by email' : 'Saved reply, not emailed')} · {ago(m.at)}</small></div>
                     <p>{m.text}</p>
+                    {m.ai && t.resolvedByAI && <FeedbackBar kind="auto" ticketId={t.id} text={m.text.slice(0, 600)} helper={helper} me={me} toast={toast} />}
+                    {owner && helper?.token && m.email && !m.ai && !m.inbound && !m.note && <button type="button" className="link small" onClick={() => setLessonDraft({ question: String(t.body || '').slice(0, 300), answer: m.text.replace(/^\s*(hi|hello|dear)\b[^\n]*\n+/i, '').replace(/\n+\s*(best|thanks|thank you|regards|sincerely|kind regards)[^\n]*(\n[^\n]*)?\s*$/i, '').trim().slice(0, 1200), ticketId: t.id })}>Save as a lesson</button>}
                   </div>
                 </article>
               ))}
@@ -296,6 +300,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                       ? (
                         <>
                           <small>{suggestion.note}</small>
+                          {suggestion.source === 'AI' && <FeedbackBar key={suggestion.text} kind="suggest" ticketId={t.id} text={suggestion.text.slice(0, 600)} helper={helper} me={me} toast={toast} />}
                           <p className="suggest-text">{suggestion.text.split(/(\[[^\]\n]{1,120}\])/).map((p, i) => (/^\[[^\]\n]+\]$/.test(p) ? <mark key={i} className="blank">{p}</mark> : p))}</p>
                           <div className="row"><button type="button" className="btn primary sm" onClick={useSuggestion}>Use this</button><button type="button" className="btn sm" onClick={() => suggest()}>Try again</button><button type="button" className="btn sm" onClick={() => setSuggestion(null)}>Dismiss</button></div>
                         </>
@@ -347,6 +352,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
           <dl><dt>Owner</dt><dd>{agentName(t.assignee)}</dd><dt>Contact</dt><dd>{t.customer}<br /><small>{t.email}</small></dd><dt>Channel</dt><dd>{t.channel || 'Email'}</dd><dt>Created</dt><dd>{ago(t.createdAt)}</dd></dl>
         </aside>
       </div>
+      {lessonDraft && <LessonModal initial={lessonDraft} helper={helper} me={me} toast={toast} onClose={() => setLessonDraft(null)} />}
     </div>
   )
 }

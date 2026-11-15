@@ -4,6 +4,7 @@ import { Dashboard, Documents, Profile, Setup } from './Pages'
 import GapTracker from './GapTracker'
 import Guardrails from './Guardrails'
 import { Detail, List, NewTicket, VIEW_NAMES } from './Tickets'
+import Learned from './Lessons'
 import { clearFiles } from './fileStore'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
 import { followUp } from './escalate'
@@ -20,6 +21,7 @@ const NAV = [
   ['tickets', 'M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z', 'Tickets'],
   ['dashboard', 'M4 20V10M10 20V4M16 20v-7M22 20H2', 'Reports'],
   ['gaps', 'M12 3l9 16H3zM12 10v4M12 17h.01', 'Gaps'],
+  ['lessons', 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z', 'Learned'],
   ['kb', 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7', 'Documents'],
   ['settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z', 'Setup'],
 ]
@@ -195,6 +197,7 @@ export default function App({ account, signOut }) {
             ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} onNew={() => setCreating(true)} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
+          {page === 'lessons' && <Learned helper={helper} me={me} toast={setToast} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} manualAt={manualAt} />}
           {page === 'guardrails' && <Guardrails />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} helper={helper} />}

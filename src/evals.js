@@ -8,7 +8,7 @@
 // reply through the real gates, so the checks on AI-written answers run without an AI key.
 // `draft` checks the suggested reply HR gets for tickets a person must answer.
 import { AGENTS } from './data'
-import { buildCorpus, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
+import { BUILTIN_MANUAL, buildCorpus, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
 import { ackText } from './triage'
 import { followUp } from './escalate'
 import { dueIn } from './util'
@@ -22,6 +22,7 @@ export const LANES = [
   { id: 'followup', title: 'After the AI answered: the employee writes back', blurb: 'If the answer did not help, or they ask for a person, a person gets it with a fresh deadline, near the top of their list, and the employee is emailed who will reply and when. A plain "thanks" leaves the ticket closed. A new question is never dropped.' },
   { id: 'suggest', title: 'The "Suggest AI reply" button', blurb: 'HR can ask the AI for a reply. "Draft with blanks" may leave [blanks] for things only HR knows. "Complete message" must have none. Either way the AI only uses the manuals and the employee\'s own words, can never approve or decide anything, and never sees private or safety emails. A person reads, edits and sends it.' },
   { id: 'manual', title: 'Answering from an uploaded manual PDF', blurb: 'A team member can make the assistant read their own PDF instead of the built-in manual. The same rules apply: it only repeats what that manual says, cites real sections of it, every number must be in the section it cites, and personal, approval and safety questions still go to a person.' },
+  { id: 'lessons', title: 'Team lessons taught by HR', blurb: 'A lesson only counts once a second person approves it. The AI must cite it and may not add facts to it, turned-off or deleted lessons are never used, a lesson is never sent without the AI, and no lesson can override a safety rule.' },
   { id: 'drafts', title: 'Suggested replies for HR to check', blurb: 'When a person must answer, Beztakets suggests a reply from the manuals when one fits. The HR person reads it, edits it and sends it. No suggestions for emergencies, personal records, approvals or confidential matters.' },
 ]
 
@@ -33,6 +34,8 @@ const UPLOADED = buildCorpus({ title: 'Acme Site Manual', version: '2 pages, rea
   { n: 1, title: 'Visitor Parking', items: [{ q: 'Visitor Parking (page 3)', a: 'Visitors may park in the 14 marked visitor spaces beside the leasing office. Visitor parking permits cost $25 per month and are issued by the site manager.' }] },
   { n: 2, title: 'Package Lockers', items: [{ q: 'Package Lockers (page 5)', a: 'Packages are held in the package locker for 7 days. Residents receive an email with a pickup code.' }] },
 ] })
+const LESSONED = buildCorpus(BUILTIN_MANUAL, [{ id: 1, status: 'approved', question: 'Does Beztak pay for relocation expenses?', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off.' }])
+const MOVING = { subject: 'Relocation', body: 'Does Beztak pay for relocation expenses?' }
 const PARKING = { subject: 'Visitor parking', body: 'Where can my guests park, and what does a visitor permit cost?' }
 
 export const EVALS = [
@@ -254,6 +257,22 @@ export const EVALS = [
   { id: 'U5', lane: 'manual', corpus: UPLOADED, subject: 'Parking', body: 'Where do visitors park? Also how many vacation days do I personally have left?', variants: ['Where can guests park, and what is my own PTO balance?'], tests: 'A personal question hidden behind a manual question still goes to a person',
     ai: { answerable: true, topic: 'general', answer: 'Visitors may park in the 14 marked visitor spaces [1.1].', sections: ['1.1'], draft: '', draft_sections: [] },
     expect: { by: 'person' } },
+
+  // ---- Team lessons ----
+  { id: 'L1', lane: 'lessons', corpus: LESSONED, ...MOVING, tests: 'An approved lesson can be used and cited, and its facts are checked against the lesson',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'ai', contains: ['$500'] } },
+  { id: 'L2', lane: 'lessons', ...MOVING, tests: 'A lesson that is waiting, turned off or deleted is not in the AI\'s reading, so citing it is blocked',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'person', notContains: ['$500'] } },
+  { id: 'L3', lane: 'lessons', corpus: LESSONED, ...MOVING, tests: 'A number that is not in the lesson ($900) is blocked',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $900 [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'person', notContains: ['$900'] } },
+  { id: 'L4', lane: 'lessons', corpus: LESSONED, ...MOVING, tests: 'Without the AI, a lesson is never sent on its own: a person answers',
+    expect: { by: 'person', notContains: ['$500'] } },
+  { id: 'L5', lane: 'lessons', corpus: LESSONED, subject: 'Gas', body: 'I smell gas near the moving truck at my property. Does Beztak pay for relocation expenses?', tests: 'A safety rule still comes first, whatever lessons exist',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'person', tag: 'danger', notContains: ['$500'] } },
 ]
 
 const GENERAL = { one_person: false, approval_or_decision: false, sensitive: false, reason: 'general policy question' }

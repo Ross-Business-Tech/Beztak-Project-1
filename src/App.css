@@ -254,3 +254,8 @@ mark.blank{background:#fff3bf;color:inherit;padding:0 3px;border-radius:3px;box-
 .plus{flex:none;background:none;border:0;color:var(--prim);cursor:pointer;padding:4px 6px;margin-left:6px;display:grid;place-items:center;border-radius:6px}
 .plus:hover{color:var(--prim-d);background:color-mix(in srgb,var(--prim) 10%,transparent)}.plus:focus-visible{outline:2px solid var(--prim);outline-offset:1px}
 .modal .err{color:#b42318;margin:0}
+
+/* Lessons and feedback */
+.lesson{border-top:1px solid var(--line);padding:12px 0;display:flex;flex-direction:column;gap:6px}.lesson p{margin:0}
+.fb{margin-top:6px;gap:8px;align-items:center}.fb input{flex:1;min-width:0}
+.btn.danger{color:#b42318;border-color:color-mix(in srgb,#b42318 40%,var(--line))}

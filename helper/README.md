@@ -19,6 +19,13 @@ On the website, the "+" button creates a ticket for an employee. The first reply
 Later replies use the normal reply route. To limit mistakes, the helper refuses bad addresses and its own address, and sends at most 25 such
 new emails per day. Use made-up employees only while testing.
 
+## Team lessons and feedback
+The website's **Learned** page lets the team teach the agent short answers ("lessons"). A lesson is saved here (Cloudflare KV) as waiting for approval;
+a second person approves it before the AI can read or cite it (`[L-3]`). Lessons can be turned off or deleted at any time and stop being used at once.
+The AI never changes by itself: it only reads the manuals plus the approved lessons, every fact in its answer must appear in what it cites, and the
+safety rules still run first. 👍/👎 feedback on AI replies is stored here for review only. Routes: `/lessons`, `/lessons/:id`, `/feedback`.
+Lessons and feedback must never contain real personal information.
+
 ## Only new email is handled
 - The helper remembers when it was first switched on and ignores every email from before that, so the old inbox is never read or answered.
 - It never answers a conversation that already has a reply from the inbox address (a person already answered it), or out-of-office and bulk mail.
