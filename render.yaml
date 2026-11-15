@@ -6,7 +6,6 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     autoDeployTrigger: commit
-    branch: development
     routes:
       # Single-page app: any path that isn't a real file serves index.html
       - type: rewrite
