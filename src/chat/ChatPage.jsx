@@ -6,7 +6,7 @@ export default function ChatPage({ user, signOut, embed = false }) {
   return (
     <div className={`ask-page${embed ? ' embed' : ''}`}>
       <header className="ask-head">
-        <div className="who"><span className="ask-logo" aria-hidden="true">B</span><div><h1>Ask Beztak</h1><p>Answers from the Beztak Operations Manual</p></div></div>
+        <div className="who"><span className="ask-logo" aria-hidden="true">B</span><div><h1>Ask Beztak</h1><p>Answers from the Operations Manual (a sample made up for the demo)</p></div></div>
         {signOut && <button className="btn" onClick={signOut}>Sign out</button>}
       </header>
       <main className="ask-body"><Chat user={user} compact={embed} /></main>

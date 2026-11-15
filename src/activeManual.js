@@ -1,4 +1,4 @@
-import { SECTIONS } from './data/beztakManual.js'
+import { SECTIONS } from './data/sampleManual.js'
 
 // Which Operations Manual the assistant is reading, as far as the website needs to know: the section titles, so a citation
 // like [3.2] on the Manual gaps page names the right section. null means the built-in manual.

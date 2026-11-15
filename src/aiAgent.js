@@ -11,11 +11,11 @@
 //      If anything fails, a person replies (with the AI's draft to check).
 //   4. If the AI is not connected or can't be reached, the simple keyword answers are used instead.
 import { AGENTS, KNOWLEDGE, SELF_URGENT, TOPIC_LABELS } from './data'
-import { MANUAL, SECTIONS } from './data/beztakManual.js'
+import { MANUAL, SECTIONS } from './data/sampleManual.js'
 import { triage } from './triage'
 
 export const AI_MODEL = 'claude-opus-5-5'
-export const FOOTER = '\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. If it did not help, reply to this email and say you would like a person: someone from HR will reply within one business day.'
+export const FOOTER = '\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Operations Manual. If it did not help, reply to this email and say you would like a person: someone from HR will reply within one business day.'
 
 // ---- rules the AI must never handle ----
 const HARD_STOPS = [
@@ -24,7 +24,7 @@ const HARD_STOPS = [
   [/flood|leak|burst|water (everywhere|pouring|coming)|sewage|no heat|heat (is )?(out|off|not working)|furnace (is )?(out|broken|not working)/i, 'emergency', 'This looks like an emergency. Please call your community\'s on-call maintenance line now instead of waiting for email: the on-call technician responds right away.'],
   [/injur|\bhurt\b|accident|\bfell\b|slipped|bleeding/i, 'injury', 'If someone needs emergency care, call 911. A person on our team will follow up on this right away.'],
   [/harass|discriminat|retaliat|hostile work|bull(y|ied)|sexual|inappropriate (comment|touch|message|text|photo|picture|joke|behavio)|touch(es|ing|ed)? me|keeps touching|unwanted (touch|advance|attention)|uncomfortable|racis|sexis/i, 'concern', 'This is a confidential matter, so a person will handle it personally.'],
-  [/wire (instruction|transfer|fraud)|new (bank|payment|wire) (details|info|instructions)|phish|suspicious (link|email)|hacked|data breach|lost (my |a )?(laptop|phone|device|tablet)/i, 'security', 'Please do not act on this message. Report it to the Help Desk at helpdesk@beztak.com. A person on our team will follow up.'],
+  [/wire (instruction|transfer|fraud)|new (bank|payment|wire) (details|info|instructions)|phish|suspicious (link|email)|hacked|data breach|lost (my |a )?(laptop|phone|device|tablet)/i, 'security', 'Please do not act on this message. Report it to IT Security at security@beztak.example. A person on our team will follow up.'],
   [/\b\d{3}-?\d{2}-?\d{4}\b|password\s*(is|:)|\bssn\b|social security|routing number|account number|alarm code is|gate code is/i, 'private-info', 'For your safety, please do not send passwords, ID numbers or account numbers by email. A person will follow up.'],
   [/\b(sue|suing|lawsuit|lawyer|attorney|legal advice|illegal|is (it|this|that)( even)? legal)\b/i, 'legal', 'Legal questions go to a person, because we cannot give legal advice by email.'],
   [/\b(diagnos|symptom|medication|dosage|treatment)\w*/i, 'medical', 'We cannot give medical advice. For health concerns please see a medical professional. A person will follow up.'],
@@ -55,13 +55,13 @@ const HR = KNOWLEDGE.map((k, i) => ({ ref: `HR-${i + 1}`, q: k.keys[0], a: k.ans
 // The Operations Manual is either the built-in one or one read from an uploaded PDF (see buildCorpus below, which turns one
 // manual into everything this file needs: the text the AI reads, the real section numbers, and the search index).
 const buildManualText = (manual) => [
-  '## HR ANSWERS (short answers to common employee questions, taken from the Beztak Operations Manual)',
+  '## HR ANSWERS (short answers to common employee questions, taken from the Operations Manual)',
   ...HR.map((x) => `### [${x.ref}] ${x.q}\n${x.a}`),
   `## ${manual.title.toUpperCase()} (${manual.version}): policies and procedures for Beztak site teams`,
   ...manual.sections.map((s) => `### Section ${s.n}: ${s.title}\n` + s.items.map((it, i) => `[${s.n}.${i + 1}] ${it.q}\n${it.a}`).join('\n\n')),
 ].join('\n\n')
 
-const systemPrompt = (manualText) => `You are the AI agent for Beztakets, the HR help desk for Beztak (Oakland Management Corp.), a property management company. You read one email from a Beztak employee and decide whether you can answer it from the company manuals below.
+const systemPrompt = (manualText) => `You are the AI agent for Beztakets, the HR help desk for Beztak, a property management company. You read one email from a Beztak employee and decide whether you can answer it from the company manuals below.
 
 RULES
 - Answer ONLY from the manuals between <manuals> tags. Never invent procedures, numbers, dates, contacts or approvals.
@@ -442,5 +442,5 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   return { kind: personal ? 'person' : 'unknown', urgent: Boolean(res.urgent), refs: [], related, topic: res.topic, assignee: res.assignee,
     text: personal
       ? `This needs a person${res.reason ? `: ${res.reason}` : ', because it is about one person\'s situation, an approval, or a sensitive matter'}. I can pass it to the HR and Ops team.`
-      : `I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. ${related.length ? 'You can try one of the related topics below, or I can pass your question to a person.' : 'I can pass your question to a person.'}` }
+      : `I could not find a clear answer to that in the Operations Manual, so I won't guess. ${related.length ? 'You can try one of the related topics below, or I can pass your question to a person.' : 'I can pass your question to a person.'}` }
 }
