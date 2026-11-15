@@ -19,7 +19,7 @@ export function learnedMatch(subject, body, learned = []) {
   const q = new Set(words(`${subject} ${body}`))
   let best = null
   for (const l of learned) {
-    const w = new Set(words(l.question))
+    const w = new Set(l.keywords ? l.keywords.split(' ') : words(l.question || ''))
     const shared = [...q].filter((x) => w.has(x)).length
     const score = shared / Math.max(1, Math.min(q.size, w.size))
     if (shared >= 3 && score >= 0.5 && (!best || score > best.score || (score === best.score && l.at > best.l.at))) best = { l, score }
@@ -63,5 +63,6 @@ export const needsCheck = (t) => !t.resolvedByAI && t.status !== 'Closed' && !t.
 // What gets remembered after HR sends: the email turned back into a reusable template.
 export function toLearned(t, me, sent, original) {
   const template = sent.replaceAll(agentName(me), '{agent}').replace(new RegExp(`\\b${firstName(t.customer).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), '{name}')
-  return { id: `${t.id}-${Date.now()}`, ticket: t.id, subject: t.subject, question: `${t.subject} ${t.body}`, template, edited: sent.trim() !== original.trim(), by: me, at: new Date().toISOString() }
+  // Only the question's keywords are kept, not the employee's message itself.
+  return { id: `${t.id}-${Date.now()}`, ticket: t.id, subject: t.subject, keywords: words(`${t.subject} ${t.body}`).join(' '), template, edited: sent.trim() !== original.trim(), by: me, at: new Date().toISOString() }
 }

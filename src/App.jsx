@@ -7,6 +7,7 @@ import { Detail, List } from './Tickets'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
+import { deleteShared, loadShared, saveShared } from './sharedLearned'
 
 const store = (key, fallback) => {
   try { const v = JSON.parse(localStorage.getItem(key)); if (v) return v } catch { /* ignore */ }
@@ -29,6 +30,34 @@ export default function App() {
   // Replies HR approved or corrected. The AI suggests them again for similar questions.
   const [learned, setLearned] = useState(() => store('hr-desk-learned-v1', []))
   useEffect(() => { try { localStorage.setItem('hr-desk-learned-v1', JSON.stringify(learned)) } catch { /* ignore */ } }, [learned])
+  // On the team's dev site the list is shared by the whole HR team (here.now Site Data).
+  // Elsewhere (test links) it stays in this browser.
+  const [sharedOn, setSharedOn] = useState(false)
+  useEffect(() => {
+    let stop = false
+    const pull = async () => {
+      const list = await loadShared()
+      if (stop || !list) return
+      setSharedOn(true)
+      // Answers saved here before sharing worked are uploaded once, so nothing is lost.
+      setLearned((cur) => {
+        const pending = cur.filter((l) => !l.shared)
+        pending.forEach((l) => saveShared(l).then((r) => r && setLearned((p) => p.map((x) => (x.id === l.id ? r : x)))))
+        return [...pending, ...list]
+      })
+    }
+    pull()
+    const id = setInterval(pull, 120000)
+    return () => { stop = true; clearInterval(id) }
+  }, [])
+  const learn = (e) => {
+    setLearned((p) => [e, ...p.filter((x) => x.ticket !== e.ticket || x.shared)].slice(0, 500))
+    saveShared(e).then((r) => { if (r) { setSharedOn(true); setLearned((p) => p.map((x) => (x.id === e.id ? r : x))) } })
+  }
+  const forget = (l) => {
+    setLearned((p) => p.filter((x) => x.id !== l.id))
+    if (l.shared) deleteShared(l.id).then((ok) => { if (!ok) setToast('Could not remove it from the team list. Try again later.') })
+  }
   const [me, setMe] = useState(() => store('hr-desk-me', 'dana'))
   const [prefs, setPrefs] = useState(() => ({ theme: 'light', notify: true, ooo: false, ...store('hr-desk-prefs', {}) }))
   const [helper, setHelper] = useState(() => ({ url: DEFAULT_HELPER_URL, token: '', ...store('hr-desk-helper', {}) }))
@@ -153,7 +182,7 @@ export default function App() {
         </header>
         <div className="content">
           {page === 'tickets' && (openId
-            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} learned={learned} learn={(e) => setLearned((p) => [e, ...p.filter((x) => x.ticket !== e.ticket)].slice(0, 200))} />
+            ? <Detail key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} canned={canned} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} learned={learned} learn={learn} />
             : <List tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS) }} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'gaps' && <GapTracker tickets={tickets} />}
@@ -161,7 +190,7 @@ export default function App() {
           {page === 'replies' && <Canned canned={canned} setCanned={setCanned} />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} />}
           {page === 'profile' && <Profile helper={helper} setHelper={setHelper} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} switchUser={switchUser} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setCanned(CANNED); setDocs(SEED_DOCS); setToast('Sample data reset.') }} />}
-          {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} learned={learned} forget={(id) => setLearned((p) => p.filter((x) => x.id !== id))} />}
+          {page === 'settings' && <Setup me={me} openGuardrails={() => go('guardrails')} learned={learned} forget={forget} sharedOn={sharedOn} />}
         </div>
       </div>
       {composing && <Compose tickets={tickets} onClose={() => setComposing(false)} onCreate={onCreate} />}

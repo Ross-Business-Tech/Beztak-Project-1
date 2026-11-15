@@ -224,3 +224,4 @@ textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px
 .btn.ok{background:#15803d;border-color:#15803d;color:#fff}.btn.ok:hover{background:#166534}
 .btn:disabled{opacity:.6;cursor:default}
 .verify-box .nl{white-space:normal;height:auto;min-height:20px;padding:3px 6px}
+.badge.green{background:#dcfce7;color:#166534}

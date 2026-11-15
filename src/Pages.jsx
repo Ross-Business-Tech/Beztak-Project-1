@@ -156,18 +156,21 @@ export function Canned({ canned, setCanned }) {
   )
 }
 
-export function Setup({ me, openGuardrails, learned = [], forget }) {
+export function Setup({ me, openGuardrails, learned = [], forget, sharedOn }) {
   return (
     <>
       <section className="panel pad"><h2>What the AI has learned</h2>
-        <p>Every time someone on the team sends an AI reply, with or without edits, the AI remembers it. When a similar question comes in, it suggests that reply first. It is still flagged for a person to check. Confidential topics are never saved.</p>
+        <p>Every time someone on the team sends an AI reply, with or without edits, the AI remembers it. When a similar question comes in, it suggests that reply first. It is still flagged for a person to check. Confidential topics are never saved, and only the question's keywords are kept, not the employee's message.</p>
+        <p>{sharedOn
+          ? <span className="badge green">Shared with the whole HR team</span>
+          : <><span className="badge grey">Saved in this browser only</span> <small className="mute">On the team's dev site this list is shared by everyone on the HR team. Test links can't share it.</small></>}</p>
         {learned.length === 0 && <p className="mute small">Nothing yet. Open a ticket under "Needs your check" and send or edit the AI's reply.</p>}
         {learned.map((l) => (
           <div key={l.id} className="kb">
             <b>{l.subject}</b>
             <small className="mute">{l.edited ? 'Corrected' : 'Approved'} by {agentName(l.by)} on ticket #{l.ticket}</small>
             <p className="pre small">{l.template.replaceAll('{name}', '[name]').replaceAll('{agent}', '[your name]')}</p>
-            <button className="link small" onClick={() => forget(l.id)}>Forget this answer</button>
+            <button className="link small" onClick={() => forget(l)}>Forget this answer{l.shared ? ' (for the whole team)' : ''}</button>
           </div>
         ))}
       </section>

@@ -1,0 +1,18 @@
+{
+  "collections": {
+    "learned_answers": {
+      "fields": {
+        "ticket": { "type": "integer", "minimum": 0 },
+        "subject": { "type": "string", "required": true, "maxLength": 200, "trim": true },
+        "keywords": { "type": "string", "required": true, "maxLength": 2000 },
+        "template": { "type": "string", "required": true, "maxLength": 4000 },
+        "edited": { "type": "boolean", "default": false },
+        "by": { "type": "string", "maxLength": 40 },
+        "at": { "type": "string", "maxLength": 40 }
+      },
+      "access": { "read": "public", "insert": "public", "update": "owner", "delete": "public" },
+      "publicMutation": "open",
+      "rateLimit": "120/hour/ip"
+    }
+  }
+}
