@@ -13,6 +13,12 @@ lets the AI agent answer what it safely can (sent by email), and sends replies w
 and, to turn the AI on, `UMGPT_API_KEY` (the U-M GPT Toolkit key). Without it the helper still works and uses the
 simple keyword answers.
 
+## Tickets HR opens by hand
+On the website, the "+" button creates a ticket for an employee. The first reply HR sends on it starts a new email to the employee
+(`POST /tickets/new`: the helper sends the email and saves it as a ticket here, so the employee's answer joins the same ticket).
+Later replies use the normal reply route. To limit mistakes, the helper refuses bad addresses and its own address, and sends at most 25 such
+new emails per day. Use made-up employees only while testing.
+
 ## Only new email is handled
 - The helper remembers when it was first switched on and ignores every email from before that, so the old inbox is never read or answered.
 - It never answers a conversation that already has a reply from the inbox address (a person already answered it), or out-of-office and bulk mail.

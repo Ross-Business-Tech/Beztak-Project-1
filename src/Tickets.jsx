@@ -125,7 +125,7 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
           })}
         </div>
       </div>
-      <button className="fab" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
+      <button className="fab" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
       <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span><button className="link small" onClick={reset}>Reset sample data</button></p>
     </>
   )
@@ -155,11 +155,18 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
     e.preventDefault()
     if (!text.trim()) return
     if (tab === 'reply' && BLANKS_LEFT.test(text)) { toast('Fill in every [blank] before sending. The blanks are the parts in square brackets.'); return }
-    if (tab === 'reply' && t.threadId && helper?.token) {
-      try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text }) }) } catch (err) { toast(`Email not sent: ${err.message}`); return }
+    let threadId = t.threadId
+    let emailed = false
+    if (tab === 'reply' && helper?.token) {
+      try {
+        if (t.threadId) await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text }) })
+        else threadId = (await helperCall(helper, '/tickets/new', { method: 'POST', body: JSON.stringify({ to: t.email, name: t.customer, subject: t.subject, text }) })).threadId // a ticket HR opened by hand: starts the email conversation
+        emailed = true
+      } catch (err) { toast(`Email not sent: ${err.message}`); return }
     }
-    const m = { from: agentName(me), text, at: stamp(), ...(tab === 'note' ? { note: true } : { email: true }) }
-    update(t.id, (x) => ({ replies: [...x.replies, m], status: tab === 'reply' && x.status === 'Open' ? 'In progress' : x.status }))
+    const m = { from: agentName(me), text, at: stamp(), ...(tab === 'note' ? { note: true } : { email: true, emailed }) }
+    update(t.id, (x) => ({ ...(threadId && !x.threadId ? { threadId } : {}), replies: [...x.replies, m], status: tab === 'reply' && x.status === 'Open' ? 'In progress' : x.status }))
+    if (tab === 'reply') toast(emailed ? `Email sent to ${t.email}.` : 'Saved on the ticket. It was not emailed because the email helper is not connected (see your profile).')
     setText('')
   }
   const addTag = (e) => {
@@ -235,7 +242,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                 <article key={i} className={`msg ${m.inbound ? 'in' : m.note ? 'note' : 'out'}`}>
                   <Avatar name={m.ai && t.resolvedByAI ? 'AI agent' : m.from} />
                   <div>
-                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? (t.threadId ? 'Received by email' : 'Opened by HR') : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : (t.threadId ? 'Sent by email' : 'Saved reply, not emailed')} · {ago(m.at)}</small></div>
+                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? (t.threadId ? 'Received by email' : 'Opened by HR') : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : (m.emailed || (t.threadId && m.emailed === undefined) ? 'Sent by email' : 'Saved reply, not emailed')} · {ago(m.at)}</small></div>
                     <p>{m.text}</p>
                   </div>
                 </article>
@@ -299,9 +306,9 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                       )}
                 </div>
               )}
-              <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer}${t.threadId ? ' (sent by email)' : ' (saved on the ticket, not emailed)'}…` : 'Only your team can see this…'} />
+              <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer}${t.threadId || helper?.token ? ' (sent by email)' : ' (saved on the ticket, not emailed)'}…` : 'Only your team can see this…'} />
               <div className="row between">
-                <small className="mute">{tab === 'reply' ? (t.threadId ? `To: ${t.email}` : `For: ${t.email}. Saved on the ticket, not emailed.`) : 'Not sent to the employee'}</small>
+                <small className="mute">{tab === 'reply' ? (t.threadId ? `To: ${t.email}` : helper?.token ? `To: ${t.email}. The first reply starts the email conversation.` : `For: ${t.email}. Saved on the ticket, not emailed (the email helper is not connected).`) : 'Not sent to the employee'}</small>
                 <button className="btn primary" type="submit">{tab === 'reply' ? 'Send' : 'Add note'}</button>
               </div>
             </form>

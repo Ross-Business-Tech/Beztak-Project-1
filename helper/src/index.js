@@ -166,6 +166,31 @@ export async function sendReply(env, id, text, auto = false) {
   return t
 }
 
+// Starts a NEW email conversation for a ticket an HR person opened by hand. The conversation is saved as a ticket here too,
+// so when the employee writes back, their reply joins the same ticket instead of making a new one.
+const NEW_PER_DAY = 25 // a safety limit on emails started from the website per day
+const clean = (v, max) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').replace(/[<>",;]/g, '').trim().slice(0, max)
+export async function startConversation(env, input = {}) {
+  const email = String(input.to ?? '').trim().toLowerCase()
+  const name = clean(input.name, 80)
+  const subject = clean(input.subject, 150)
+  const text = String(input.text ?? '').trim()
+  if (!/^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/.test(email) || email.length > 120) throw Object.assign(new Error('That email address does not look right.'), { status: 400 })
+  if (email === env.BURNER_EMAIL.toLowerCase()) throw Object.assign(new Error('That is the help desk\'s own address.'), { status: 400 })
+  if (!subject || !text || text.length > 10000) throw Object.assign(new Error('A subject and a message are required.'), { status: 400 })
+  const day = 'newsent:' + new Date().toISOString().slice(0, 10)
+  const used = Number(await env.TICKETS.get(day)) || 0
+  if (used >= NEW_PER_DAY) throw Object.assign(new Error(`Today's limit of ${NEW_PER_DAY} new emails from the website has been reached.`), { status: 429 })
+  await env.TICKETS.put(day, String(used + 1), { expirationTtl: 60 * 60 * 48 })
+  const encoded = /^[\x20-\x7e]*$/.test(subject) ? subject : `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(subject)))}?=`
+  const lines = [`To: ${email}`, `Subject: ${encoded}`, 'Content-Type: text/plain; charset=UTF-8']
+  const token = await accessToken(env)
+  const sent = await gmail(env, token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw: b64u(lines.join('\r\n') + '\r\n\r\n' + text) }) })
+  const at = new Date().toISOString()
+  await saveTicket(env, { id: sent.threadId, subject, customer: name ? `${name} <${email}>` : email, status: 'Open', createdAt: at, autoReplied: true, replies: [{ outbound: true, text, at }] })
+  return { threadId: sent.threadId }
+}
+
 export default {
   async scheduled(_e, env, ctx) { ctx.waitUntil(pollInbox(env)) },
   async fetch(req, env, ctx) {
@@ -195,6 +220,9 @@ export default {
         }
       }
       if (url.pathname === '/status' && req.method === 'GET') return json((await env.TICKETS.get('status', 'json')) || { never: true })
+      if (url.pathname === '/tickets/new' && req.method === 'POST') {
+        try { return json(await startConversation(env, await req.json())) } catch (e) { return json({ error: e.message }, e.status || 500) }
+      }
       const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)
       if (m && req.method === 'POST') {
         const { text, auto } = await req.json()
