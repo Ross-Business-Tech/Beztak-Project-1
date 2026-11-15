@@ -87,8 +87,11 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
 
   return (
     <>
-      <div className="nviews" role="tablist" aria-label="Views">
-        {VIEWS.map(([k, n, l]) => <button key={k} role="tab" aria-selected={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{l.length}</em></button>)}
+      <div className="nbar">
+        <div className="nviews" role="tablist" aria-label="Views">
+          {VIEWS.map(([k, n, l]) => <button key={k} role="tab" aria-selected={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{l.length}</em></button>)}
+        </div>
+        <button className="plus" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg></button>
       </div>
       <div className="ntools">
         <p className="mute small">{note}{view !== 'ai' && view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
@@ -125,7 +128,6 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
           })}
         </div>
       </div>
-      <button className="fab" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
       <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span><button className="link small" onClick={reset}>Reset sample data</button></p>
     </>
   )
