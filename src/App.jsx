@@ -10,6 +10,7 @@ import { followUp } from './escalate'
 import { setActiveManualTitles } from './activeManual'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
+import ChatBubble from './chat/ChatBubble'
 
 const store = (key, fallback) => {
   try { const v = JSON.parse(localStorage.getItem(key)); if (v) return v } catch { /* ignore */ }
@@ -103,7 +104,7 @@ export default function App({ account, signOut }) {
             created.unshift({
               id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,
               status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent, inbound[0].at),
-              resolvedByAI: res.resolved, channel: 'Email', note: res.note, advice: [], draft: res.draft || undefined,
+              resolvedByAI: res.resolved, channel: r.source === 'chat' ? 'Chat' : 'Email', note: res.note, advice: [], draft: res.draft || undefined,
               tags: [...(res.resolved ? ['ai-resolved'] : []), ...(res.tags || (res.sensitive ? ['sensitive'] : []))],
               replies: [{ from: 'HR Assistant (automated)', text: reply, at: now, email: true, ai: true }, ...inbound.slice(1).map((m) => ({ inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId }))],
             })
@@ -186,6 +187,11 @@ export default function App({ account, signOut }) {
           {page === 'settings' && <Setup me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
+      <ChatBubble onUseInReply={(text) => {
+        if (page !== 'tickets' || !openId) { setToast('Open a ticket first, then use "Use in reply" to add this answer to your reply.'); return }
+        window.dispatchEvent(new CustomEvent('beztakets:use-in-reply', { detail: text }))
+        setToast('Added to your reply. Check it before sending.')
+      }} />
       {toast && <div className="toast" role="status" onClick={() => setToast('')}>{toast}</div>}
     </div>
   )

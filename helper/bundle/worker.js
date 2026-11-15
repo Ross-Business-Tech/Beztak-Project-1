@@ -30327,6 +30327,86 @@ async function suggestReply(env, input = {}, { ask = askSuggest, corpus = BUILTI
 		return local(`The AI could not be reached${e?.status ? ` (${e.status})` : ""}.`);
 	}
 }
+var FOLLOW_UP_RE = /\b(it|that|this|they|them|those|these|there|same|one|what about|how about|what if|and if|also)\b/i;
+var titleOf = (ref, corpus) => {
+	const hr = HR.find((x) => x.ref === ref);
+	if (hr) return hr.q;
+	return (corpus.entryText[ref] || "").split("\n")[0] || ref;
+};
+var refsIn = (text, corpus) => [...new Set([...String(text).matchAll(/\[([A-Z]+-\d+|\d+\.\d+)\]|, (\d+\.\d+): /g)].map((m) => m[1] || m[2]))].filter((r) => corpus.valid.has(r)).map((ref) => ({
+	ref,
+	title: titleOf(ref, corpus)
+}));
+async function chatAnswer(env, input = {}, opts = {}) {
+	const corpus = opts.corpus || BUILTIN;
+	const message = String(input.message || "").replace(/\s+/g, " ").trim().slice(0, 1e3);
+	const history = (Array.isArray(input.history) ? input.history : []).slice(-10);
+	if (!message) return {
+		kind: "unknown",
+		text: "Type a question about Beztak policies or procedures.",
+		refs: [],
+		related: []
+	};
+	const prev = [...history].reverse().find((m) => m?.role === "user" && typeof m.text === "string")?.text?.slice(0, 500);
+	const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message));
+	const related = rankManual("", followUp ? `${prev} ${message}` : message, corpus).slice(0, 3).filter((x) => x.score >= 2).map((x) => ({
+		ref: x.e.ref,
+		title: x.e.title
+	}));
+	const stop = mustGoToPerson("", message);
+	if (stop) return {
+		kind: "person",
+		urgent: Boolean(stop.urgent),
+		refs: [],
+		related: [],
+		topic: stop.topic,
+		assignee: stop.assignee,
+		text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR team.` : stop.extra || "This is a personal or confidential matter, so a person on the HR team needs to answer it. I can pass it to them."
+	};
+	const withContext = `${prev}\n\nFollow-up question: ${message}`;
+	let res;
+	if (followUp && aiConnected(env)) res = await decide(env, "Chat question", withContext, {
+		...opts,
+		corpus
+	});
+	else {
+		res = await decide(env, "Chat question", message, {
+			...opts,
+			corpus
+		});
+		if (!res.resolved && !res.sensitive && followUp) {
+			const again = await decide(env, "Chat question", withContext, {
+				...opts,
+				corpus
+			});
+			const lastAnswer = [...history].reverse().find((m) => m?.role === "assistant")?.text || "";
+			if (again.resolved && !(lastAnswer && String(again.answer).startsWith(lastAnswer.slice(0, 60)))) res = again;
+		}
+	}
+	if (res.resolved) {
+		const full = String(res.answer || "").trim();
+		return {
+			kind: "answer",
+			text: full.replace(/\n*\(From the [^()]*\)\s*$/, "").trim(),
+			refs: refsIn(full, corpus),
+			source: res.aiAnswered ? "AI" : "manual",
+			urgent: false,
+			related: [],
+			topic: res.topic,
+			assignee: res.assignee
+		};
+	}
+	const personal = res.sensitive || (res.tags || []).some((t) => ["ai-second-check"].includes(t));
+	return {
+		kind: personal ? "person" : "unknown",
+		urgent: Boolean(res.urgent),
+		refs: [],
+		related,
+		topic: res.topic,
+		assignee: res.assignee,
+		text: personal ? `This needs a person${res.reason ? `: ${res.reason}` : ", because it is about one person's situation, an approval, or a sensitive matter"}. I can pass it to the HR team.` : "I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. You can try one of the related topics below, or I can pass your question to a person."
+	};
+}
 //#endregion
 //#region helper/src/index.js
 var cors = {
@@ -30528,6 +30608,10 @@ async function pollOnce(env, stats) {
 			messageId: header(m, "message-id")
 		};
 		let t = await getTicket(env, m.threadId);
+		if (!t) {
+			const alias = await env.TICKETS.get("thread:" + m.threadId);
+			if (alias) t = await getTicket(env, alias);
+		}
 		if (t) {
 			t.replies.push(entry);
 			stats.followUps++;
@@ -30581,14 +30665,20 @@ async function sendReply(env, id, text, auto = false) {
 		`Subject: ${subject.replace(/[\r\n]/g, " ")}`,
 		"Content-Type: text/plain; charset=UTF-8"
 	];
-	if (last?.messageId) lines.push(`In-Reply-To: ${last.messageId}`, `References: ${last.messageId}`);
-	await gmail(env, await accessToken(env), "messages/send", {
+	if (last?.messageId?.startsWith("<")) lines.push(`In-Reply-To: ${last.messageId}`, `References: ${last.messageId}`);
+	const token = await accessToken(env);
+	const threadId = t.source === "chat" ? t.gmailThreadId : id;
+	const sent = await gmail(env, token, "messages/send", {
 		method: "POST",
 		body: JSON.stringify({
 			raw: b64u(lines.join("\r\n") + "\r\n\r\n" + text),
-			threadId: id
+			...threadId ? { threadId } : {}
 		})
 	});
+	if (t.source === "chat" && !t.gmailThreadId && sent?.threadId) {
+		t.gmailThreadId = sent.threadId;
+		await env.TICKETS.put("thread:" + sent.threadId, t.id);
+	}
 	t.replies.push({
 		outbound: true,
 		text,
@@ -30597,14 +30687,92 @@ async function sendReply(env, id, text, auto = false) {
 	await saveTicket(env, t);
 	return t;
 }
+async function underLimit(env, req, kind, max) {
+	const key = `rl:${kind}:${req.headers.get("cf-connecting-ip") || "unknown"}:${Math.floor(Date.now() / 36e5)}`;
+	const n = Number(await env.TICKETS.get(key) || 0);
+	if (n >= max) return false;
+	await env.TICKETS.put(key, String(n + 1), { expirationTtl: 3700 });
+	return true;
+}
+async function chatTicket(env, input) {
+	const bad = (msg) => Object.assign(new Error(msg), { status: 400 });
+	const line = (x, n) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+	const name = line(input?.name, 80);
+	const email = line(input?.email, 120).toLowerCase();
+	if (!/^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email)) throw bad("Please enter a valid email address, so the HR team can reply.");
+	const note = String(input?.note ?? "").trim().slice(0, 1500);
+	const turns = (Array.isArray(input?.transcript) ? input.transcript : []).slice(-20).map((m) => ({
+		who: m?.role === "user" ? "Employee" : "Chat assistant",
+		text: String(m?.text ?? "").trim().slice(0, 1500)
+	})).filter((m) => m.text);
+	const question = turns.filter((m) => m.who === "Employee").map((m) => m.text).pop() || note;
+	if (!question) throw bad("There is no question to pass on yet.");
+	const transcript = turns.map((m) => `${m.who}: ${m.text}`).join("\n\n");
+	const text = [note && `Message from the employee: ${note}`, transcript && `Chat so far:\n${transcript}`].filter(Boolean).join("\n\n") || question;
+	const customer = name ? `${name.replace(/[<>"]/g, "")} <${email}>` : email;
+	const subject = `Chat: ${line(question, 70)}`;
+	const r = mustGoToPerson(subject, `${question}\n${note}`) || triage(subject, `${question}\n${note}`);
+	const agent = AGENTS.find((a) => a.id === r.assignee) || AGENTS[0];
+	const at = (/* @__PURE__ */ new Date()).toISOString();
+	const id = "chat-" + crypto.randomUUID();
+	const reply = ackText(name || "there", agent.name, r.urgent, r.sensitive, r.extra);
+	const t = {
+		id,
+		source: "chat",
+		subject,
+		customer,
+		status: "Open",
+		createdAt: at,
+		replies: [{
+			inbound: true,
+			from: customer,
+			text,
+			at,
+			messageId: id
+		}],
+		triage: {
+			resolved: false,
+			topic: r.topic,
+			urgent: Boolean(r.urgent),
+			assignee: agent.id,
+			sensitive: Boolean(r.sensitive),
+			tags: [...r.tags || [], "from-chat"],
+			note: `${r.note || ""} Handed over from the chat by the employee.`.trim(),
+			replyText: reply
+		}
+	};
+	await saveTicket(env, t);
+	try {
+		await sendReply(env, id, reply, true);
+	} catch {}
+	return t;
+}
 var src_default = {
 	async scheduled(_e, env, ctx) {
 		ctx.waitUntil(pollInbox(env));
 	},
 	async fetch(req, env, ctx) {
 		if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-		if (req.headers.get("authorization") !== "Bearer " + env.HELPER_TOKEN) return json({ error: "Not allowed" }, 401);
 		const url = new URL(req.url);
+		if (url.pathname === "/chat" && req.method === "POST") try {
+			if (!await underLimit(env, req, "chat", 40)) return json({ error: "Too many questions in a short time. Please wait a few minutes." }, 429);
+			const input = await req.json();
+			return json(await chatAnswer(env, input && typeof input === "object" ? input : {}, { corpus: await activeCorpus(env) }));
+		} catch (e) {
+			return json({ error: e.message }, 500);
+		}
+		if (url.pathname === "/chat/escalate" && req.method === "POST") try {
+			if (!await underLimit(env, req, "esc", 6)) return json({ error: "Too many requests in a short time. Please wait a few minutes." }, 429);
+			const t = await chatTicket(env, await req.json());
+			return json({
+				ok: true,
+				assignee: AGENTS.find((a) => a.id === t.triage.assignee)?.name,
+				urgent: t.triage.urgent
+			});
+		} catch (e) {
+			return json({ error: e.message }, e.status || 500);
+		}
+		if (req.headers.get("authorization") !== "Bearer " + env.HELPER_TOKEN) return json({ error: "Not allowed" }, 401);
 		try {
 			if (url.pathname === "/tickets" && req.method === "GET") {
 				if (url.searchParams.get("refresh")) await pollInbox(env);

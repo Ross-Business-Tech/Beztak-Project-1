@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
 import { manualDraft, suggestReply } from './aiAgent'
@@ -99,6 +99,12 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
 export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update, transfer, merge, toast, back }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
+  // The desk's chat bubble can drop a manual answer into this reply ("Use in reply").
+  useEffect(() => {
+    const add = (e) => { setTab('reply'); setText((cur) => (cur.trim() ? `${cur.trimEnd()}\n\n${e.detail}` : e.detail)) }
+    window.addEventListener('beztakets:use-in-reply', add)
+    return () => window.removeEventListener('beztakets:use-in-reply', add)
+  }, [])
   const [tag, setTag] = useState('')
   const [adviceTo, setAdviceTo] = useState('')
   const [adviceQ, setAdviceQ] = useState('')

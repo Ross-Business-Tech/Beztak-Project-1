@@ -1,8 +1,8 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { buildCorpus, decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
-import { ackText } from '../../src/triage.js'
+import { buildCorpus, chatAnswer, decide, FOOTER, mustGoToPerson, suggestReply } from '../../src/aiAgent.js'
+import { ackText, triage } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
 
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS' }
@@ -127,6 +127,7 @@ async function pollOnce(env, stats) {
     if ((auto && auto !== 'no') || /^(bulk|junk|list)$/i.test(header(m, 'precedence'))) { stats.automatic++; continue } // out-of-office and bulk mail: never answer
     const entry = { inbound: true, from, text: stripQuote(bodyText(m.payload)) || m.snippet, at: new Date(+m.internalDate).toISOString(), messageId: header(m, 'message-id') }
     let t = await getTicket(env, m.threadId)
+    if (!t) { const alias = await env.TICKETS.get('thread:' + m.threadId); if (alias) t = await getTicket(env, alias) } // a reply to a chat hand-off email
     if (t) { t.replies.push(entry); stats.followUps++; if (t.status === 'Closed') t.status = 'Open' }
     else {
       if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) { stats.alreadyAnswered++; continue } // already answered by someone: leave it alone
@@ -158,11 +159,57 @@ export async function sendReply(env, id, text, auto = false) {
   const to = (t.customer.match(/<(.+)>/) || [null, t.customer])[1]
   const subject = /^re:/i.test(t.subject) ? t.subject : 'Re: ' + t.subject
   const lines = [`To: ${to}`, `Subject: ${subject.replace(/[\r\n]/g, ' ')}`, 'Content-Type: text/plain; charset=UTF-8']
-  if (last?.messageId) lines.push(`In-Reply-To: ${last.messageId}`, `References: ${last.messageId}`)
+  if (last?.messageId?.startsWith('<')) lines.push(`In-Reply-To: ${last.messageId}`, `References: ${last.messageId}`)
   const token = await accessToken(env)
-  await gmail(env, token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw: b64u(lines.join('\r\n') + '\r\n\r\n' + text), threadId: id }) })
+  // A ticket from the chat has no email thread until its first email; after that, replies stay in one thread.
+  const threadId = t.source === 'chat' ? t.gmailThreadId : id
+  const sent = await gmail(env, token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw: b64u(lines.join('\r\n') + '\r\n\r\n' + text), ...(threadId ? { threadId } : {}) }) })
+  if (t.source === 'chat' && !t.gmailThreadId && sent?.threadId) { t.gmailThreadId = sent.threadId; await env.TICKETS.put('thread:' + sent.threadId, t.id) }
   t.replies.push({ outbound: true, text, at: new Date().toISOString() })
   await saveTicket(env, t)
+  return t
+}
+
+// ---- the chat (public) ----
+// About one hour per window: a visitor can ask `max` questions per hour. Kept loose on purpose; it only stops runaway use.
+async function underLimit(env, req, kind, max) {
+  const who = req.headers.get('cf-connecting-ip') || 'unknown'
+  const key = `rl:${kind}:${who}:${Math.floor(Date.now() / 3600000)}`
+  const n = Number((await env.TICKETS.get(key)) || 0)
+  if (n >= max) return false
+  await env.TICKETS.put(key, String(n + 1), { expirationTtl: 3700 })
+  return true
+}
+
+// "Talk to a person" in the chat: the conversation becomes a ticket for the HR team, and the employee gets an email
+// saying who will reply. The HR person answers it on the desk like any email ticket.
+async function chatTicket(env, input) {
+  const bad = (msg) => Object.assign(new Error(msg), { status: 400 })
+  const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
+  const name = line(input?.name, 80)
+  const email = line(input?.email, 120).toLowerCase()
+  if (!/^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email)) throw bad('Please enter a valid email address, so the HR team can reply.')
+  const note = String(input?.note ?? '').trim().slice(0, 1500)
+  const turns = (Array.isArray(input?.transcript) ? input.transcript : []).slice(-20)
+    .map((m) => ({ who: m?.role === 'user' ? 'Employee' : 'Chat assistant', text: String(m?.text ?? '').trim().slice(0, 1500) })).filter((m) => m.text)
+  const question = turns.filter((m) => m.who === 'Employee').map((m) => m.text).pop() || note
+  if (!question) throw bad('There is no question to pass on yet.')
+  const transcript = turns.map((m) => `${m.who}: ${m.text}`).join('\n\n')
+  const text = [note && `Message from the employee: ${note}`, transcript && `Chat so far:\n${transcript}`].filter(Boolean).join('\n\n') || question
+  const customer = name ? `${name.replace(/[<>"]/g, '')} <${email}>` : email
+  const subject = `Chat: ${line(question, 70)}`
+  // The same routing as an email: the safety rules first, then the topic decides who gets it.
+  const r = mustGoToPerson(subject, `${question}\n${note}`) || triage(subject, `${question}\n${note}`)
+  const agent = AGENTS.find((a) => a.id === r.assignee) || AGENTS[0]
+  const at = new Date().toISOString()
+  const id = 'chat-' + crypto.randomUUID()
+  const reply = ackText(name || 'there', agent.name, r.urgent, r.sensitive, r.extra)
+  const t = { id, source: 'chat', subject, customer, status: 'Open', createdAt: at,
+    replies: [{ inbound: true, from: customer, text, at, messageId: id }],
+    triage: { resolved: false, topic: r.topic, urgent: Boolean(r.urgent), assignee: agent.id, sensitive: Boolean(r.sensitive), tags: [...(r.tags || []), 'from-chat'],
+      note: `${r.note || ''} Handed over from the chat by the employee.`.trim(), replyText: reply } }
+  await saveTicket(env, t)
+  try { await sendReply(env, id, reply, true) } catch { /* the ticket exists either way; the HR person can reply */ }
   return t
 }
 
@@ -170,8 +217,24 @@ export default {
   async scheduled(_e, env, ctx) { ctx.waitUntil(pollInbox(env)) },
   async fetch(req, env, ctx) {
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
-    if (req.headers.get('authorization') !== 'Bearer ' + env.HELPER_TOKEN) return json({ error: 'Not allowed' }, 401)
     const url = new URL(req.url)
+    // The chat page and bubble are open to any employee without a password, so these two routes are public
+    // and limited per visitor. They can only ask questions and hand a question to a person: they can never read tickets.
+    if (url.pathname === '/chat' && req.method === 'POST') {
+      try {
+        if (!(await underLimit(env, req, 'chat', 40))) return json({ error: 'Too many questions in a short time. Please wait a few minutes.' }, 429)
+        const input = await req.json()
+        return json(await chatAnswer(env, input && typeof input === 'object' ? input : {}, { corpus: await activeCorpus(env) }))
+      } catch (e) { return json({ error: e.message }, 500) }
+    }
+    if (url.pathname === '/chat/escalate' && req.method === 'POST') {
+      try {
+        if (!(await underLimit(env, req, 'esc', 6))) return json({ error: 'Too many requests in a short time. Please wait a few minutes.' }, 429)
+        const t = await chatTicket(env, await req.json())
+        return json({ ok: true, assignee: AGENTS.find((a) => a.id === t.triage.assignee)?.name, urgent: t.triage.urgent })
+      } catch (e) { return json({ error: e.message }, e.status || 500) }
+    }
+    if (req.headers.get('authorization') !== 'Bearer ' + env.HELPER_TOKEN) return json({ error: 'Not allowed' }, 401)
     try {
       if (url.pathname === '/tickets' && req.method === 'GET') {
         if (url.searchParams.get('refresh')) await pollInbox(env)
