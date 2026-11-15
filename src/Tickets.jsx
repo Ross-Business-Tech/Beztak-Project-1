@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
 import { manualDraft, suggestReply } from './aiAgent'
@@ -22,11 +22,45 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
 // Blanks left in a reply: [like this], {like this} or TBD. A reply with blanks cannot be sent.
 const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
-const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up' }
+const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
 const TAG_COLORS = { 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange' }
 export const VIEW_NAMES = { mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
 
-export function List({ tickets, me, open, reset, nav, setNav }) {
+// "New ticket": an HR person opens a ticket themselves (a phone call, a chat in the hallway, a walk-up).
+export function NewTicket({ onCreate, onClose }) {
+  const [f, setF] = useState({ customer: '', email: '', subject: '', body: '' })
+  const [err, setErr] = useState('')
+  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }))
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onClose])
+  const submit = (e) => {
+    e.preventDefault()
+    const v = { customer: f.customer.trim(), email: f.email.trim(), subject: f.subject.trim(), body: f.body.trim() }
+    if (!v.customer || !v.subject || !v.body) { setErr('Please fill in the name, subject and details.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) { setErr('Please enter a valid email address, like name@company.com.'); return }
+    onCreate(v)
+  }
+  return (
+    <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <form className="modal" onSubmit={submit} noValidate role="dialog" aria-modal="true" aria-labelledby="newt-h">
+        <h2 id="newt-h">New ticket</h2>
+        <p className="mute small">Open a ticket for an employee yourself. It is assigned to you.</p>
+        <label className="field">Employee name<input value={f.customer} onChange={set('customer')} placeholder="Example: Alex Kim" autoFocus maxLength={80} /></label>
+        <label className="field">Employee email<input type="email" value={f.email} onChange={set('email')} placeholder="name@company.com" maxLength={120} /></label>
+        <label className="field">Subject<input value={f.subject} onChange={set('subject')} placeholder="What is this about?" maxLength={150} /></label>
+        <label className="field">Details<textarea rows={5} value={f.body} onChange={set('body')} placeholder="What did the employee ask or report?" maxLength={4000} /></label>
+        <p className="mute small">Use made-up names and details only. Do not type real personal information into this demo.</p>
+        {err && <p className="err small" role="alert">{err}</p>}
+        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary">Create ticket</button></div>
+      </form>
+    </div>
+  )
+}
+
+export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
   // The view lives in App so it survives opening a ticket and coming back.
   const { view } = nav
   const setView = (v) => setNav({ ...nav, view: v })
@@ -91,6 +125,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
           })}
         </div>
       </div>
+      <button className="fab" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
       <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span><button className="link small" onClick={reset}>Reset sample data</button></p>
     </>
   )
@@ -200,7 +235,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                 <article key={i} className={`msg ${m.inbound ? 'in' : m.note ? 'note' : 'out'}`}>
                   <Avatar name={m.ai && t.resolvedByAI ? 'AI agent' : m.from} />
                   <div>
-                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? 'Received by email' : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : 'Sent by email'} · {ago(m.at)}</small></div>
+                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? (t.threadId ? 'Received by email' : 'Opened by HR') : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : (t.threadId ? 'Sent by email' : 'Saved reply, not emailed')} · {ago(m.at)}</small></div>
                     <p>{m.text}</p>
                   </div>
                 </article>
@@ -264,9 +299,9 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                       )}
                 </div>
               )}
-              <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer} (sent by email)…` : 'Only your team can see this…'} />
+              <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer}${t.threadId ? ' (sent by email)' : ' (saved on the ticket, not emailed)'}…` : 'Only your team can see this…'} />
               <div className="row between">
-                <small className="mute">{tab === 'reply' ? `To: ${t.email}` : 'Not sent to the employee'}</small>
+                <small className="mute">{tab === 'reply' ? (t.threadId ? `To: ${t.email}` : `For: ${t.email}. Saved on the ticket, not emailed.`) : 'Not sent to the employee'}</small>
                 <button className="btn primary" type="submit">{tab === 'reply' ? 'Send' : 'Add note'}</button>
               </div>
             </form>
@@ -300,7 +335,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
             </>
           )}
           <hr />
-          <dl><dt>Owner</dt><dd>{agentName(t.assignee)}</dd><dt>Contact</dt><dd>{t.customer}<br /><small>{t.email}</small></dd><dt>Channel</dt><dd>Email</dd><dt>Created</dt><dd>{ago(t.createdAt)}</dd></dl>
+          <dl><dt>Owner</dt><dd>{agentName(t.assignee)}</dd><dt>Contact</dt><dd>{t.customer}<br /><small>{t.email}</small></dd><dt>Channel</dt><dd>{t.channel || 'Email'}</dd><dt>Created</dt><dd>{ago(t.createdAt)}</dd></dl>
         </aside>
       </div>
     </div>
