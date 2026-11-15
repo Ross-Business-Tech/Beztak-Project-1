@@ -10,8 +10,14 @@ lets the AI agent answer what it safely can (sent by email), and sends replies w
 
 ## Secrets (set in Cloudflare, never in this repo)
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `BURNER_EMAIL`, `HELPER_TOKEN`
-and, to turn the AI on, `ANTHROPIC_API_KEY`. Without that last one the helper still works and uses the
+and, to turn the AI on, `UMGPT_API_KEY` (the U-M GPT Toolkit key). Without it the helper still works and uses the
 simple keyword answers.
+
+## Tickets HR opens by hand
+On the website, the "+" button creates a ticket for an employee. The first reply HR sends on it starts a new email to the employee
+(`POST /tickets/new`: the helper sends the email and saves it as a ticket here, so the employee's answer joins the same ticket).
+Later replies use the normal reply route. To limit mistakes, the helper refuses bad addresses and its own address, and sends at most 25 such
+new emails per day. Use made-up employees only while testing.
 
 ## Only new email is handled
 - The helper remembers when it was first switched on and ignores every email from before that, so the old inbox is never read or answered.
@@ -21,7 +27,7 @@ simple keyword answers.
 
 ## Suggest AI reply
 The website's "Suggest AI reply" button on a ticket calls the helper at `/suggest`, because the AI key lives here.
-It needs the newest `worker.js` and the `ANTHROPIC_API_KEY` secret. Without them the button still works but offers the closest
+It needs the newest `worker.js` and the `UMGPT_API_KEY` secret. Without them the button still works but offers the closest
 manual answer or a template with [blanks] instead of an AI-written reply. Personal, approval and safety emails are never
 sent to the AI.
 

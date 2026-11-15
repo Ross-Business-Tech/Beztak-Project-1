@@ -225,7 +225,7 @@ export const EVALS = [
     ai: { body: 'Your vacation has been approved. Enjoy the time off.', sections: ['HR-2'] } },
   { id: 'S6', lane: 'suggest', suggest: { mode: 'draft', notSource: 'AI', notContains: ['999.1'] }, subject: 'Time off', body: 'How do I request vacation?', tests: 'Citing a manual section that does not exist is blocked',
     ai: { body: 'Request it in Paycor.', sections: ['999.1'] } },
-  { id: 'S7', lane: 'suggest', suggest: { mode: 'draft', source: 'AI', blanks: false }, subject: 'Overtime', body: 'I worked 45 hours this week. How does overtime work?', tests: "The employee's own numbers may be repeated",
+  { id: 'S7', lane: 'suggest', suggest: { mode: 'complete', source: 'AI', blanks: false }, subject: 'Overtime', body: 'I worked 45 hours this week. How does overtime work?', tests: "The employee's own numbers may be repeated",
     ai: { body: 'Hourly employees get one and one-half times their hourly rate for time worked over 40 hours in a week. Thanks for telling me about your 45 hours, I will look into it and follow up.', sections: ['13.4'] } },
   { id: 'S8', lane: 'suggest', variants: ['Can you tell me my PTO balance?', 'How many sick days do I have left?'], suggest: { mode: 'draft', source: 'template', aiCalled: false, blanks: true, notContains: ['$'] }, subject: 'My balance', body: 'How many vacation days do I personally have left?', tests: 'Personal records: never sent to the AI, HR gets a template with blanks',
     ai: { body: 'You have 9 vacation days left.', sections: [] } },
@@ -329,7 +329,7 @@ async function checkSuggest(c, body) {
   const e = c.suggest
   let called = false
   const ask = async () => { called = true; return c.ai }
-  const env = { ANTHROPIC_API_KEY: 'test-only' }
+  const env = { UMGPT_API_KEY: 'test-only' }
   const res = await suggestReply(env, { subject: c.subject, body, thread: [], mode: e.mode, customer: 'Alex Kim', agent: 'Priya Nair' }, { ask })
   const text = res.text || ''
   const has = (s) => text.toLowerCase().includes(s.toLowerCase())
@@ -352,7 +352,7 @@ async function checkSuggest(c, body) {
 // The chat: what the employee sees for one message in a conversation.
 async function checkChat(c, body) {
   const e = c.chat
-  const env = e.ai ? { ANTHROPIC_API_KEY: 'test-only' } : {}
+  const env = e.ai ? { UMGPT_API_KEY: 'test-only' } : {}
   const res = await chatAnswer(env, { message: body, history: e.history }, { ask: async () => c.ai, scope: async () => GENERAL })
   const has = (s) => res.text.toLowerCase().includes(s.toLowerCase())
   const problems = []
@@ -388,7 +388,7 @@ async function check(c, subject, body) {
   if (c.chat) return checkChat(c, body)
   if (c.follow) return checkFollowUp(c, body)
   if (c.suggest) return checkSuggest(c, body)
-  const env = c.ai ? { ANTHROPIC_API_KEY: 'test-only' } : {}
+  const env = c.ai ? { UMGPT_API_KEY: 'test-only' } : {}
   const res = await decide(env, subject, body, { ask: async () => c.ai, scope: async () => c.scope || GENERAL, corpus: c.corpus })
   const reply = replyFor(res)
   const e = c.expect

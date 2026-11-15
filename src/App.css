@@ -247,3 +247,10 @@ mark.blank{background:#fff3bf;color:inherit;padding:0 3px;border-radius:3px;box-
 .files .tr{grid-template-columns:minmax(0,2.5fr) 1fr .7fr auto auto}
 @media(max-width:820px){.files .tr{grid-template-columns:1fr auto auto}.files .tr.th{display:none}.files .tr>span{display:none}}
 .manual-use{margin:6px 0}
+
+/* New ticket: a plain blue "+" at the right end of the tabs row (the bottom-right corner is kept free for the chat) */
+.nbar{display:flex;align-items:center;border-bottom:1px solid var(--line);margin-bottom:8px}
+.nbar .nviews{flex:1;min-width:0;border-bottom:0;margin-bottom:0}
+.plus{flex:none;background:none;border:0;color:var(--prim);cursor:pointer;padding:4px 6px;margin-left:6px;display:grid;place-items:center;border-radius:6px}
+.plus:hover{color:var(--prim-d);background:color-mix(in srgb,var(--prim) 10%,transparent)}.plus:focus-visible{outline:2px solid var(--prim);outline-offset:1px}
+.modal .err{color:#b42318;margin:0}

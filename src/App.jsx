@@ -3,7 +3,7 @@ import { AGENTS, SEED_DOCS, SEED_TICKETS, agentForAccount } from './data'
 import { Dashboard, Documents, Profile, Setup } from './Pages'
 import GapTracker from './GapTracker'
 import Guardrails from './Guardrails'
-import { Detail, List, VIEW_NAMES } from './Tickets'
+import { Detail, List, NewTicket, VIEW_NAMES } from './Tickets'
 import { clearFiles } from './fileStore'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
 import { followUp } from './escalate'
@@ -39,6 +39,7 @@ export default function App({ account, signOut }) {
   const [page, setPage] = useState(() => (location.hash === '#guardrails' ? 'guardrails' : 'tickets'))
   useEffect(() => { if (page !== 'guardrails' && location.hash === '#guardrails') history.replaceState(null, '', location.pathname + location.search) }, [page])
   const [openId, setOpenId] = useState(null)
+  const [creating, setCreating] = useState(false)
   useEffect(() => { const f = () => { if (location.hash === '#guardrails') { setPage('guardrails'); setOpenId(null) } }; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f) }, [])
   const [toast, setToast] = useState('')
   useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v5', JSON.stringify(tickets)); localStorage.setItem('hr-desk-docs-v2', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, docs, prefs, helper])
@@ -193,6 +194,21 @@ export default function App({ account, signOut }) {
     setOpenId(target.id)
     setToast(`Ticket #${src.id} merged into #${target.id}.`)
   }
+  const createTicket = (v) => {
+    const res = triage(v.subject, v.body) // sets the topic and whether it is urgent, by the team's own rules
+    const id = Math.max(1000, ...tickets.map((x) => x.id)) + 1
+    const now = new Date().toISOString()
+    setTickets((p) => [{
+      id, subject: v.subject, body: v.body, customer: v.customer, email: v.email,
+      status: 'Open', urgent: res.urgent, topic: res.topic, assignee: me, createdAt: now, dueAt: dueIn(res.urgent, now),
+      resolvedByAI: false, channel: 'Created by HR', note: `Created by ${agentName(me)}.${res.urgent ? ' Marked urgent by the team rules.' : ''}`,
+      advice: [], tags: ['created-by-hr'], replies: [],
+    }, ...p])
+    setNav({ view: 'mine' })
+    setCreating(false)
+    setOpenId(id)
+    setToast(`Ticket #${id} created and assigned to you.`)
+  }
   const go = (k) => { setPage(k); setOpenId(null) }
 
   return (
@@ -211,7 +227,7 @@ export default function App({ account, signOut }) {
         <div className="content">
           {page === 'tickets' && (openId
             ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
-            : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} />)}
+            : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} onNew={() => setCreating(true)} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} manualAt={manualAt} />}
           {page === 'guardrails' && <Guardrails />}
@@ -220,6 +236,7 @@ export default function App({ account, signOut }) {
           {page === 'settings' && <Setup me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
+      {creating && <NewTicket onCreate={createTicket} onClose={() => setCreating(false)} />}
       <ChatBubble user={{ name: agentName(me), email: account }} onUseInReply={(text) => {
         if (page !== 'tickets' || !openId) { setToast('Open a ticket first, then use "Use in reply" to add this answer to your reply.'); return }
         window.dispatchEvent(new CustomEvent('beztakets:use-in-reply', { detail: text }))
