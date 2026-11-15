@@ -1,11 +1,11 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { decide, FOOTER } from '../../src/aiAgent.js'
+import { buildCorpus, decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
 import { ackText } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
 
-const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }
+const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS' }
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...cors } })
 const b64u = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const unb64u = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)))
@@ -42,24 +42,99 @@ async function saveTicket(env, t) {
   if (!index.includes(t.id)) await env.TICKETS.put('index', JSON.stringify([t.id, ...index]))
 }
 
+// The helper only ever looks at email that arrives AFTER it was first switched on. The moment of its
+// first check is saved (minus a few minutes, so an email sent right while it was being switched on
+// is not missed), and anything older is ignored, so the old inbox is never read or answered.
+const START_SLACK = 5 * 60 * 1000
+async function startedAt(env) {
+  let s = await env.TICKETS.get('startedAt')
+  if (!s) { s = String(Date.now() - START_SLACK); await env.TICKETS.put('startedAt', s) }
+  return Number(s)
+}
+
+// True when this address already wrote in the thread before `internalDate` (a person, or an earlier
+// automatic answer, already replied). The helper never answers those a second time.
+async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
+  try {
+    const th = await gmail(env, token, `threads/${threadId}?format=metadata&metadataHeaders=From`)
+    return (th.messages || []).some((x) => +x.internalDate < internalDate && header(x, 'from').toLowerCase().includes(me))
+  } catch { return false } // if Gmail will not say, treat it as a new question: better answered than dropped
+}
+
+// ---- The Operations Manual the assistant reads ----
+// Normally the built-in manual. A team member can instead choose a PDF on the Documents page: the website reads its text,
+// splits it into sections and sends them here (POST /manual), and every answer and suggestion then uses it, with the same
+// safety checks. DELETE /manual goes back to the built-in manual.
+const MANUAL_MAX_CHARS = 350000
+let manualCache = { at: null, corpus: null }
+async function activeCorpus(env) {
+  const m = await env.TICKETS.get('manual', 'json')
+  if (!m) return undefined // the built-in manual
+  if (manualCache.at !== m.at) manualCache = { at: m.at, corpus: buildCorpus(m) }
+  return manualCache.corpus
+}
+function cleanManual(input) {
+  if (!input || typeof input !== 'object') throw new Error('No manual was sent.')
+  const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
+  const block = (x, n) => String(x ?? '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, n)
+  let chars = 0
+  const sections = (Array.isArray(input.sections) ? input.sections : []).slice(0, 400)
+    .map((s) => ({ title: line(s?.title, 200), items: (Array.isArray(s?.items) ? s.items : []).slice(0, 600).map((it) => ({ q: line(it?.q, 300), a: block(it?.a, 4000) })).filter((it) => it.q && it.a) }))
+    .filter((s) => s.title && s.items.length)
+    .map((s, i) => ({ n: i + 1, title: s.title, items: s.items }))
+  for (const s of sections) for (const it of s.items) chars += it.q.length + it.a.length
+  if (!sections.length) throw new Error('The manual had no readable sections.')
+  if (chars > MANUAL_MAX_CHARS) throw new Error(`The manual is too long for the assistant (about ${Math.round(chars / 1000)},000 characters; the limit is ${MANUAL_MAX_CHARS / 1000},000).`)
+  const name = line(input.name, 200) || 'Uploaded manual'
+  return { title: line(input.title, 120) || name.replace(/\.pdf$/i, ''), version: line(input.version, 80) || 'uploaded PDF', name, pages: Math.max(0, Math.floor(Number(input.pages) || 0)), sections, at: new Date().toISOString() }
+}
+const manualInfo = (m) => (m
+  ? { custom: true, title: m.title, version: m.version, name: m.name, pages: m.pages, at: m.at, sections: m.sections.length, entries: m.sections.reduce((n, s) => n + s.items.length, 0), sectionTitles: m.sections.map((s) => ({ n: s.n, title: s.title })) }
+  : { custom: false })
+
 export async function pollInbox(env) {
+  // Only one check at a time: the schedule and the website can both ask, and two checks at once answered the same email twice.
+  // Each check writes its own tag on the lock, waits a moment, and carries on only if its tag is still the one there.
+  if (await env.TICKETS.get('lock')) return
+  const mine = crypto.randomUUID()
+  await env.TICKETS.put('lock', mine, { expirationTtl: 60 })
+  await new Promise((r) => setTimeout(r, 200))
+  if ((await env.TICKETS.get('lock')) !== mine) return
+  // What this check found is saved, so the website can show it (and show any error, which would otherwise be invisible).
+  const stats = { at: new Date().toISOString(), ok: true, listed: 0, seenBefore: 0, older: 0, own: 0, automatic: 0, alreadyAnswered: 0, newTickets: 0, followUps: 0 }
+  try { await pollOnce(env, stats) } catch (e) { stats.ok = false; stats.error = String(e.message || e); throw e } finally {
+    try { await env.TICKETS.put('status', JSON.stringify(stats)) } catch { /* status is only for display */ }
+    if ((await env.TICKETS.get('lock')) === mine) await env.TICKETS.delete('lock')
+  }
+}
+
+async function pollOnce(env, stats) {
+  const floor = await startedAt(env)
+  const corpus = await activeCorpus(env)
+  stats.startedAt = new Date(floor).toISOString()
   const token = await accessToken(env)
   const me = env.BURNER_EMAIL.toLowerCase()
-  const list = await gmail(env, token, 'messages?q=' + encodeURIComponent('in:inbox newer_than:7d') + '&maxResults=25')
+  const list = await gmail(env, token, 'messages?q=' + encodeURIComponent(`in:inbox after:${Math.floor(floor / 1000)}`) + '&maxResults=25')
+  stats.listed = (list.messages || []).length
   for (const { id: msgId } of (list.messages || []).reverse()) {
-    if (await env.TICKETS.get('seen:' + msgId)) continue
+    if (await env.TICKETS.get('seen:' + msgId)) { stats.seenBefore++; continue }
     const m = await gmail(env, token, `messages/${msgId}?format=full`)
     const from = header(m, 'from')
-    await env.TICKETS.put('seen:' + msgId, '1', { expirationTtl: 60 * 60 * 24 * 14 })
-    if (from.toLowerCase().includes(me)) continue
+    await env.TICKETS.put('seen:' + msgId, '1', { expirationTtl: 60 * 60 * 24 * 30 })
+    if (+m.internalDate < floor) { stats.older++; continue } // older than the helper itself
+    if (from.toLowerCase().includes(me)) { stats.own++; continue }
+    const auto = header(m, 'auto-submitted').toLowerCase()
+    if ((auto && auto !== 'no') || /^(bulk|junk|list)$/i.test(header(m, 'precedence'))) { stats.automatic++; continue } // out-of-office and bulk mail: never answer
     const entry = { inbound: true, from, text: stripQuote(bodyText(m.payload)) || m.snippet, at: new Date(+m.internalDate).toISOString(), messageId: header(m, 'message-id') }
     let t = await getTicket(env, m.threadId)
-    if (t) { t.replies.push(entry); if (t.status === 'Closed') t.status = 'Open' }
+    if (t) { t.replies.push(entry); stats.followUps++; if (t.status === 'Closed') t.status = 'Open' }
     else {
+      if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) { stats.alreadyAnswered++; continue } // already answered by someone: leave it alone
+      stats.newTickets++
       t = { id: m.threadId, subject: header(m, 'subject') || '(no subject)', customer: from, status: 'Open', createdAt: entry.at, replies: [entry] }
       if (!/no-?reply|mailer-daemon/i.test(from)) {
         // New conversation: decide who answers, then send the automatic email.
-        const res = await decide(env, t.subject, entry.text)
+        const res = await decide(env, t.subject, entry.text, { corpus })
         const name = (from.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || from
         const agent = AGENTS.find((a) => a.id === res.assignee)
         const reply = res.resolved ? res.answer + FOOTER : ackText(name, agent.name, res.urgent, res.sensitive, res.extra)
@@ -103,6 +178,23 @@ export default {
         const ids = (await env.TICKETS.get('index', 'json')) || []
         return json((await Promise.all(ids.map((i) => getTicket(env, i)))).filter(Boolean))
       }
+      // "Suggest AI reply" on a ticket: the website sends the ticket text, the AI (key kept here) writes a suggestion for HR to check.
+      if (url.pathname === '/suggest' && req.method === 'POST') {
+        const input = await req.json()
+        if (!input || typeof input !== 'object') return json({ error: 'Nothing to suggest a reply for' }, 400)
+        return json(await suggestReply(env, input, { corpus: await activeCorpus(env) }))
+      }
+      if (url.pathname === '/manual') {
+        if (req.method === 'GET') return json(manualInfo(await env.TICKETS.get('manual', 'json')))
+        if (req.method === 'DELETE') { await env.TICKETS.delete('manual'); return json({ custom: false }) }
+        if (req.method === 'POST') {
+          let m
+          try { m = cleanManual(await req.json()) } catch (e) { return json({ error: e.message }, 400) }
+          await env.TICKETS.put('manual', JSON.stringify(m))
+          return json(manualInfo(m))
+        }
+      }
+      if (url.pathname === '/status' && req.method === 'GET') return json((await env.TICKETS.get('status', 'json')) || { never: true })
       const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)
       if (m && req.method === 'POST') {
         const { text, auto } = await req.json()

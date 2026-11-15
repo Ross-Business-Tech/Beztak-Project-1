@@ -68,6 +68,12 @@
     document.body.classList.toggle('has-data', has);
     Object.keys(navButtons).forEach(function (k) { navButtons[k].disabled = !has; });
     syncBadges();
+    notifyHost();
+  }
+
+  // Lets the desk draw the tabs: tells it the current view, whether data is loaded, and the badges.
+  function notifyHost() {
+    if (Q.hostState) Q.hostState({ view: ui.view, has: !!svc.state.brief, fixes: svc.state.brief ? svc.counts().open : 0, due: svc.state.brief ? svc.updates.due().length > 0 : false });
   }
 
   function syncBadges() {
@@ -131,6 +137,9 @@
     const tc = h('div', { class: 'top-ctl' });
     controls(tc);
     top.append(tc);
+    // Inside the desk the tracker has no sidebar or header of its own: the desk shows the tabs,
+    // and the month picker, file and settings controls sit in a slim bar above the content.
+    if (window.GAP_EMBEDDED) { const eb = $('embed-bar'); eb.hidden = false; controls(eb); }
 
     svc.on('brief', function () {
       if (svc.state.brief && ui.panelKey && !svc.find(ui.panelKey)) A.fixes.closePanel();
@@ -170,6 +179,7 @@
       else if (e.key === 'Enter' && tag !== 'button' && tag !== 'summary' && ui.visible[ui.hi]) { e.preventDefault(); A.fixes.openPanel(ui.visible[ui.hi]); }
     });
 
+    Q.goView = function (v) { if (VIEWS.some(function (x) { return x.id === v; }) && svc.state.brief) go(v, true); };
     A.actions.go = go;
     A.actions.openGap = openGap;
 

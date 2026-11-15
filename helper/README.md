@@ -13,9 +13,30 @@ lets the AI agent answer what it safely can (sent by email), and sends replies w
 and, to turn the AI on, `ANTHROPIC_API_KEY`. Without that last one the helper still works and uses the
 simple keyword answers.
 
+## Only new email is handled
+- The helper remembers when it was first switched on and ignores every email from before that, so the old inbox is never read or answered.
+- It never answers a conversation that already has a reply from the inbox address (a person already answered it), or out-of-office and bulk mail.
+- Only one inbox check runs at a time, so the same email is never answered twice.
+- The website only turns emails into tickets if they arrived after that browser was connected (reconnecting starts the clock again), and the website never sends automatic emails itself.
+
+## Suggest AI reply
+The website's "Suggest AI reply" button on a ticket calls the helper at `/suggest`, because the AI key lives here.
+It needs the newest `worker.js` and the `ANTHROPIC_API_KEY` secret. Without them the button still works but offers the closest
+manual answer or a template with [blanks] instead of an AI-written reply. Personal, approval and safety emails are never
+sent to the AI.
+
+## The assistant's manual (PDF)
+On the website's Documents page, open a PDF and click "Use as the assistant's manual". The website reads the PDF's text, splits it into
+sections and sends them here (`POST /manual`, saved in Cloudflare KV). From then on every answer and suggestion uses that PDF in place of
+the built-in Operations Manual, with the same safety checks (facts must appear in the cited section, personal/approval/safety emails still
+go to a person). `GET /manual` says which manual is active and `DELETE /manual` goes back to the built-in one. Scanned PDFs (pictures of
+pages) have no text and cannot be read. The text is stored here and sent to the AI with each question, so use sample documents only.
+
 ## How an email is handled
 1. Safety rules first: emergencies, personal records, pay disputes, approvals, confidential matters,
    legal or medical questions, and anything containing passwords or ID numbers always go to a person.
 2. With an AI key: the AI answers only from the HR answers plus the Operations Manual and must cite sections.
-   If unsure, a person takes over.
+   Every number, phone number and email in the answer must appear in the cited sections, and a second AI
+   check must agree it is a general question (not about one person, an approval, or anything sensitive).
+   If not, a person takes over and gets a suggested reply to check, edit and send.
 3. Everything else gets a short "we passed this to ..." email.
