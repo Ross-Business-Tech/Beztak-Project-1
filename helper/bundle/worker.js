@@ -30361,7 +30361,7 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		related: [],
 		topic: stop.topic,
 		assignee: stop.assignee,
-		text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR team.` : stop.extra || "This is a personal or confidential matter, so a person on the HR team needs to answer it. I can pass it to them."
+		text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR and Ops team.` : stop.extra || "This is a personal or confidential matter, so a person on the HR and Ops team needs to answer it. I can pass it to them."
 	};
 	const withContext = `${prev}\n\nFollow-up question: ${message}`;
 	let res;
@@ -30404,7 +30404,7 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		related,
 		topic: res.topic,
 		assignee: res.assignee,
-		text: personal ? `This needs a person${res.reason ? `: ${res.reason}` : ", because it is about one person's situation, an approval, or a sensitive matter"}. I can pass it to the HR team.` : "I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. You can try one of the related topics below, or I can pass your question to a person."
+		text: personal ? `This needs a person${res.reason ? `: ${res.reason}` : ", because it is about one person's situation, an approval, or a sensitive matter"}. I can pass it to the HR and Ops team.` : "I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. You can try one of the related topics below, or I can pass your question to a person."
 	};
 }
 //#endregion

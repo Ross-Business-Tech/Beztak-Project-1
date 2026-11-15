@@ -409,8 +409,8 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   if (stop) {
     return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee,
       // safety rules (911, 988, the on-call line) keep their exact wording; personal and approval questions get the reason
-      text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR team.`
-        : stop.extra || 'This is a personal or confidential matter, so a person on the HR team needs to answer it. I can pass it to them.' }
+      text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR and Ops team.`
+        : stop.extra || 'This is a personal or confidential matter, so a person on the HR and Ops team needs to answer it. I can pass it to them.' }
   }
   // With the AI, a follow-up is sent together with the question before it, so "it" makes sense.
   // Without the AI (word matching), the new message is tried on its own first, and only joined to the
@@ -436,6 +436,6 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   const personal = res.sensitive || (res.tags || []).some((t) => ['ai-second-check'].includes(t))
   return { kind: personal ? 'person' : 'unknown', urgent: Boolean(res.urgent), refs: [], related, topic: res.topic, assignee: res.assignee,
     text: personal
-      ? `This needs a person${res.reason ? `: ${res.reason}` : ', because it is about one person\'s situation, an approval, or a sensitive matter'}. I can pass it to the HR team.`
+      ? `This needs a person${res.reason ? `: ${res.reason}` : ', because it is about one person\'s situation, an approval, or a sensitive matter'}. I can pass it to the HR and Ops team.`
       : 'I could not find a clear answer to that in the Beztak Operations Manual, so I won\'t guess. You can try one of the related topics below, or I can pass your question to a person.' }
 }

@@ -9,7 +9,7 @@ export default function ChatBubble({ onUseInReply }) {
     <>
       {open && (
         <section className="bubble-panel" role="dialog" aria-label="Ask the Operations Manual">
-          <div className="bubble-head"><div><b>Ask the manual</b><small>Quick look-up for the HR team</small></div><button onClick={() => setOpen(false)} aria-label="Close chat">✕</button></div>
+          <div className="bubble-head"><div><b>Ask the manual</b><small>Quick look-up in the Operations Manual</small></div><button onClick={() => setOpen(false)} aria-label="Close chat">✕</button></div>
           <Chat mode="staff" compact onUseInReply={onUseInReply} />
         </section>
       )}
