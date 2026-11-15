@@ -40,7 +40,7 @@ export default function Chat({ mode = 'employee', user, onUseInReply, compact = 
     try {
       const r = await handToPerson({ name: handoff.name, email: handoff.email, note: handoff.note, transcript: transcript() })
       setHandoff(null)
-      setMessages((m) => [...m, { role: 'system', text: `Done. Your question is now with ${r.assignee || 'the HR and Ops team'}${r.urgent ? ' and marked urgent' : ''}. They will reply by email to ${handoff.email}. We also sent you an email to confirm.` }])
+      setMessages((m) => [...m, { role: 'system', text: `Ticket submitted. ${r.assignee || 'The HR and Ops team'} will handle it${r.urgent ? ', and it is marked urgent' : ''}. They will reply by email to ${handoff.email}, and we also sent you an email to confirm.` }])
     } catch (err) {
       const offline = !err.status || err.status >= 500 || err.status === 404 || err.status === 401
       setHandoff((h) => ({ ...h, busy: false, error: offline ? `The help desk can't be reached right now. Please email your question to ${HR_ADDRESS}.` : err.message }))
@@ -68,13 +68,13 @@ export default function Chat({ mode = 'employee', user, onUseInReply, compact = 
         {busy && <div className="cm cm-bot cm-typing" aria-label="Looking it up"><i /><i /><i /></div>}
         {handoff && (
           <form className="cm cm-handoff" onSubmit={sendHandoff}>
-            <b>Pass this to a person</b>
-            <p className="mute small">The HR and Ops team gets your question and this chat, and replies by email, usually within one business day.</p>
+            <b>Submit a ticket</b>
+            <p className="mute small">This creates a support ticket for the HR and Ops team with your question and this chat. A person will reply by email, usually within one business day.</p>
             <label className="field">Your name<input value={handoff.name} onChange={(e) => setHandoff({ ...handoff, name: e.target.value })} autoComplete="name" /></label>
             <label className="field">Your email (so they can reply)<input type="email" required value={handoff.email} onChange={(e) => setHandoff({ ...handoff, email: e.target.value })} autoComplete="email" /></label>
             <label className="field">Anything to add? (optional)<textarea rows={2} value={handoff.note} onChange={(e) => setHandoff({ ...handoff, note: e.target.value })} placeholder="Don't include passwords, ID or bank numbers." /></label>
             {handoff.error && <p className="chat-error" role="alert">{handoff.error}</p>}
-            <div className="row"><button className="btn primary" disabled={handoff.busy}>{handoff.busy ? 'Sending…' : 'Send to HR'}</button><button type="button" className="btn" onClick={() => setHandoff(null)}>Cancel</button></div>
+            <div className="row"><button className="btn primary" disabled={handoff.busy}>{handoff.busy ? 'Submitting…' : 'Submit ticket'}</button><button type="button" className="btn" onClick={() => setHandoff(null)}>Cancel</button></div>
           </form>
         )}
         <div ref={endRef} />
