@@ -106,7 +106,7 @@ function Answer({ m, mode, onAsk, onUseInReply, onHandOff, isLast }) {
       {m.related?.length > 0 && isLast && <div className="chat-chips">{m.related.map((r) => <button key={r.ref} className="chip" onClick={() => onAsk(r.title)}>{r.title}</button>)}</div>}
       <div className="cm-actions">
         {mode === 'staff' && m.kind === 'answer' && onUseInReply && <button className="link" onClick={() => onUseInReply(m.text)}>Use in reply</button>}
-        {mode === 'employee' && m.kind !== 'answer' && isLast && onHandOff && <button className="btn primary small-btn" onClick={onHandOff}>Pass to a person</button>}
+        {mode === 'employee' && (m.kind === 'person' || m.kind === 'unknown') && isLast && onHandOff && <button className="btn primary small-btn" onClick={onHandOff}>Pass to a person</button>}
       </div>
     </div>
   )

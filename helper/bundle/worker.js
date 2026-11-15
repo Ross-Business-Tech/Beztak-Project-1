@@ -30347,6 +30347,25 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		refs: [],
 		related: []
 	};
+	const small = message.toLowerCase().replace(/[^a-z' ]+/g, " ").replace(/\s+/g, " ").trim();
+	if (/^(hey+|hi+|hello+|hiya|yo|howdy|good (morning|afternoon|evening)|hey there|hi there|hello there)( (there|team|bot|beztak|ask beztak))?$/.test(small)) return {
+		kind: "smalltalk",
+		refs: [],
+		related: [],
+		text: "Hi! I can help with Beztak operations questions, like rent, work orders, purchasing, maintenance and on-call. What would you like to know?"
+	};
+	if (/^(thanks?( you)?( so much| a lot)?|thank u|thx|ty|cheers|perfect|great|awesome|got it|ok(ay)?|cool|sounds good)( thanks?( you)?)?$/.test(small)) return {
+		kind: "smalltalk",
+		refs: [],
+		related: [],
+		text: "You're welcome! Ask me anything else about Beztak operations."
+	};
+	if (/^(bye|goodbye|see (you|ya)|that'?s all|nothing else|no thanks?)$/.test(small)) return {
+		kind: "smalltalk",
+		refs: [],
+		related: [],
+		text: "Glad I could help. Come back any time you have a question."
+	};
 	const prev = [...history].reverse().find((m) => m?.role === "user" && typeof m.text === "string")?.text?.slice(0, 500);
 	const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message));
 	const GENERIC = new Set([

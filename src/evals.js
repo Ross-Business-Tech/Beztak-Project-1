@@ -268,6 +268,8 @@ export const EVALS = [
   { id: 'C5', lane: 'chat', subject: 'Chat', body: 'how far ahead?', tests: 'A short follow-up is read with the question before it',
     chat: { history: [{ role: 'user', text: 'How do I request time off?' }, { role: 'assistant', text: 'PTO requests go through Paycor.' }], kind: 'answer', ai: true, contains: ['Paycor'] },
     ai: { answerable: true, topic: 'timeoff', answer: 'PTO requests go through Paycor, and your manager approves them [HR-2].', sections: ['HR-2'], draft: '', draft_sections: [] } },
+  { id: 'C7', lane: 'chat', subject: 'Chat', body: 'hey', variants: ['Hi there!', 'good morning', 'thanks!', 'ok'], tests: 'Greetings and thanks get a friendly reply, not "not in the manual"',
+    chat: { history: [], kind: 'smalltalk', notContains: ["won't guess", 'could not find'] } },
   { id: 'C6', lane: 'chat', subject: 'Chat', body: 'How many vacation days do I get?', tests: 'With the AI on: an AI chat answer with an invented number is blocked',
     chat: { history: [], ai: true, notKind: 'answer-ai', notContains: ['15 days'] },
     ai: { answerable: true, topic: 'timeoff', answer: 'You get 15 days of vacation each year [HR-2].', sections: ['HR-2'], draft: '', draft_sections: [] } },
