@@ -1,9 +1,9 @@
-// Makes public/docs/sample-operations-manual.pdf: a readable PDF copy of the manual text the assistant answers from
-// (src/data/sampleManual.js), so the Documents page has a real PDF to open.
+// Makes public/docs/beztak-operations-manual.pdf: a readable PDF copy of the manual text the assistant answers from
+// (src/data/beztakManual.js), so the Documents page has a real PDF to open.
 // Run:  npm run build:manual-pdf      (needs Playwright with a Chromium browser; set CHROMIUM_PATH if it is not found)
 import { mkdirSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { MANUAL, SECTIONS } from '../src/data/sampleManual.js'
+import { MANUAL, SECTIONS } from '../src/data/beztakManual.js'
 
 const require = createRequire(import.meta.url)
 let playwright
@@ -43,7 +43,7 @@ ${SECTIONS.map((s) => `<h2>${s.n}. ${esc(s.title)}</h2>${s.items.map((it, i) => 
 </body></html>`
 
 mkdirSync(new URL('../public/docs/', import.meta.url), { recursive: true })
-const out = new URL('../public/docs/sample-operations-manual.pdf', import.meta.url).pathname
+const out = new URL('../public/docs/beztak-operations-manual.pdf', import.meta.url).pathname
 const browser = await playwright.chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
 try {
   const page = await browser.newPage()

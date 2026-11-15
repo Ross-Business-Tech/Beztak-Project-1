@@ -7,7 +7,7 @@ import { readPdfPages, manualFromPages } from './manualFromPdf'
 import { setActiveManualTitles } from './activeManual'
 import { AGENTS, ESCALATIONS, KNOWLEDGE, TOPIC_LABELS } from './data'
 import { topicLabel } from './triage'
-import { MANUAL, SECTIONS } from './data/sampleManual.js'
+import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { ago, agent, agentName, dueInfo, initials, pendingAdviceFor } from './util'
 
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
@@ -33,7 +33,7 @@ export function Dashboard({ tickets, me }) {
 
 // Documents that come with the site as a real PDF file (by document id). The built-in manual entry was saved before
 // PDFs could be opened, so it is matched by id and not by a flag stored with it.
-const BUILTIN_PDFS = { 1: { file: 'docs/sample-operations-manual.pdf', note: 'This is a text copy of the manual the assistant answers from, made for reading here. To read the original, upload the PDF.' } }
+const BUILTIN_PDFS = { 1: { file: 'docs/beztak-operations-manual.pdf', note: 'This is a text copy of the manual the assistant answers from, made for reading here. To read the original, upload the PDF.' } }
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
 
 // Opens one document: a real PDF page by page, or the plain text of a text file.
@@ -98,7 +98,7 @@ function AssistantManual({ am }) {
           : info.error ? <p className="pdf-err">{info.error}</p>
             : info.custom
               ? <p><span className="badge violet">Your PDF</span> The assistant is reading <b>{info.name}</b> ({info.pages} pages, {info.sections} sections), set {new Date(info.at).toLocaleString()}.</p>
-              : <p><span className="badge grey">Built-in</span> The assistant is reading the built-in sample Operations Manual (made up for the demo) ({MANUAL.version}, {SECTIONS.reduce((n, x) => n + x.items.length, 0)} answers).</p>}
+              : <p><span className="badge grey">Built-in</span> The assistant is reading the built-in Beztak Operations Manual ({MANUAL.version}, {SECTIONS.reduce((n, x) => n + x.items.length, 0)} answers).</p>}
       {busy && <p role="status" className="mute">{busy}</p>}
       {msg && <p className="note-line" role="status">{msg}</p>}
       {info?.custom && <button type="button" className="btn sm" disabled={Boolean(busy)} onClick={reset}>Go back to the built-in manual</button>}

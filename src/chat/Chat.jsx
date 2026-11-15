@@ -3,8 +3,8 @@ import { askChat, handToPerson } from './chatClient'
 import { HR_ADDRESS } from '../data'
 import './chat.css'
 
-// Starter questions show what the chat is for: day-to-day operations from the Operations Manual.
-const STARTERS = ['When is rent due?', 'A resident is locked out. What do I do?', 'How much can I approve for a repair?', 'What are the maintenance priority levels?']
+// Starter questions show what the chat is for: day-to-day operations from the Beztak Operations Manual.
+const STARTERS = ['When is rent due?', 'How fast must work orders be completed?', 'When do I need a purchase order?', 'How fast must on-call respond to an emergency?']
 
 // One chat, used everywhere: the "Ask Beztak" page, the bubble on other sites, the employee view after sign-in,
 // and (with mode="staff") the look-up bubble inside the HR desk.
@@ -56,7 +56,7 @@ export default function Chat({ mode = 'employee', user, onUseInReply, compact = 
         {messages.length === 0 && (
           <div className="chat-hello">
             <p><b>Hi{user?.name ? ` ${user.name.split(' ')[0]}` : ''}! Ask me about Beztak policies and procedures.</b></p>
-            <p className="mute small">{mode === 'staff' ? 'Look up anything in the Operations Manual while you work on a ticket.' : 'I answer only from the Operations Manual and show the section I used. For anything personal, I\'ll pass you to a person.'}</p>
+            <p className="mute small">{mode === 'staff' ? 'Look up anything in the Operations Manual while you work on a ticket.' : 'I answer only from the Beztak Operations Manual and show the section I used. For anything personal, I\'ll pass you to a person.'}</p>
             <div className="chat-chips">{STARTERS.map((s) => <button key={s} className="chip" onClick={() => ask(s)}>{s}</button>)}</div>
           </div>
         )}
@@ -102,7 +102,7 @@ function Answer({ m, mode, onAsk, onUseInReply, onHandOff, isLast }) {
       {lines.map((l, i) => (/^[-•]\s/.test(l) ? null : <p key={i}>{l}</p>))}
       {bullets.length > 0 && <ul>{bullets.map((l, i) => <li key={i}>{l.replace(/^[-•]\s/, '')}</li>)}</ul>}
       {m.refs?.length > 0 && <div className="cm-refs">{m.refs.map((r) => <span key={r.ref} className="cm-ref" title={r.title}>{r.ref} · {r.title}</span>)}</div>}
-      {m.kind === 'answer' && <p className="cm-src">{m.source === 'AI' ? 'Written by AI from the Operations Manual and checked against the sections above.' : 'From the Operations Manual.'}</p>}
+      {m.kind === 'answer' && <p className="cm-src">{m.source === 'AI' ? 'Written by AI from the Beztak Operations Manual and checked against the sections above.' : 'From the Beztak Operations Manual.'}</p>}
       {m.related?.length > 0 && isLast && <div className="chat-chips">{m.related.map((r) => <button key={r.ref} className="chip" onClick={() => onAsk(r.title)}>{r.title}</button>)}</div>}
       <div className="cm-actions">
         {mode === 'staff' && m.kind === 'answer' && onUseInReply && <button className="link" onClick={() => onUseInReply(m.text)}>Use in reply</button>}
