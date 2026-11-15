@@ -15,6 +15,10 @@ import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { triage } from './triage'
 
 export const AI_MODEL = 'claude-opus-5-5'
+// The U-M GPT Toolkit (an OpenAI-style service) is used when the helper has a UMGPT_API_KEY secret;
+// otherwise Claude is used when it has an ANTHROPIC_API_KEY secret.
+export const UM_BASE_URL = 'https://api.toolkit.umgpt.umich.edu/v1'
+export const UM_MODEL = 'gpt-5.6-terra'
 export const FOOTER = '\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. If it did not help, reply to this email and say you would like a person: someone from HR will reply within one business day.'
 
 // ---- rules the AI must never handle ----
@@ -123,7 +127,7 @@ async function askModel(env, subject, body, corpus = BUILTIN) {
   return callModel(env, { system: systemPrompt(corpus.text), schema: ANSWER_SCHEMA, effort: 'medium', maxTokens: 6000, cache: true }, subject, body)
 }
 
-export const aiConnected = (env) => Boolean(env.ANTHROPIC_API_KEY)
+export const aiConnected = (env) => Boolean(env.UMGPT_API_KEY || env.ANTHROPIC_API_KEY)
 
 // The SDK is loaded only when the AI is actually used, so pages stay fast.
 let sdk = null
@@ -131,7 +135,35 @@ const loadSdk = async () => (sdk ||= (await import('@anthropic-ai/sdk')).default
 
 const clientFor = (Anthropic, env) => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 30000, maxRetries: 1 })
 
+const emailMessage = (subject, body) => `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4000)}\n</email>`
+
+// U-M GPT Toolkit, through the OpenAI-style "responses" call (the same one Codex uses).
+async function callUmModel(env, { system, schema, effort, maxTokens }, subject, body) {
+  const res = await fetch(`${(env.UMGPT_BASE_URL || UM_BASE_URL).replace(/\/$/, '')}/responses`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.UMGPT_API_KEY}`, 'content-type': 'application/json' },
+    signal: AbortSignal.timeout(45000),
+    body: JSON.stringify({
+      model: env.UMGPT_MODEL || UM_MODEL,
+      instructions: system,
+      input: emailMessage(subject, body),
+      max_output_tokens: Math.max(maxTokens, 4000), // reasoning models spend some of this thinking
+      reasoning: { effort },
+      store: false,
+      text: { format: { type: 'json_schema', name: 'result', strict: true, schema } },
+    }),
+  })
+  if (!res.ok) { const err = new Error(`U-M AI service answered ${res.status}`); err.status = res.status; throw err }
+  const data = await res.json()
+  const parts = (data.output || []).flatMap((o) => (o.type === 'message' ? o.content || [] : []))
+  if (parts.some((p) => p.type === 'refusal')) return null // treated as "not answerable": a person replies
+  const text = parts.filter((p) => p.type === 'output_text').map((p) => p.text).join('')
+  if (data.status === 'incomplete' || !text) throw new Error('U-M AI service gave no complete answer')
+  return JSON.parse(text)
+}
+
 async function callModel(env, { system, schema, effort, maxTokens, cache }, subject, body) {
+  if (env.UMGPT_API_KEY) return callUmModel(env, { system, schema, effort, maxTokens }, subject, body)
   const Anthropic = await loadSdk()
   const response = await clientFor(Anthropic, env).beta.messages.create({
     model: AI_MODEL,
@@ -141,7 +173,7 @@ async function callModel(env, { system, schema, effort, maxTokens, cache }, subj
     fallbacks: 'default',
     output_config: { effort, format: { type: 'json_schema', schema } },
     system: [{ type: 'text', text: system, ...(cache ? { cache_control: { type: 'ephemeral' } } : {}) }],
-    messages: [{ role: 'user', content: `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4000)}\n</email>` }],
+    messages: [{ role: 'user', content: emailMessage(subject, body) }],
   })
   if (response.stop_reason === 'refusal') return null // treated as "not answerable": a person replies
   const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('')

@@ -10,7 +10,7 @@ lets the AI agent answer what it safely can (sent by email), and sends replies w
 
 ## Secrets (set in Cloudflare, never in this repo)
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `BURNER_EMAIL`, `HELPER_TOKEN`
-and, to turn the AI on, `ANTHROPIC_API_KEY`. Without that last one the helper still works and uses the
+and, to turn the AI on, `UMGPT_API_KEY` (the U-M GPT Toolkit key, used first) or `ANTHROPIC_API_KEY` (Claude, used if there is no U-M key). Without that last one the helper still works and uses the
 simple keyword answers.
 
 ## Only new email is handled
@@ -21,7 +21,7 @@ simple keyword answers.
 
 ## Suggest AI reply
 The website's "Suggest AI reply" button on a ticket calls the helper at `/suggest`, because the AI key lives here.
-It needs the newest `worker.js` and the `ANTHROPIC_API_KEY` secret. Without them the button still works but offers the closest
+It needs the newest `worker.js` and the `UMGPT_API_KEY` (or `ANTHROPIC_API_KEY`) secret. Without them the button still works but offers the closest
 manual answer or a template with [blanks] instead of an AI-written reply. Personal, approval and safety emails are never
 sent to the AI.
 

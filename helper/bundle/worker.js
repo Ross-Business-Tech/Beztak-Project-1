@@ -29953,7 +29953,7 @@ async function askModel(env, subject, body, corpus = BUILTIN) {
 		cache: true
 	}, subject, body);
 }
-var aiConnected = (env) => Boolean(env.ANTHROPIC_API_KEY);
+var aiConnected = (env) => Boolean(env.UMGPT_API_KEY || env.ANTHROPIC_API_KEY);
 var sdk = null;
 var loadSdk = async () => sdk ||= (await Promise.resolve().then(() => (init_sdk(), sdk_exports))).default;
 var clientFor = (Anthropic, env) => new Anthropic({
@@ -29961,7 +29961,49 @@ var clientFor = (Anthropic, env) => new Anthropic({
 	timeout: 3e4,
 	maxRetries: 1
 });
+var emailMessage = (subject, body) => `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4e3)}\n</email>`;
+async function callUmModel(env, { system, schema, effort, maxTokens }, subject, body) {
+	const res = await fetch(`${(env.UMGPT_BASE_URL || "https://api.toolkit.umgpt.umich.edu/v1").replace(/\/$/, "")}/responses`, {
+		method: "POST",
+		headers: {
+			authorization: `Bearer ${env.UMGPT_API_KEY}`,
+			"content-type": "application/json"
+		},
+		signal: AbortSignal.timeout(45e3),
+		body: JSON.stringify({
+			model: env.UMGPT_MODEL || "gpt-5.6-terra",
+			instructions: system,
+			input: emailMessage(subject, body),
+			max_output_tokens: Math.max(maxTokens, 4e3),
+			reasoning: { effort },
+			store: false,
+			text: { format: {
+				type: "json_schema",
+				name: "result",
+				strict: true,
+				schema
+			} }
+		})
+	});
+	if (!res.ok) {
+		const err = /* @__PURE__ */ new Error(`U-M AI service answered ${res.status}`);
+		err.status = res.status;
+		throw err;
+	}
+	const data = await res.json();
+	const parts = (data.output || []).flatMap((o) => o.type === "message" ? o.content || [] : []);
+	if (parts.some((p) => p.type === "refusal")) return null;
+	const text = parts.filter((p) => p.type === "output_text").map((p) => p.text).join("");
+	if (data.status === "incomplete" || !text) throw new Error("U-M AI service gave no complete answer");
+	return JSON.parse(text);
+}
 async function callModel(env, { system, schema, effort, maxTokens, cache }, subject, body) {
+	if (env.UMGPT_API_KEY) return callUmModel(env, {
+		system,
+		schema,
+		effort,
+		maxTokens
+	}, subject, body);
 	const response = await clientFor(await loadSdk(), env).beta.messages.create({
 		model: AI_MODEL,
 		max_tokens: maxTokens,
@@ -29981,7 +30023,7 @@ async function callModel(env, { system, schema, effort, maxTokens, cache }, subj
 		}],
 		messages: [{
 			role: "user",
-			content: `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4e3)}\n</email>`
+			content: emailMessage(subject, body)
 		}]
 	});
 	if (response.stop_reason === "refusal") return null;
