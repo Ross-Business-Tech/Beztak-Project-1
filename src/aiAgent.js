@@ -455,3 +455,30 @@ export async function chatAnswer(env, input = {}, opts = {}) {
       ? `This needs a person${res.reason ? `: ${res.reason}` : ', because it is about one person\'s situation, an approval, or a sensitive matter'}. I can pass it to the HR and Ops team.`
       : `I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. ${related.length ? 'You can try one of the related topics below, or I can pass your question to a person.' : 'I can pass your question to a person.'}` }
 }
+
+// ---- Every chat is a ticket ----
+// One ticket per chat conversation. Given the turns so far ({ role, text, kind, urgent, topic, assignee }), decide how the
+// ticket looks on the desk: answered chats are closed as "answered by the AI"; anything that needed a person (a personal
+// question, something the manual doesn't cover, or the employee asking for a person) is open for the team, routed and
+// prioritised the same way as an email.
+export function chatTicketState(turns = [], { askedForPerson = false } = {}) {
+  const bot = turns.filter((t) => t && t.role === 'assistant')
+  const needs = bot.filter((t) => t.kind === 'person' || t.kind === 'unknown')
+  const urgent = bot.some((t) => t.urgent)
+  const questions = turns.filter((t) => t && t.role === 'user').map((t) => String(t.text || ''))
+  const firstReal = questions.find((q) => q.split(/\s+/).length > 2) || questions[0] || ''
+  const resolved = !askedForPerson && needs.length === 0 && bot.some((t) => t.kind === 'answer')
+  // What the ticket is about: the question that needed a person (not "When is rent due?" asked before it), else the first real question.
+  const firstNeed = turns.findIndex((t) => t && t.role === 'assistant' && (t.kind === 'person' || t.kind === 'unknown'))
+  const focus = (firstNeed > 0 && turns[firstNeed - 1]?.role === 'user' ? String(turns[firstNeed - 1].text) : '') || firstReal
+  // Who gets it: the first turn that needed a person decides, otherwise the topic of the first real question.
+  const pick = needs.find((t) => t.assignee) || bot.find((t) => t.assignee)
+  const routed = pick?.assignee ? { assignee: pick.assignee, topic: pick.topic } : (() => { const r = triage('Chat', firstReal); return { assignee: r.assignee, topic: r.topic } })()
+  const reasons = [askedForPerson && 'the employee asked for a person', needs.some((t) => t.kind === 'person') && 'a question needs a person', needs.some((t) => t.kind === 'unknown') && 'a question is not covered by the manual'].filter(Boolean)
+  return {
+    resolved, urgent, focus, assignee: routed.assignee || AGENTS[0].id, topic: routed.topic || 'general', subject: `Chat: ${focus.replace(/\s+/g, ' ').trim().slice(0, 70) || 'question'}`,
+    tags: ['from-chat', ...(resolved ? ['ai-resolved'] : []), ...(askedForPerson ? ['asked-for-person'] : []), ...(urgent ? ['urgent'] : [])],
+    note: resolved ? 'Chat answered automatically from the manual. No person needed unless the employee asks.'
+      : `From the chat: ${reasons.join(', ') || 'needs a person'}.${urgent ? ' Marked urgent.' : ''}`,
+  }
+}

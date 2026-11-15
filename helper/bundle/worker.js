@@ -30445,6 +30445,47 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		text: personal ? `This needs a person${res.reason ? `: ${res.reason}` : ", because it is about one person's situation, an approval, or a sensitive matter"}. I can pass it to the HR and Ops team.` : `I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. ${related.length ? "You can try one of the related topics below, or I can pass your question to a person." : "I can pass your question to a person."}`
 	};
 }
+function chatTicketState(turns = [], { askedForPerson = false } = {}) {
+	const bot = turns.filter((t) => t && t.role === "assistant");
+	const needs = bot.filter((t) => t.kind === "person" || t.kind === "unknown");
+	const urgent = bot.some((t) => t.urgent);
+	const questions = turns.filter((t) => t && t.role === "user").map((t) => String(t.text || ""));
+	const firstReal = questions.find((q) => q.split(/\s+/).length > 2) || questions[0] || "";
+	const resolved = !askedForPerson && needs.length === 0 && bot.some((t) => t.kind === "answer");
+	const firstNeed = turns.findIndex((t) => t && t.role === "assistant" && (t.kind === "person" || t.kind === "unknown"));
+	const focus = (firstNeed > 0 && turns[firstNeed - 1]?.role === "user" ? String(turns[firstNeed - 1].text) : "") || firstReal;
+	const pick = needs.find((t) => t.assignee) || bot.find((t) => t.assignee);
+	const routed = pick?.assignee ? {
+		assignee: pick.assignee,
+		topic: pick.topic
+	} : (() => {
+		const r = triage("Chat", firstReal);
+		return {
+			assignee: r.assignee,
+			topic: r.topic
+		};
+	})();
+	const reasons = [
+		askedForPerson && "the employee asked for a person",
+		needs.some((t) => t.kind === "person") && "a question needs a person",
+		needs.some((t) => t.kind === "unknown") && "a question is not covered by the manual"
+	].filter(Boolean);
+	return {
+		resolved,
+		urgent,
+		focus,
+		assignee: routed.assignee || AGENTS[0].id,
+		topic: routed.topic || "general",
+		subject: `Chat: ${focus.replace(/\s+/g, " ").trim().slice(0, 70) || "question"}`,
+		tags: [
+			"from-chat",
+			...resolved ? ["ai-resolved"] : [],
+			...askedForPerson ? ["asked-for-person"] : [],
+			...urgent ? ["urgent"] : []
+		],
+		note: resolved ? "Chat answered automatically from the manual. No person needed unless the employee asks." : `From the chat: ${reasons.join(", ") || "needs a person"}.${urgent ? " Marked urgent." : ""}`
+	};
+}
 //#endregion
 //#region helper/src/index.js
 var cors = {
@@ -30732,6 +30773,119 @@ async function underLimit(env, req, kind, max) {
 	await env.TICKETS.put(key, String(n + 1), { expirationTtl: 3700 });
 	return true;
 }
+var chatId = (cid) => /^[a-z0-9-]{8,64}$/i.test(String(cid || "")) ? "chat-" + String(cid).toLowerCase() : null;
+var contactOf = (input) => {
+	const line = (x, n) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+	const name = line(input?.name, 80).replace(/[<>"]/g, "");
+	const email = line(input?.email, 120).toLowerCase();
+	if (!/^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email)) return null;
+	return {
+		name,
+		email,
+		customer: name ? `${name} <${email}>` : email
+	};
+};
+function refreshChatTicket(t) {
+	const state = chatTicketState(t.turns || [], { askedForPerson: Boolean(t.askedForPerson) });
+	t.subject = state.subject;
+	t.focus = state.focus;
+	t.status = state.resolved ? "Closed" : "Open";
+	t.triage = {
+		...t.triage || {},
+		resolved: state.resolved,
+		topic: state.topic,
+		urgent: state.urgent,
+		assignee: state.assignee,
+		sensitive: !state.resolved && (t.turns || []).some((x) => x.kind === "person"),
+		tags: state.tags,
+		note: state.note
+	};
+	return t;
+}
+async function logChat(env, input, res) {
+	const id = chatId(input?.conversationId);
+	const who = contactOf(input);
+	const message = String(input?.message ?? "").replace(/\s+/g, " ").trim().slice(0, 1e3);
+	if (!id || !who || !message) return null;
+	const at = (/* @__PURE__ */ new Date()).toISOString();
+	const t = await getTicket(env, id) || {
+		id,
+		source: "chat",
+		customer: who.customer,
+		createdAt: at,
+		turns: [],
+		replies: []
+	};
+	t.customer = who.customer;
+	const n = t.turns.length;
+	t.turns.push({
+		role: "user",
+		text: message,
+		at
+	}, {
+		role: "assistant",
+		text: String(res.text || "").slice(0, 4e3),
+		kind: res.kind,
+		urgent: Boolean(res.urgent),
+		topic: res.topic,
+		assignee: res.assignee,
+		at
+	});
+	t.replies.push({
+		inbound: true,
+		from: who.customer,
+		text: message,
+		at,
+		messageId: `${id}-${n}`
+	}, {
+		chatAnswer: true,
+		kind: res.kind,
+		text: String(res.text || "").slice(0, 4e3),
+		at
+	});
+	await saveTicket(env, refreshChatTicket(t));
+	return {
+		id,
+		status: t.status
+	};
+}
+async function escalateChat(env, input) {
+	const id = chatId(input?.conversationId);
+	if (!id) return null;
+	const t = await getTicket(env, id);
+	if (!t) return null;
+	const who = contactOf(input);
+	if (who) t.customer = who.customer;
+	const note = String(input?.note ?? "").trim().slice(0, 1500);
+	const at = (/* @__PURE__ */ new Date()).toISOString();
+	if (note) {
+		t.turns.push({
+			role: "user",
+			text: note,
+			at
+		});
+		t.replies.push({
+			inbound: true,
+			from: t.customer,
+			text: note,
+			at,
+			messageId: `${id}-${t.turns.length}`
+		});
+	}
+	t.askedForPerson = true;
+	refreshChatTicket(t);
+	const agent = AGENTS.find((a) => a.id === t.triage.assignee) || AGENTS[0];
+	const name = (t.customer.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || "there";
+	t.triage.replyText = ackText(name, agent.name, t.triage.urgent, t.triage.sensitive, null);
+	await saveTicket(env, t);
+	if (!t.ackSent) try {
+		await sendReply(env, id, t.triage.replyText, true);
+		const fresh = await getTicket(env, id);
+		fresh.ackSent = true;
+		await saveTicket(env, fresh);
+	} catch {}
+	return t;
+}
 async function chatTicket(env, input) {
 	const bad = (msg) => Object.assign(new Error(msg), { status: 400 });
 	const line = (x, n) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, n);
@@ -30752,7 +30906,7 @@ async function chatTicket(env, input) {
 	const r = mustGoToPerson(subject, `${question}\n${note}`) || triage(subject, `${question}\n${note}`);
 	const agent = AGENTS.find((a) => a.id === r.assignee) || AGENTS[0];
 	const at = (/* @__PURE__ */ new Date()).toISOString();
-	const id = "chat-" + crypto.randomUUID();
+	const id = chatId(input?.conversationId) || "chat-" + crypto.randomUUID();
 	const reply = ackText(name || "there", agent.name, r.urgent, r.sensitive, r.extra);
 	const t = {
 		id,
@@ -30795,13 +30949,22 @@ var src_default = {
 		if (url.pathname === "/chat" && req.method === "POST") try {
 			if (!await underLimit(env, req, "chat", 40)) return json({ error: "Too many questions in a short time. Please wait a few minutes." }, 429);
 			const input = await req.json();
-			return json(await chatAnswer(env, input && typeof input === "object" ? input : {}, { corpus: await activeCorpus(env) }));
+			const res = await chatAnswer(env, input && typeof input === "object" ? input : {}, { corpus: await activeCorpus(env) });
+			let ticket = null;
+			try {
+				ticket = await logChat(env, input, res);
+			} catch {}
+			return json({
+				...res,
+				ticket
+			});
 		} catch (e) {
 			return json({ error: e.message }, 500);
 		}
 		if (url.pathname === "/chat/escalate" && req.method === "POST") try {
 			if (!await underLimit(env, req, "esc", 6)) return json({ error: "Too many requests in a short time. Please wait a few minutes." }, 429);
-			const t = await chatTicket(env, await req.json());
+			const input = await req.json();
+			const t = await escalateChat(env, input) || await chatTicket(env, input);
 			return json({
 				ok: true,
 				assignee: AGENTS.find((a) => a.id === t.triage.assignee)?.name,

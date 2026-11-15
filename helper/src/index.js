@@ -1,7 +1,7 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { buildCorpus, chatAnswer, decide, FOOTER, mustGoToPerson, suggestReply } from '../../src/aiAgent.js'
+import { buildCorpus, chatAnswer, chatTicketState, decide, FOOTER, mustGoToPerson, suggestReply } from '../../src/aiAgent.js'
 import { ackText, triage } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
 
@@ -181,6 +181,59 @@ async function underLimit(env, req, kind, max) {
   return true
 }
 
+// ---- every chat is a ticket ----
+const chatId = (cid) => (/^[a-z0-9-]{8,64}$/i.test(String(cid || '')) ? 'chat-' + String(cid).toLowerCase() : null)
+const contactOf = (input) => {
+  const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
+  const name = line(input?.name, 80).replace(/[<>"]/g, '')
+  const email = line(input?.email, 120).toLowerCase()
+  if (!/^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email)) return null
+  return { name, email, customer: name ? `${name} <${email}>` : email }
+}
+// Re-reads the whole chat and sets status, owner, priority and tags, the same way every time.
+function refreshChatTicket(t) {
+  const state = chatTicketState(t.turns || [], { askedForPerson: Boolean(t.askedForPerson) })
+  t.subject = state.subject
+  t.focus = state.focus
+  t.status = state.resolved ? 'Closed' : 'Open'
+  t.triage = { ...(t.triage || {}), resolved: state.resolved, topic: state.topic, urgent: state.urgent, assignee: state.assignee, sensitive: !state.resolved && (t.turns || []).some((x) => x.kind === 'person'), tags: state.tags, note: state.note }
+  return t
+}
+async function logChat(env, input, res) {
+  const id = chatId(input?.conversationId)
+  const who = contactOf(input)
+  const message = String(input?.message ?? '').replace(/\s+/g, ' ').trim().slice(0, 1000)
+  if (!id || !who || !message) return null
+  const at = new Date().toISOString()
+  const t = (await getTicket(env, id)) || { id, source: 'chat', customer: who.customer, createdAt: at, turns: [], replies: [] }
+  t.customer = who.customer
+  const n = t.turns.length
+  t.turns.push({ role: 'user', text: message, at }, { role: 'assistant', text: String(res.text || '').slice(0, 4000), kind: res.kind, urgent: Boolean(res.urgent), topic: res.topic, assignee: res.assignee, at })
+  t.replies.push({ inbound: true, from: who.customer, text: message, at, messageId: `${id}-${n}` }, { chatAnswer: true, kind: res.kind, text: String(res.text || '').slice(0, 4000), at })
+  await saveTicket(env, refreshChatTicket(t))
+  return { id, status: t.status }
+}
+// "Submit a ticket" when the chat already is one: it is handed to a person, and the employee gets an email saying who will reply.
+async function escalateChat(env, input) {
+  const id = chatId(input?.conversationId)
+  if (!id) return null
+  const t = await getTicket(env, id)
+  if (!t) return null
+  const who = contactOf(input)
+  if (who) t.customer = who.customer
+  const note = String(input?.note ?? '').trim().slice(0, 1500)
+  const at = new Date().toISOString()
+  if (note) { t.turns.push({ role: 'user', text: note, at }); t.replies.push({ inbound: true, from: t.customer, text: note, at, messageId: `${id}-${t.turns.length}` }) }
+  t.askedForPerson = true
+  refreshChatTicket(t)
+  const agent = AGENTS.find((a) => a.id === t.triage.assignee) || AGENTS[0]
+  const name = (t.customer.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || 'there'
+  t.triage.replyText = ackText(name, agent.name, t.triage.urgent, t.triage.sensitive, null)
+  await saveTicket(env, t)
+  if (!t.ackSent) { try { await sendReply(env, id, t.triage.replyText, true); const fresh = await getTicket(env, id); fresh.ackSent = true; await saveTicket(env, fresh) } catch { /* the ticket is with the team either way */ } }
+  return t
+}
+
 // "Talk to a person" in the chat: the conversation becomes a ticket for the HR team, and the employee gets an email
 // saying who will reply. The HR person answers it on the desk like any email ticket.
 async function chatTicket(env, input) {
@@ -202,7 +255,7 @@ async function chatTicket(env, input) {
   const r = mustGoToPerson(subject, `${question}\n${note}`) || triage(subject, `${question}\n${note}`)
   const agent = AGENTS.find((a) => a.id === r.assignee) || AGENTS[0]
   const at = new Date().toISOString()
-  const id = 'chat-' + crypto.randomUUID()
+  const id = chatId(input?.conversationId) || 'chat-' + crypto.randomUUID()
   const reply = ackText(name || 'there', agent.name, r.urgent, r.sensitive, r.extra)
   const t = { id, source: 'chat', subject, customer, status: 'Open', createdAt: at,
     replies: [{ inbound: true, from: customer, text, at, messageId: id }],
@@ -224,13 +277,18 @@ export default {
       try {
         if (!(await underLimit(env, req, 'chat', 40))) return json({ error: 'Too many questions in a short time. Please wait a few minutes.' }, 429)
         const input = await req.json()
-        return json(await chatAnswer(env, input && typeof input === 'object' ? input : {}, { corpus: await activeCorpus(env) }))
+        const res = await chatAnswer(env, input && typeof input === 'object' ? input : {}, { corpus: await activeCorpus(env) })
+        // Every chat is a ticket: the question and answer are added to this conversation's ticket on the desk.
+        let ticket = null
+        try { ticket = await logChat(env, input, res) } catch { /* the employee still gets the answer */ }
+        return json({ ...res, ticket })
       } catch (e) { return json({ error: e.message }, 500) }
     }
     if (url.pathname === '/chat/escalate' && req.method === 'POST') {
       try {
         if (!(await underLimit(env, req, 'esc', 6))) return json({ error: 'Too many requests in a short time. Please wait a few minutes.' }, 429)
-        const t = await chatTicket(env, await req.json())
+        const input = await req.json()
+        const t = (await escalateChat(env, input)) || (await chatTicket(env, input))
         return json({ ok: true, assignee: AGENTS.find((a) => a.id === t.triage.assignee)?.name, urgent: t.triage.urgent })
       } catch (e) { return json({ error: e.message }, e.status || 500) }
     }

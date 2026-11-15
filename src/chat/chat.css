@@ -51,3 +51,5 @@
 .bubble-head button{background:rgba(255,255,255,.18);border:0;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer}
 @media (max-width:820px){.bubble-btn{bottom:calc(76px + env(safe-area-inset-bottom,0px))}.bubble-panel{bottom:calc(142px + env(safe-area-inset-bottom,0px));height:min(520px,calc(100dvh - 170px))}}
 .auth-card a{color:var(--prim);font-weight:600}
+.chat-start{gap:10px}.chat-start .btn{align-self:flex-start}
+.chat-input input:disabled{opacity:.6}

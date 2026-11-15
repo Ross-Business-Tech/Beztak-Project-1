@@ -8,7 +8,7 @@
 // reply through the real gates, so the checks on AI-written answers run without an AI key.
 // `draft` checks the suggested reply HR gets for tickets a person must answer.
 import { AGENTS } from './data'
-import { buildCorpus, chatAnswer, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
+import { buildCorpus, chatAnswer, chatTicketState, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
 import { ackText } from './triage'
 import { followUp } from './escalate'
 import { dueIn } from './util'
@@ -270,6 +270,14 @@ export const EVALS = [
     ai: { answerable: true, topic: 'timeoff', answer: 'PTO requests go through Paycor, and your manager approves them [HR-2].', sections: ['HR-2'], draft: '', draft_sections: [] } },
   { id: 'C7', lane: 'chat', subject: 'Chat', body: 'hey', variants: ['Hi there!', 'good morning', 'thanks!', 'ok'], tests: 'Greetings and thanks get a friendly reply, not "not in the manual"',
     chat: { history: [], kind: 'smalltalk', notContains: ["won't guess", 'could not find'] } },
+  { id: 'C8', lane: 'chat', subject: 'Chat', body: 'When is rent due?', tests: 'Every chat is a ticket: an answered chat is closed as answered by the AI',
+    ticket: { turns: ['When is rent due?', 'thanks!'], resolved: true } },
+  { id: 'C9', lane: 'chat', subject: 'Chat', body: 'my paycheck was short this week', tests: 'Every chat is a ticket: a chat that needs a person stays open for the team, routed like an email',
+    ticket: { turns: ['When is rent due?', 'my paycheck was short this week'], resolved: false, assignee: 'omar' } },
+  { id: 'C10', lane: 'chat', subject: 'Chat', body: 'there is water pouring through the ceiling', tests: 'Every chat is a ticket: an emergency in a chat is open and urgent',
+    ticket: { turns: ['there is water pouring through the ceiling'], resolved: false, urgent: true } },
+  { id: 'C11', lane: 'chat', subject: 'Chat', body: 'When is rent due?', tests: 'Every chat is a ticket: asking for a person reopens an answered chat for the team',
+    ticket: { turns: ['When is rent due?'], askedForPerson: true, resolved: false } },
   { id: 'C6', lane: 'chat', subject: 'Chat', body: 'How many vacation days do I get?', tests: 'With the AI on: an AI chat answer with an invented number is blocked',
     chat: { history: [], ai: true, notKind: 'answer-ai', notContains: ['15 days'] },
     ai: { answerable: true, topic: 'timeoff', answer: 'You get 15 days of vacation each year [HR-2].', sections: ['HR-2'], draft: '', draft_sections: [] } },
@@ -357,7 +365,26 @@ async function checkChat(c, body) {
     res: { resolved: res.kind === 'answer', assignee: res.assignee || 'dana', urgent: Boolean(res.urgent), tags: [], note: `Chat result: ${res.kind}${res.source ? ` (${res.source})` : ''}.`, label: res.kind === 'answer' ? 'Answered in the chat' : res.kind === 'person' ? 'Offered a person' : 'Said it could not find it' } }
 }
 
+// Every chat is a ticket: how the ticket for a whole chat looks on the desk.
+async function checkChatTicket(c, body) {
+  const e = c.ticket
+  const turns = []
+  for (const q of e.turns) {
+    const r = await chatAnswer({}, { message: q, history: turns })
+    turns.push({ role: 'user', text: q }, { role: 'assistant', text: r.text, kind: r.kind, urgent: r.urgent, topic: r.topic, assignee: r.assignee })
+  }
+  const t = chatTicketState(turns, { askedForPerson: e.askedForPerson })
+  const problems = []
+  if (t.resolved !== e.resolved) problems.push(e.resolved ? 'should be closed as answered by the AI' : 'should be open for a person')
+  if (e.assignee && t.assignee !== e.assignee) problems.push(`should go to ${nameOf(e.assignee)}, went to ${nameOf(t.assignee)}`)
+  if (e.urgent && !t.urgent) problems.push('should be marked urgent')
+  if (!t.tags.includes('from-chat')) problems.push('should be tagged "from-chat"')
+  return { body, pass: problems.length === 0, problems, reply: `${t.subject} (${t.resolved ? 'closed, answered by the AI' : 'open for ' + nameOf(t.assignee)})`,
+    res: { resolved: t.resolved, assignee: t.assignee, urgent: t.urgent, tags: t.tags, note: t.note, label: t.resolved ? 'Ticket closed (AI answered)' : `Ticket open for ${nameOf(t.assignee)}` } }
+}
+
 async function check(c, subject, body) {
+  if (c.ticket) return checkChatTicket(c, body)
   if (c.chat) return checkChat(c, body)
   if (c.follow) return checkFollowUp(c, body)
   if (c.suggest) return checkSuggest(c, body)
