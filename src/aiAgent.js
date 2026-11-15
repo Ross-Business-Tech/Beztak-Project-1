@@ -14,9 +14,7 @@ import { AGENTS, KNOWLEDGE, SELF_URGENT, TOPIC_LABELS } from './data'
 import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { triage } from './triage'
 
-export const AI_MODEL = 'claude-opus-5-5'
-// The U-M GPT Toolkit (an OpenAI-style service) is used when the helper has a UMGPT_API_KEY secret;
-// otherwise Claude is used when it has an ANTHROPIC_API_KEY secret.
+// The AI is the U-M GPT Toolkit (an OpenAI-style service). It is switched on when the helper has a UMGPT_API_KEY secret.
 export const UM_BASE_URL = 'https://api.toolkit.umgpt.umich.edu/v1'
 export const UM_MODEL = 'gpt-5.6-terra'
 export const FOOTER = '\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. If it did not help, reply to this email and say you would like a person: someone from HR will reply within one business day.'
@@ -127,13 +125,7 @@ async function askModel(env, subject, body, corpus = BUILTIN) {
   return callModel(env, { system: systemPrompt(corpus.text), schema: ANSWER_SCHEMA, effort: 'medium', maxTokens: 6000, cache: true }, subject, body)
 }
 
-export const aiConnected = (env) => Boolean(env.UMGPT_API_KEY || env.ANTHROPIC_API_KEY)
-
-// The SDK is loaded only when the AI is actually used, so pages stay fast.
-let sdk = null
-const loadSdk = async () => (sdk ||= (await import('@anthropic-ai/sdk')).default)
-
-const clientFor = (Anthropic, env) => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 30000, maxRetries: 1 })
+export const aiConnected = (env) => Boolean(env.UMGPT_API_KEY)
 
 const emailMessage = (subject, body) => `<email>\nSubject: ${subject.slice(0, 300)}\n\n${body.slice(0, 4000)}\n</email>`
 
@@ -162,22 +154,8 @@ async function callUmModel(env, { system, schema, effort, maxTokens }, subject, 
   return JSON.parse(text)
 }
 
-async function callModel(env, { system, schema, effort, maxTokens, cache }, subject, body) {
-  if (env.UMGPT_API_KEY) return callUmModel(env, { system, schema, effort, maxTokens }, subject, body)
-  const Anthropic = await loadSdk()
-  const response = await clientFor(Anthropic, env).beta.messages.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    // If a safety filter declines, the API retries on a fallback model automatically.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort, format: { type: 'json_schema', schema } },
-    system: [{ type: 'text', text: system, ...(cache ? { cache_control: { type: 'ephemeral' } } : {}) }],
-    messages: [{ role: 'user', content: emailMessage(subject, body) }],
-  })
-  if (response.stop_reason === 'refusal') return null // treated as "not answerable": a person replies
-  const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('')
-  return JSON.parse(text)
+async function callModel(env, opts, subject, body) {
+  return callUmModel(env, opts, subject, body)
 }
 
 // Every fact in an AI answer (numbers, dollar amounts, percentages, times, phone numbers, emails)

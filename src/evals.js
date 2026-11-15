@@ -302,7 +302,7 @@ async function checkSuggest(c, body) {
   const e = c.suggest
   let called = false
   const ask = async () => { called = true; return c.ai }
-  const env = { ANTHROPIC_API_KEY: 'test-only' }
+  const env = { UMGPT_API_KEY: 'test-only' }
   const res = await suggestReply(env, { subject: c.subject, body, thread: [], mode: e.mode, customer: 'Alex Kim', agent: 'Priya Nair' }, { ask })
   const text = res.text || ''
   const has = (s) => text.toLowerCase().includes(s.toLowerCase())
@@ -325,7 +325,7 @@ async function checkSuggest(c, body) {
 async function check(c, subject, body) {
   if (c.follow) return checkFollowUp(c, body)
   if (c.suggest) return checkSuggest(c, body)
-  const env = c.ai ? { ANTHROPIC_API_KEY: 'test-only' } : {}
+  const env = c.ai ? { UMGPT_API_KEY: 'test-only' } : {}
   const res = await decide(env, subject, body, { ask: async () => c.ai, scope: async () => c.scope || GENERAL, corpus: c.corpus })
   const reply = replyFor(res)
   const e = c.expect
