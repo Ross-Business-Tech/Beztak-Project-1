@@ -187,6 +187,14 @@ export function Setup({ me, account, linked, openGuardrails }) {
         <p>The checks that prove the AI assistant only answers what it safely can, and hands everything else to a person. This is a back-office page, so it is not in the main menu.</p>
         <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>
       </section>
+      <section className="panel pad"><h2>Ask Beztak: the employee chat</h2>
+        <p>Employees ask questions in a chat and get answers from the Operations Manual, with the same safety rules as email. <b>Every chat is saved as a ticket here</b> (one per conversation): answered chats are filed as AI answered, and anything that needs a person (a personal question, something the manual doesn't cover, or "Submit a ticket") lands in the right person's list. The round chat button at the bottom right of the desk is the same chat; the one extra is "Use in reply", which adds an answer to the ticket you have open.</p>
+        <div className="row">
+          <a className="btn primary" href="/ask" target="_blank" rel="noreferrer">Open the chat page</a>
+          <a className="btn" href="/employee-portal-demo.html" target="_blank" rel="noreferrer">See the bubble on a sample employee page</a>
+        </div>
+        <p className="mute small">The chat page needs no sign-in; employees type their name and email once. Employee logins (emails that start with <b>employee</b>, for example employee@beztak.example) see only the chat. To add the chat bubble to another website, such as the intranet, its IT team adds one line: <code>{`<script src="${location.origin}/ask-widget.js" defer></script>`}</code></p>
+      </section>
       <section className="panel pad"><h2>Signing in</h2>
         <p>You signed in as <b>{account}</b>, so you are <b>{agentName(me)}</b>{linked ? '' : ' (this login is not linked to an HR team member, so the desk is shown from the first team member\'s point of view)'}. Each person only sees their own tickets and any ticket they were asked to advise on.</p>
         <p className="mute small">A login belongs to an HR team member when the start of the email matches their name (for example <b>omar@…</b> or <b>omar.haddad@…</b>). Team members: {AGENTS.map((a) => a.name).join(', ')}. Tickets are still stored only in this browser.</p>

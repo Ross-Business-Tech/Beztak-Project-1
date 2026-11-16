@@ -36,12 +36,13 @@ function SignIn() {
     <div className="auth-wrap">
       <form className="auth-card panel pad" onSubmit={submit}>
         <div className="auth-brand"><span className="auth-logo" aria-hidden="true">B</span><h1>Beztakets</h1></div>
-        <p className="mute">Sign in to the HR help desk.</p>
+        <p className="mute">Sign in with your Beztak account. Employees go straight to <b>Ask Beztak</b>, the policy chat; the HR and Ops team go to the help desk.</p>
         <label className="field">Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
         <label className="field">Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="btn primary auth-btn" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-        <p className="mute small">Sign in with your own HR team account. New accounts can't be created from this page, so ask your team lead if you don't have one.</p>
+        <p className="mute small">New accounts can't be created from this page. If you don't have one, ask your manager or HR.</p>
+        <p className="mute small">Just have a quick question? <a href="/ask">Ask Beztak without signing in</a>.</p>
       </form>
     </div>
   )

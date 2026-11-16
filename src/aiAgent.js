@@ -402,3 +402,105 @@ export async function suggestReply(env, input = {}, { ask = askSuggest, corpus =
     return local(`The AI could not be reached${e?.status ? ` (${e.status})` : ''}.`)
   }
 }
+
+// ---- Chat: the "Ask Beztak" page and the chat bubble ----
+// The chat uses exactly the same decision as an email (decide above): the same safety rules, the same manuals,
+// the same checks on every AI answer. Only the wording around it changes. A follow-up question ("what if it's
+// after hours?") is read together with the question before it; the safety rules look at the new message on its own,
+// so an earlier, harmless question can never unblock a private or urgent one.
+const FOLLOW_UP_RE = /\b(it|that|this|they|them|those|these|there|same|one|what about|how about|what if|and if|also)\b/i
+const titleOf = (ref, corpus) => {
+  const hr = HR.find((x) => x.ref === ref)
+  if (hr) return hr.q
+  return (corpus.entryText[ref] || '').split('\n')[0] || ref
+}
+const refsIn = (text, corpus) => [...new Set([...String(text).matchAll(/\[([A-Z]+-\d+|\d+\.\d+)\]|, (\d+\.\d+): /g)].map((m) => m[1] || m[2]))]
+  .filter((r) => corpus.valid.has(r)).map((ref) => ({ ref, title: titleOf(ref, corpus) }))
+
+// Always returns { kind: 'answer' | 'person' | 'unknown', text, refs, source, urgent, related }; never throws.
+export async function chatAnswer(env, input = {}, opts = {}) {
+  const corpus = opts.corpus || BUILTIN
+  const message = String(input.message || '').replace(/\s+/g, ' ').trim().slice(0, 1000)
+  const history = (Array.isArray(input.history) ? input.history : []).slice(-10)
+  if (!message) return { kind: 'unknown', text: 'Type a question about Beztak policies or procedures.', refs: [], related: [] }
+  // Greetings, thanks and goodbyes get a friendly reply, not "I could not find that in the manual".
+  const small = message.toLowerCase().replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (/^(hey+|hi+|hello+|hiya|yo|howdy|good (morning|afternoon|evening)|hey there|hi there|hello there)( (there|team|bot|beztak|ask beztak))?$/.test(small)) {
+    return { kind: 'smalltalk', refs: [], related: [], text: 'Hi! I can help with Beztak operations questions, like rent, work orders, purchasing, maintenance and on-call. What would you like to know?' }
+  }
+  if (/^(thanks?( you)?( so much| a lot)?|thank u|thx|ty|cheers|perfect|great|awesome|got it|ok(ay)?|cool|sounds good)( thanks?( you)?)?$/.test(small)) {
+    return { kind: 'smalltalk', refs: [], related: [], text: 'You\'re welcome! Ask me anything else about Beztak operations.' }
+  }
+  if (/^(bye|goodbye|see (you|ya)|that'?s all|nothing else|no thanks?)$/.test(small)) {
+    return { kind: 'smalltalk', refs: [], related: [], text: 'Glad I could help. Come back any time you have a question.' }
+  }
+  const prev = [...history].reverse().find((m) => m?.role === 'user' && typeof m.text === 'string')?.text?.slice(0, 500)
+  const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message))
+  // Related topics are only offered when they share a meaningful word with the question ("lockout", "vendor"), not just
+  // a general word like "process" or "work": an unrelated suggestion looks careless and sends people the wrong way.
+  const GENERIC = new Set(['process', 'procedur', 'policy', 'polic', 'work', 'rule', 'standard', 'happen', 'step', 'way', 'type', 'thing', 'resident', 'employee', 'apartment', 'property'].map(stem))
+  const askedWords = words(followUp ? `${prev} ${message}` : message).filter((w) => !GENERIC.has(w))
+  const related = rankManual('', followUp ? `${prev} ${message}` : message, corpus).slice(0, 5)
+    .filter((x) => x.score >= 2 && askedWords.some((w) => x.e.qw.has(w))).slice(0, 3).map((x) => ({ ref: x.e.ref, title: x.e.title }))
+
+  const stop = mustGoToPerson('', message)
+  if (stop) {
+    return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee,
+      // safety rules (911, 988, the on-call line) keep their exact wording; personal and approval questions get the reason
+      text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR and Ops team.`
+        : stop.extra || 'This is a personal or confidential matter, so a person on the HR and Ops team needs to answer it. I can pass it to them.' }
+  }
+  // With the AI, a follow-up is sent together with the question before it, so "it" makes sense.
+  // Without the AI (word matching), the new message is tried on its own first, and only joined to the
+  // earlier question when it can't be answered alone ("how far ahead?").
+  const withContext = `${prev}\n\nFollow-up question: ${message}`
+  let res
+  if (followUp && aiConnected(env)) res = await decide(env, 'Chat question', withContext, { ...opts, corpus })
+  else {
+    res = await decide(env, 'Chat question', message, { ...opts, corpus })
+    if (!res.resolved && !res.sensitive && followUp) {
+      const again = await decide(env, 'Chat question', withContext, { ...opts, corpus })
+      // only if it adds something: repeating the previous answer to a new topic ("what about holidays?") would mislead
+      const lastAnswer = [...history].reverse().find((m) => m?.role === 'assistant')?.text || ''
+      if (again.resolved && !(lastAnswer && String(again.answer).startsWith(lastAnswer.slice(0, 60)))) res = again
+    }
+  }
+  if (res.resolved) {
+    const full = String(res.answer || '').trim()
+    // the "(From the manual, 4.3: ...)" line becomes the section tags shown under the answer
+    const text = full.replace(/\n*\(From the [^()]*\)\s*$/, '').trim()
+    return { kind: 'answer', text, refs: refsIn(full, corpus), source: res.aiAnswered ? 'AI' : 'manual', urgent: false, related: [], topic: res.topic, assignee: res.assignee }
+  }
+  const personal = res.sensitive || (res.tags || []).some((t) => ['ai-second-check'].includes(t))
+  return { kind: personal ? 'person' : 'unknown', urgent: Boolean(res.urgent), refs: [], related, topic: res.topic, assignee: res.assignee,
+    text: personal
+      ? `This needs a person${res.reason ? `: ${res.reason}` : ', because it is about one person\'s situation, an approval, or a sensitive matter'}. I can pass it to the HR and Ops team.`
+      : `I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. ${related.length ? 'You can try one of the related topics below, or I can pass your question to a person.' : 'I can pass your question to a person.'}` }
+}
+
+// ---- Every chat is a ticket ----
+// One ticket per chat conversation. Given the turns so far ({ role, text, kind, urgent, topic, assignee }), decide how the
+// ticket looks on the desk: answered chats are closed as "answered by the AI"; anything that needed a person (a personal
+// question, something the manual doesn't cover, or the employee asking for a person) is open for the team, routed and
+// prioritised the same way as an email.
+export function chatTicketState(turns = [], { askedForPerson = false } = {}) {
+  const bot = turns.filter((t) => t && t.role === 'assistant')
+  const needs = bot.filter((t) => t.kind === 'person' || t.kind === 'unknown')
+  const urgent = bot.some((t) => t.urgent)
+  const questions = turns.filter((t) => t && t.role === 'user').map((t) => String(t.text || ''))
+  const firstReal = questions.find((q) => q.split(/\s+/).length > 2) || questions[0] || ''
+  const resolved = !askedForPerson && needs.length === 0 && bot.some((t) => t.kind === 'answer')
+  // What the ticket is about: the question that needed a person (not "When is rent due?" asked before it), else the first real question.
+  const firstNeed = turns.findIndex((t) => t && t.role === 'assistant' && (t.kind === 'person' || t.kind === 'unknown'))
+  const focus = (firstNeed > 0 && turns[firstNeed - 1]?.role === 'user' ? String(turns[firstNeed - 1].text) : '') || firstReal
+  // Who gets it: the first turn that needed a person decides, otherwise the topic of the first real question.
+  const pick = needs.find((t) => t.assignee) || bot.find((t) => t.assignee)
+  const routed = pick?.assignee ? { assignee: pick.assignee, topic: pick.topic } : (() => { const r = triage('Chat', firstReal); return { assignee: r.assignee, topic: r.topic } })()
+  const reasons = [askedForPerson && 'the employee asked for a person', needs.some((t) => t.kind === 'person') && 'a question needs a person', needs.some((t) => t.kind === 'unknown') && 'a question is not covered by the manual'].filter(Boolean)
+  return {
+    resolved, urgent, focus, assignee: routed.assignee || AGENTS[0].id, topic: routed.topic || 'general', subject: `Chat: ${focus.replace(/\s+/g, ' ').trim().slice(0, 70) || 'question'}`,
+    tags: ['from-chat', ...(resolved ? ['ai-resolved'] : []), ...(askedForPerson ? ['asked-for-person'] : []), ...(urgent ? ['urgent'] : [])],
+    note: resolved ? 'Chat answered automatically from the manual. No person needed unless the employee asks.'
+      : `From the chat: ${reasons.join(', ') || 'needs a person'}.${urgent ? ' Marked urgent.' : ''}`,
+  }
+}

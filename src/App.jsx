@@ -11,6 +11,7 @@ import { followUp } from './escalate'
 import { setActiveManualTitles } from './activeManual'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
+import ChatBubble from './chat/ChatBubble'
 
 const store = (key, fallback) => {
   try { const v = JSON.parse(localStorage.getItem(key)); if (v) return v } catch { /* ignore */ }
@@ -84,8 +85,39 @@ export default function App({ account, signOut }) {
         const cur = ticketsRef.current
         const created = []
         const follow = {}
+        const chatUpd = {}
         let nextId = Math.max(1000, ...cur.map((x) => x.id))
         for (const r of [...remote].reverse()) {
+          // Every chat is a ticket. Its conversation comes from the helper and is kept up to date while the employee chats;
+          // the desk's own notes, events and replies stay as they are.
+          if (r.source === 'chat') {
+            const turns = r.replies || []
+            const firstIn = turns.find((m) => m.inbound)
+            if (!firstIn) continue
+            const { name, email } = parse(r.customer)
+            const res = r.triage || {}
+            const fromChat = turns.slice(turns.indexOf(firstIn) + 1).filter((m) => m.inbound || m.chatAnswer)
+              .map((m) => (m.inbound ? { inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId, fromChat: true } : { from: 'Ask Beztak chat (automated)', text: m.text, at: m.at, ai: true, fromChat: true }))
+            const local = cur.find((x) => x.threadId === r.id)
+            if (!local) {
+              if (new Date(firstIn.at).getTime() < cutoff) { older++; continue }
+              created.unshift({
+                id: ++nextId, threadId: r.id, firstMessageId: firstIn.messageId, subject: r.subject, body: firstIn.text, customer: name, email,
+                status: r.status, urgent: Boolean(res.urgent), topic: res.topic, assignee: res.assignee, createdAt: firstIn.at, dueAt: dueIn(Boolean(res.urgent), firstIn.at),
+                resolvedByAI: Boolean(res.resolved), channel: 'Chat', note: res.note, advice: [], tags: res.tags || ['from-chat'], chatLen: turns.length, replies: fromChat,
+              })
+            } else if ((local.chatLen || 0) !== turns.length || (r.status === 'Open' && local.status === 'Closed')) {
+              const reopen = r.status === 'Open' && local.status === 'Closed'
+              const auto = local.resolvedByAI || reopen // still the chat's own routing: a person has not taken it over yet
+              chatUpd[local.id] = {
+                chatLen: turns.length, subject: r.subject,
+                replies: [...local.replies.filter((m) => !m.fromChat), ...fromChat].sort((a, b) => new Date(a.at) - new Date(b.at)),
+                ...(reopen ? { status: 'Open', resolvedByAI: false, dueAt: dueIn(Boolean(res.urgent), new Date()) } : {}),
+                ...(auto ? { urgent: Boolean(res.urgent), assignee: res.assignee, topic: res.topic, tags: res.tags || local.tags, note: res.note } : {}),
+              }
+            }
+            continue
+          }
           const inbound = r.replies.filter((m) => m.inbound)
           const local = cur.find((x) => x.threadId === r.id)
           if (local) {
@@ -106,13 +138,14 @@ export default function App({ account, signOut }) {
             created.unshift({
               id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,
               status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent, inbound[0].at),
-              resolvedByAI: res.resolved, channel: 'Email', note: res.note, advice: [], draft: res.draft || undefined,
+              resolvedByAI: res.resolved, channel: r.source === 'chat' ? 'Chat' : 'Email', note: res.note, advice: [], draft: res.draft || undefined,
               tags: [...(res.resolved ? ['ai-resolved'] : []), ...(res.tags || (res.sensitive ? ['sensitive'] : []))],
               replies: [{ from: 'HR Assistant (automated)', text: reply, at: now, email: true, ai: true }, ...inbound.slice(1).map((m) => ({ inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId }))],
             })
           }
         }
         const ids = Object.keys(follow)
+        const chatIds = Object.keys(chatUpd)
         setHelperStatus({ at: new Date().toISOString(), ok: true, remote: remote.length, imported: created.length, older, hidden, newest, mail })
         // An employee wrote back after the AI answered: a person gets it if they asked for one (or asked something new),
         // and the employee gets an email saying who will reply and when. A plain "thanks" leaves the ticket closed.
@@ -123,8 +156,9 @@ export default function App({ account, signOut }) {
           const { confirmation } = followUp(t, follow[id], when)
           if (confirmation && t.threadId) { try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text: confirmation }) }) } catch { /* the ticket is still escalated */ } }
         }
-        if (created.length || ids.length) {
+        if (created.length || ids.length || chatIds.length) {
           setTickets((p) => [...created.filter((c) => !p.some((x) => x.threadId === c.threadId)), ...p.map((t) => {
+            if (chatUpd[t.id]) return { ...t, ...chatUpd[t.id] }
             const f = follow[t.id]
             if (!f) return t
             if (t.resolvedByAI) return { ...t, ...followUp(t, f, when).patch }
@@ -133,7 +167,7 @@ export default function App({ account, signOut }) {
               note: reopen ? 'The employee replied after the automatic answer, so a person needs to look at it.' : t.note,
               replies: [...t.replies, ...f.map((m) => ({ inbound: true, from: t.customer, text: m.text, at: m.at, messageId: m.messageId }))] }
           })])
-          setToast(`${created.length ? `${created.length} new email ticket${created.length > 1 ? 's' : ''}` : ''}${created.length && ids.length ? ' and ' : ''}${ids.length ? `${ids.length} customer repl${ids.length > 1 ? 'ies' : 'y'}` : ''}.`)
+          if (created.length || ids.length) setToast(`${created.length ? `${created.length} new ticket${created.length > 1 ? 's' : ''}` : ''}${created.length && ids.length ? ' and ' : ''}${ids.length ? `${ids.length} customer repl${ids.length > 1 ? 'ies' : 'y'}` : ''}.`)
         }
       } catch (e) { setHelperStatus({ at: new Date().toISOString(), ok: false, error: e.message === 'Failed to fetch' ? 'Could not reach the helper. Check the helper address, and that the helper is deployed in Cloudflare.' : e.message }) /* try again next time */ }
       syncing.current = false
@@ -206,6 +240,11 @@ export default function App({ account, signOut }) {
         </div>
       </div>
       {creating && <NewTicket onCreate={createTicket} onClose={() => setCreating(false)} />}
+      <ChatBubble user={{ name: agentName(me), email: account }} onUseInReply={(text) => {
+        if (page !== 'tickets' || !openId) { setToast('Open a ticket first, then use "Use in reply" to add this answer to your reply.'); return }
+        window.dispatchEvent(new CustomEvent('beztakets:use-in-reply', { detail: text }))
+        setToast('Added to your reply. Check it before sending.')
+      }} />
       {toast && <div className="toast" role="status" onClick={() => setToast('')}>{toast}</div>}
     </div>
   )

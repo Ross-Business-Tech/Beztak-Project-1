@@ -53,3 +53,14 @@ pages) have no text and cannot be read. The text is stored here and sent to the 
    check must agree it is a general question (not about one person, an approval, or anything sensitive).
    If not, a person takes over and gets a suggested reply to check, edit and send.
 3. Everything else gets a short "we passed this to ..." email.
+
+## The employee chat (Ask Beztak)
+The chat page (`/ask`), the chat bubble on other websites (`ask-widget.js`) and the bubble in the desk call the helper at
+`POST /chat` (one question plus the conversation so far) and `POST /chat/escalate` ("Submit a ticket": the employee gets an email
+saying who will reply). **Every chat is a ticket:** each conversation is saved as one ticket (`chat-<id>`) with the employee's name and
+email, updated after every question. Answered chats are closed as answered by the AI; a chat with a personal question, a question the
+manual doesn't cover, or "Submit a ticket" is open for the right person (`chatTicketState` in `src/aiAgent.js`). These two routes need **no helper password**, because employees use the
+chat without signing in. They can only ask questions and create a ticket, never read tickets, and each visitor is limited
+(40 questions and 6 hand-offs per hour). Answers use exactly the same rules and manual as email (`chatAnswer` in `src/aiAgent.js`).
+**After pulling this change, rebuild and redeploy the helper** (`npm run build:helper`, then paste `helper/bundle/worker.js` in Cloudflare).
+Until then the chat still answers from the manual in the browser (no AI), and "Pass to a person" asks the employee to email HR instead.

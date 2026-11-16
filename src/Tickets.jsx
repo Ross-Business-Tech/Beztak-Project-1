@@ -137,6 +137,12 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
 export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update, transfer, merge, toast, back }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
+  // The desk's chat bubble can drop a manual answer into this reply ("Use in reply").
+  useEffect(() => {
+    const add = (e) => { setTab('reply'); setText((cur) => (cur.trim() ? `${cur.trimEnd()}\n\n${e.detail}` : e.detail)) }
+    window.addEventListener('beztakets:use-in-reply', add)
+    return () => window.removeEventListener('beztakets:use-in-reply', add)
+  }, [])
   const [tag, setTag] = useState('')
   const [adviceTo, setAdviceTo] = useState('')
   const [adviceQ, setAdviceQ] = useState('')
@@ -246,7 +252,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                 <article key={i} className={`msg ${m.inbound ? 'in' : m.note ? 'note' : 'out'}`}>
                   <Avatar name={m.ai && t.resolvedByAI ? 'AI agent' : m.from} />
                   <div>
-                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? (t.threadId ? 'Received by email' : 'Opened by HR') : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : (m.emailed || (t.threadId && m.emailed === undefined) ? 'Sent by email' : 'Saved reply, not emailed')} · {ago(m.at)}</small></div>
+                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? (t.channel === 'Chat' && (m.fromChat || i === 0) ? 'Asked in the chat' : t.threadId ? 'Received by email' : 'Opened by HR') : m.fromChat ? 'Chat answer from the manual' : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : (m.emailed || (t.threadId && m.emailed === undefined) ? 'Sent by email' : 'Saved reply, not emailed')} · {ago(m.at)}</small></div>
                     <p>{m.text}</p>
                     {m.ai && t.resolvedByAI && <FeedbackBar kind="auto" ticketId={t.id} text={m.text.slice(0, 600)} helper={helper} me={me} toast={toast} />}
                     {owner && helper?.token && m.email && !m.ai && !m.inbound && !m.note && <button type="button" className="link small" onClick={() => setLessonDraft({ question: String(t.body || '').slice(0, 300), answer: m.text.replace(/^\s*(hi|hello|dear)\b[^\n]*\n+/i, '').replace(/\n+\s*(best|thanks|thank you|regards|sincerely|kind regards)[^\n]*(\n[^\n]*)?\s*$/i, '').trim().slice(0, 1200), ticketId: t.id })}>Save as a lesson</button>}
