@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
-import { manualDraft, suggestReply } from './aiAgent'
+import { suggestReply } from './aiAgent'
+import { CONFIDENCE, draftFor, hasBlanks, isSensitive, needsCheck } from './drafts'
 import { WORK } from './hours'
 import { helperCall } from './helper'
-import { agentName, ago, byUrgency, dueInfo, fill, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
+import { FeedbackBar, LessonModal } from './Lessons'
+import { agentName, ago, byUrgency, dueInfo, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
 
 const STATUSES = ['Open', 'In progress', 'On hold', 'Closed']
 const DEPTS = ['benefits', 'payroll', 'timeoff', 'onboarding', 'relations', 'general']
@@ -22,11 +24,45 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
 // Blanks left in a reply: [like this], {like this} or TBD. A reply with blanks cannot be sent.
 const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
-const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up' }
-const TAG_COLORS = { 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange' }
-export const VIEW_NAMES = { mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
+const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
+const TAG_COLORS = { 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange', 'AI draft: check': 'orange' }
+export const VIEW_NAMES = { check: 'Needs your check', mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
 
-export function List({ tickets, me, open, reset, nav, setNav }) {
+// "New ticket": an HR person opens a ticket themselves (a phone call, a chat in the hallway, a walk-up).
+export function NewTicket({ onCreate, onClose }) {
+  const [f, setF] = useState({ customer: '', email: '', subject: '', body: '' })
+  const [err, setErr] = useState('')
+  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }))
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onClose])
+  const submit = (e) => {
+    e.preventDefault()
+    const v = { customer: f.customer.trim(), email: f.email.trim(), subject: f.subject.trim(), body: f.body.trim() }
+    if (!v.customer || !v.subject || !v.body) { setErr('Please fill in the name, subject and details.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) { setErr('Please enter a valid email address, like name@company.com.'); return }
+    onCreate(v)
+  }
+  return (
+    <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <form className="modal" onSubmit={submit} noValidate role="dialog" aria-modal="true" aria-labelledby="newt-h">
+        <h2 id="newt-h">New ticket</h2>
+        <p className="mute small">Open a ticket for an employee yourself. It is assigned to you.</p>
+        <label className="field">Employee name<input value={f.customer} onChange={set('customer')} placeholder="Example: Alex Kim" autoFocus maxLength={80} /></label>
+        <label className="field">Employee email<input type="email" value={f.email} onChange={set('email')} placeholder="name@company.com" maxLength={120} /></label>
+        <label className="field">Subject<input value={f.subject} onChange={set('subject')} placeholder="What is this about?" maxLength={150} /></label>
+        <label className="field">Details<textarea rows={5} value={f.body} onChange={set('body')} placeholder="What did the employee ask or report?" maxLength={4000} /></label>
+        <p className="mute small">Use made-up names and details only. Do not type real personal information into this demo.</p>
+        {err && <p className="err small" role="alert">{err}</p>}
+        <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary">Create ticket</button></div>
+      </form>
+    </div>
+  )
+}
+
+export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
   // The view lives in App so it survives opening a ticket and coming back.
   const { view } = nav
   const setView = (v) => setNav({ ...nav, view: v })
@@ -37,6 +73,7 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
   const owned = human.filter((t) => t.assignee === me)
   const tags = [...new Set(tickets.flatMap((t) => t.tags || []))].sort()
   const VIEWS = [
+    ['check', 'Needs your check', owned.filter(needsCheck), 'The AI already wrote a reply for each of these. Open one, check the reply, then send it or edit it. Nothing is sent until you do.'],
     ['mine', 'My open tickets', owned.filter(live), 'Tickets a person needs to answer, most urgent first.'],
     ['due', 'Due soon', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)), 'Overdue or due within 4 work hours.'],
     ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length), 'Teammates asked for your advice on these.'],
@@ -53,8 +90,11 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
 
   return (
     <>
-      <div className="nviews" role="tablist" aria-label="Views">
-        {VIEWS.map(([k, n, l]) => <button key={k} role="tab" aria-selected={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{l.length}</em></button>)}
+      <div className="nbar">
+        <div className="nviews" role="tablist" aria-label="Views">
+          {VIEWS.map(([k, n, l]) => <button key={k} role="tab" aria-selected={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{n}<em>{l.length}</em></button>)}
+        </div>
+        <button className="plus" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg></button>
       </div>
       <div className="ntools">
         <p className="mute small">{note}{view !== 'ai' && view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
@@ -70,12 +110,12 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
           <div className="nrow nhead" role="row">
             {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
           </div>
-          {rows.length === 0 && <p className="empty">{view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+          {rows.length === 0 && <p className="empty">{view === 'check' ? 'All caught up: no AI replies are waiting for your check.' : view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
           {rows.map((t) => {
             const p = priorityOf(t)
             const d = dueInfo(t)
             const adv = pendingAdviceFor(t, me).length > 0
-            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved').map((g) => TAG_NAMES[g] || g)].sort((a, b) => Number(!(a in TAG_COLORS)) - Number(!(b in TAG_COLORS)))
+            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(t.assignee === me && needsCheck(t) ? ['AI draft: check'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved').map((g) => TAG_NAMES[g] || g)].sort((a, b) => Number(!(a in TAG_COLORS)) - Number(!(b in TAG_COLORS)))
             return (
               <div key={t.id} className="nrow" role="row" tabIndex={0} onClick={() => open(t.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(t.id) } }}>
                 <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}{t.escalatedAt && t.status !== 'Closed' && <> · <span className="esc">{t.escalatedBecause === 'person' ? 'Asked for a person' : 'Employee follow-up'}</span></>}</small></span>
@@ -99,6 +139,12 @@ export function List({ tickets, me, open, reset, nav, setNav }) {
 export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update, transfer, merge, toast, back }) {
   const [text, setText] = useState('')
   const [tab, setTab] = useState('reply')
+  // The desk's chat bubble can drop a manual answer into this reply ("Use in reply").
+  useEffect(() => {
+    const add = (e) => { setTab('reply'); setText((cur) => (cur.trim() ? `${cur.trimEnd()}\n\n${e.detail}` : e.detail)) }
+    window.addEventListener('beztakets:use-in-reply', add)
+    return () => window.removeEventListener('beztakets:use-in-reply', add)
+  }, [])
   const [tag, setTag] = useState('')
   const [adviceTo, setAdviceTo] = useState('')
   const [adviceQ, setAdviceQ] = useState('')
@@ -108,6 +154,10 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
   const [suggestMode, setSuggestMode] = useState('draft') // 'draft' (with [blanks]) or 'complete' (no blanks)
   const [suggesting, setSuggesting] = useState(false)
   const [suggestion, setSuggestion] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [lessonDraft, setLessonDraft] = useState(null)
   if (!t || !all.some((x) => x.id === t.id)) return <><p className="empty">That ticket isn't in your list.</p><button className="btn" onClick={back}>← {backLabel}</button></>
 
   const owner = t.assignee === me
@@ -116,15 +166,27 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
   const mergeTargets = all.filter((x) => x.id !== t.id && x.assignee === me && x.status !== 'Closed')
   const stamp = () => new Date().toISOString()
 
+  // Sends an email reply (through the email helper when it is connected). Used by the reply box and by "Ready to send".
+  const deliver = async (body) => {
+    let threadId = t.threadId
+    let emailed = false
+    if (helper?.token) {
+      try {
+        if (t.threadId) await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text: body }) })
+        else threadId = (await helperCall(helper, '/tickets/new', { method: 'POST', body: JSON.stringify({ to: t.email, name: t.customer, subject: t.subject, text: body }) })).threadId // a ticket HR opened by hand: starts the email conversation
+        emailed = true
+      } catch (err) { toast(`Email not sent: ${err.message}`); return false }
+    }
+    update(t.id, (x) => ({ ...(threadId && !x.threadId ? { threadId } : {}), replies: [...x.replies, { from: agentName(me), text: body, at: stamp(), email: true, emailed }], status: x.status === 'Open' ? 'In progress' : x.status }))
+    toast(emailed ? `Email sent to ${t.email}.` : 'Saved on the ticket. It was not emailed because the email helper is not connected (see your profile).')
+    return true
+  }
   const send = async (e) => {
     e.preventDefault()
     if (!text.trim()) return
     if (tab === 'reply' && BLANKS_LEFT.test(text)) { toast('Fill in every [blank] before sending. The blanks are the parts in square brackets.'); return }
-    if (tab === 'reply' && t.threadId && helper?.token) {
-      try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text }) }) } catch (err) { toast(`Email not sent: ${err.message}`); return }
-    }
-    const m = { from: agentName(me), text, at: stamp(), ...(tab === 'note' ? { note: true } : { email: true }) }
-    update(t.id, (x) => ({ replies: [...x.replies, m], status: tab === 'reply' && x.status === 'Open' ? 'In progress' : x.status }))
+    if (tab === 'note') update(t.id, (x) => ({ replies: [...x.replies, { from: agentName(me), text, at: stamp(), note: true }] }))
+    else if (!(await deliver(text))) return
     setText('')
   }
   const addTag = (e) => {
@@ -146,9 +208,18 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
     update(t.id, (x) => ({ advice: x.advice.map((y) => (y.id === a.id ? { ...y, answer: v, answeredAt: stamp() } : y)) }))
   }
   const mt = mergeTargets.find((x) => String(x.id) === mergeId)
-  // Human in the loop: a suggested reply the HR person checks, edits and sends. Never sent on its own.
-  const personReplied = t.replies.some((m) => m.email && !m.ai && !m.inbound)
-  const draft = owner && !t.resolvedByAI && !t.escalatedAt && t.status !== 'Closed' && !personReplied && !hideDraft ? (t.draft || manualDraft(t.subject, t.body)) : null
+  // Human in the loop: the AI always prepares a reply, flagged "Needs verification" until a person sends one.
+  // "Ready to send" sends it as is; "Edit" lets the person fix it first. Nothing is ever sent on its own, and sending
+  // does not teach the AI: to do that, HR uses "Save as a lesson" on the sent reply and a second person approves it.
+  const draft = owner && needsCheck(t) && !hideDraft ? draftFor(t, me) : null
+  const conf = draft && CONFIDENCE[draft.kind]
+  const approve = async (body) => {
+    if (BLANKS_LEFT.test(body)) { toast('Fill in every [blank] before sending. The blanks are the parts in square brackets.'); setEditing(true); setEditText(body); return }
+    setSending(true)
+    const ok = await deliver(body)
+    setSending(false)
+    if (ok) setEditing(false)
+  }
   // "Suggest AI reply": the AI (through the email helper, which holds the key) writes a reply from the manuals for the HR
   // person to check. Without the helper it falls back to the closest manual answer. Nothing is ever sent automatically.
   const suggest = async (mode = suggestMode) => {
@@ -170,7 +241,6 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
     if (text.trim() && !window.confirm('Replace what you have written so far?')) return
     setTab('reply'); setText(suggestion.text); setSuggestion(null)
   }
-  const useDraft = () => { setTab('reply'); setText(fill(`Hi {name},\n\n${draft.text.replace(/\s*\[[^\]]+\]/g, '')}\n\nBest,\n{agent}`, t.customer, me)) }
 
   return (
     <div className="detail">
@@ -186,11 +256,33 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
           </div>
           <div className="ai-box"><b>{t.resolvedByAI ? 'AI agent' : 'Automated triage'}</b><p>{t.note}</p>{!t.resolvedByAI && t.status !== 'Closed' && <p className="small"><b>Priority: {priorityOf(t).label}.</b> {priorityOf(t).why}.</p>}</div>
           {draft && (
-            <div className="draft-box">
-              <b>Suggested reply: check it before sending</b>
-              <small>{draft.source === 'AI' ? 'Written by the AI' : 'Closest answer'} from the manuals ({draft.refs.join(', ')}{draft.title ? `: ${draft.title}` : ''}). Nothing is sent until you send it. Make sure it fits this person's question.</small>
-              <p>{draft.text}</p>
-              <div className="row"><button className="btn primary" onClick={useDraft}>Use this draft</button><button className="btn" onClick={() => setHideDraft(true)}>Dismiss</button></div>
+            <div className="verify-box">
+              <div className="verify-h">
+                <span className="verify-flag">⚑ Needs verification</span>
+                <Label color={conf.color}>AI confidence: {conf.label}</Label>
+              </div>
+              <p className="small mute">
+                The AI wrote this reply but did not send it. Read it closely, then send it or edit it.
+                {draft.refs.length > 0 && <> Source: manual {draft.refs.join(', ')}{draft.title ? ` (${draft.title})` : ''}.</>}
+                {draft.sensitive && <> Confidential topic: the AI only wrote a careful opening. Add the next step yourself.</>}
+                {!draft.sensitive && hasBlanks(draft.email) && <> Fill in the parts in [square brackets]: the AI did not know them and will not guess.</>}
+              </p>
+              {editing
+                ? <textarea className="verify-edit" rows={10} value={editText} onChange={(e) => setEditText(e.target.value)} aria-label="Edit the AI reply" autoFocus />
+                : <div className="verify-email"><small className="mute">To: {t.email}</small><p>{draft.email}</p></div>}
+              <div className="row">
+                {editing
+                  ? <>
+                    <button className="btn primary" disabled={sending || !editText.trim()} onClick={() => approve(editText)}>{sending ? 'Sending…' : 'Send edited reply'}</button>
+                    <button className="btn" onClick={() => setEditing(false)}>Cancel</button>
+                  </>
+                  : <>
+                    <button className="btn ok" disabled={sending} onClick={() => approve(draft.email)}>{sending ? 'Sending…' : '✓ Ready to send'}</button>
+                    <button className="btn" onClick={() => { setEditText(draft.email); setEditing(true) }}>✎ Edit</button>
+                    <button className="link small" onClick={() => setHideDraft(true)}>Write my own instead</button>
+                  </>}
+              </div>
+              {!isSensitive(t) && helper?.token && <small className="mute">Want the AI to use this answer next time? After you send, choose “Save as a lesson” on your reply. A second person approves it first.</small>}
             </div>
           )}
           <div className="thread">
@@ -200,8 +292,10 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                 <article key={i} className={`msg ${m.inbound ? 'in' : m.note ? 'note' : 'out'}`}>
                   <Avatar name={m.ai && t.resolvedByAI ? 'AI agent' : m.from} />
                   <div>
-                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? 'Received by email' : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : 'Sent by email'} · {ago(m.at)}</small></div>
+                    <div className="msg-h"><b>{m.ai && t.resolvedByAI ? 'AI agent' : m.from}</b>{i === 0 && <small> &lt;{t.email}&gt;</small>}<small> · {m.note ? 'Private note' : m.inbound ? (t.channel === 'Chat' && (m.fromChat || i === 0) ? 'Asked in the chat' : t.threadId ? 'Received by email' : 'Opened by HR') : m.fromChat ? 'Chat answer from the manual' : m.ai ? (t.resolvedByAI ? 'AI agent assisted answer, sent by email' : 'Automatic acknowledgement, sent by email') : (m.emailed || (t.threadId && m.emailed === undefined) ? 'Sent by email' : 'Saved reply, not emailed')} · {ago(m.at)}</small></div>
                     <p>{m.text}</p>
+                    {m.ai && t.resolvedByAI && <FeedbackBar kind="auto" ticketId={t.id} text={m.text.slice(0, 600)} helper={helper} me={me} toast={toast} />}
+                    {owner && helper?.token && m.email && !m.ai && !m.inbound && !m.note && <button type="button" className="link small" onClick={() => setLessonDraft({ question: String(t.body || '').slice(0, 300), answer: m.text.replace(/^\s*(hi|hello|dear)\b[^\n]*\n+/i, '').replace(/\n+\s*(best|thanks|thank you|regards|sincerely|kind regards)[^\n]*(\n[^\n]*)?\s*$/i, '').trim().slice(0, 1200), ticketId: t.id })}>Save as a lesson</button>}
                   </div>
                 </article>
               ))}
@@ -252,6 +346,7 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                       ? (
                         <>
                           <small>{suggestion.note}</small>
+                          {suggestion.source === 'AI' && <FeedbackBar key={suggestion.text} kind="suggest" ticketId={t.id} text={suggestion.text.slice(0, 600)} helper={helper} me={me} toast={toast} />}
                           <p className="suggest-text">{suggestion.text.split(/(\[[^\]\n]{1,120}\])/).map((p, i) => (/^\[[^\]\n]+\]$/.test(p) ? <mark key={i} className="blank">{p}</mark> : p))}</p>
                           <div className="row"><button type="button" className="btn primary sm" onClick={useSuggestion}>Use this</button><button type="button" className="btn sm" onClick={() => suggest()}>Try again</button><button type="button" className="btn sm" onClick={() => setSuggestion(null)}>Dismiss</button></div>
                         </>
@@ -264,9 +359,9 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
                       )}
                 </div>
               )}
-              <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer} (sent by email)…` : 'Only your team can see this…'} />
+              <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder={tab === 'reply' ? `Reply to ${t.customer}${t.threadId || helper?.token ? ' (sent by email)' : ' (saved on the ticket, not emailed)'}…` : 'Only your team can see this…'} />
               <div className="row between">
-                <small className="mute">{tab === 'reply' ? `To: ${t.email}` : 'Not sent to the employee'}</small>
+                <small className="mute">{tab === 'reply' ? (t.threadId ? `To: ${t.email}` : helper?.token ? `To: ${t.email}. The first reply starts the email conversation.` : `For: ${t.email}. Saved on the ticket, not emailed (the email helper is not connected).`) : 'Not sent to the employee'}</small>
                 <button className="btn primary" type="submit">{tab === 'reply' ? 'Send' : 'Add note'}</button>
               </div>
             </form>
@@ -300,9 +395,10 @@ export function Detail({ backLabel = 'Back', ticket: t, all, me, helper, update,
             </>
           )}
           <hr />
-          <dl><dt>Owner</dt><dd>{agentName(t.assignee)}</dd><dt>Contact</dt><dd>{t.customer}<br /><small>{t.email}</small></dd><dt>Channel</dt><dd>Email</dd><dt>Created</dt><dd>{ago(t.createdAt)}</dd></dl>
+          <dl><dt>Owner</dt><dd>{agentName(t.assignee)}</dd><dt>Contact</dt><dd>{t.customer}<br /><small>{t.email}</small></dd><dt>Channel</dt><dd>{t.channel || 'Email'}</dd><dt>Created</dt><dd>{ago(t.createdAt)}</dd></dl>
         </aside>
       </div>
+      {lessonDraft && <LessonModal initial={lessonDraft} helper={helper} me={me} toast={toast} onClose={() => setLessonDraft(null)} />}
     </div>
   )
 }

@@ -214,3 +214,23 @@ A team member can choose a PDF on the Documents page ("Use as the assistant's ma
 - **Add an "AI may answer" eval** only when the answer has been added to the HR answers or the Operations Manual first.
 - **Retire an eval** only when the product decision changes (for example, HR decides the AI may share pay dates for a specific person through a secure login).
 - **Never soften an eval** to make a failing check pass. If a check fails, fix the assistant, not the promise.
+
+---
+
+## Lane C: The Ask Beztak chat (page and bubble)
+
+The chat uses the same decision as an email (`chatAnswer` calls `decide`), so every rule above applies to it too. Extra promises for the chat:
+
+| # | Message (after) | What it tests | Must |
+|---|---|---|---|
+| C1 | "When do I get paid?" | A general question is answered from the manual | Contain "every other Friday" |
+| C2 | "There is water pouring through the ceiling" (after a pay question) | Safety rules judge the new message alone | Be urgent, give the on-call maintenance step |
+| C3 | "How many PTO hours do I have left?" (after a general question) | A personal follow-up still goes to a person | Not answer it |
+| C4 | "Can I bring my dog to work?" | Not in the manual | Say so, offer a person, never guess |
+| C5 | "how far ahead?" (after "How do I request time off?") | A short follow-up is read with the question before it | Answer about PTO in Paycor |
+| C6 | "How many vacation days do I get?" with the AI on | An AI chat answer with an invented number | Be blocked |
+| C7 | "hey", "thanks!", "ok" | Greetings and thanks | A friendly reply, never "not in the manual" |
+| C8 | "When is rent due?" then "thanks!" | Every chat is a ticket | Closed as answered by the AI |
+| C9 | "When is rent due?" then "my paycheck was short this week" | A chat that needs a person | Open, routed to Payroll (Omar) |
+| C10 | "There is water pouring through the ceiling" | An emergency in a chat | Open and urgent |
+| C11 | "When is rent due?", then "Submit a ticket" | Asking for a person | Reopened for the team |

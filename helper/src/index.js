@@ -1,8 +1,9 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { buildCorpus, decide, FOOTER, suggestReply } from '../../src/aiAgent.js'
-import { ackText } from '../../src/triage.js'
+import { BUILTIN_MANUAL, buildCorpus, chatAnswer, chatTicketState, decide, FOOTER, mustGoToPerson, suggestReply } from '../../src/aiAgent.js'
+import { checkLesson } from '../../src/lessons.js'
+import { ackText, triage } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
 
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS' }
@@ -66,13 +67,80 @@ async function alreadyRepliedIn(env, token, threadId, me, internalDate) {
 // splits it into sections and sends them here (POST /manual), and every answer and suggestion then uses it, with the same
 // safety checks. DELETE /manual goes back to the built-in manual.
 const MANUAL_MAX_CHARS = 350000
-let manualCache = { at: null, corpus: null }
+let corpusCache = { key: null, corpus: undefined }
+// The manual the AI reads: the built-in one or an uploaded PDF, plus the team lessons that are approved.
 async function activeCorpus(env) {
   const m = await env.TICKETS.get('manual', 'json')
-  if (!m) return undefined // the built-in manual
-  if (manualCache.at !== m.at) manualCache = { at: m.at, corpus: buildCorpus(m) }
-  return manualCache.corpus
+  const lessons = ((await env.TICKETS.get('lessons', 'json')) || []).filter((l) => l.status === 'approved')
+  if (!m && !lessons.length) return undefined // the built-in manual alone
+  const key = `${m?.at || 'built-in'}|${lessons.map((l) => `${l.id}:${l.changedAt}`).join(',')}`
+  if (corpusCache.key !== key) corpusCache = { key, corpus: buildCorpus(m || BUILTIN_MANUAL, lessons) }
+  return corpusCache.corpus
 }
+
+// ---- team lessons and feedback (kept here so the whole team shares them) ----
+const getLessons = async (env) => (await env.TICKETS.get('lessons', 'json')) || []
+const putLessons = (env, list) => env.TICKETS.put('lessons', JSON.stringify(list))
+const who = (x) => String(x ?? '').replace(/[^\p{L}\p{N} .'-]/gu, '').trim().slice(0, 60) || 'Someone on the team'
+// Remember which lessons the AI used, so the team can see which ones matter. refs are citations like "L-3".
+async function noteUses(env, refs) {
+  const ids = (refs || []).filter((r) => /^L-\d+$/.test(r)).map((r) => Number(r.slice(2)))
+  if (!ids.length) return
+  const list = await getLessons(env)
+  let changed = false
+  for (const l of list) if (ids.includes(l.id)) { l.uses = (l.uses || 0) + 1; l.lastUsedAt = new Date().toISOString(); changed = true }
+  if (changed) await putLessons(env, list)
+}
+async function lessonRoute(env, req, url) {
+  const parts = url.pathname.split('/').filter(Boolean) // ['lessons'] or ['lessons', id] or ['feedback', id]
+  if (parts[0] === 'lessons') {
+    const list = await getLessons(env)
+    if (parts.length === 1 && req.method === 'GET') return json({ lessons: list, feedback: (await env.TICKETS.get('feedback', 'json')) || [] })
+    if (parts.length === 1 && req.method === 'POST') {
+      const b = await req.json()
+      const c = checkLesson(b)
+      if (!c.ok) return json({ error: c.error }, 400)
+      if (list.length >= 300) return json({ error: 'There are already 300 lessons. Delete some first.' }, 400)
+      const now = new Date().toISOString()
+      const lesson = { id: Math.max(0, ...list.map((l) => l.id)) + 1, question: c.question, answer: c.answer, status: 'pending', addedBy: who(b.by), addedAt: now, changedAt: now, ticketId: Number(b.ticketId) || null, uses: 0 }
+      await putLessons(env, [...list, lesson])
+      return json(lesson)
+    }
+    const l = list.find((x) => String(x.id) === parts[1])
+    if (!l) return json({ error: 'Lesson not found' }, 404)
+    if (parts.length === 2 && req.method === 'DELETE') { await putLessons(env, list.filter((x) => x !== l)); return json({ deleted: l.id }) }
+    if (parts.length === 2 && req.method === 'POST') {
+      const { action, by } = await req.json()
+      const name = who(by)
+      if (action === 'approve') {
+        if (l.status !== 'pending') return json({ error: 'That lesson is not waiting for approval.' }, 400)
+        if (name === l.addedBy) return json({ error: 'A second person has to approve it: you wrote this lesson.' }, 400)
+        Object.assign(l, { status: 'approved', approvedBy: name, approvedAt: new Date().toISOString() })
+      } else if (action === 'off') {
+        if (l.status !== 'approved') return json({ error: 'That lesson is not in use.' }, 400)
+        l.status = 'off'
+      } else if (action === 'on') {
+        if (l.status !== 'off') return json({ error: 'That lesson is not turned off.' }, 400)
+        l.status = 'approved'
+      } else return json({ error: 'Unknown action' }, 400)
+      l.changedAt = new Date().toISOString()
+      await putLessons(env, list)
+      return json(l)
+    }
+  }
+  if (parts[0] === 'feedback') {
+    const list = (await env.TICKETS.get('feedback', 'json')) || []
+    if (parts.length === 1 && req.method === 'POST') {
+      const b = await req.json()
+      const f = { id: Date.now(), kind: b.kind === 'auto' ? 'auto' : 'suggest', ticketId: Number(b.ticketId) || null, up: Boolean(b.up), note: String(b.note ?? '').trim().slice(0, 500), text: String(b.text ?? '').trim().slice(0, 600), by: who(b.by), at: new Date().toISOString() }
+      await env.TICKETS.put('feedback', JSON.stringify([f, ...list].slice(0, 300)))
+      return json(f)
+    }
+    if (parts.length === 2 && req.method === 'DELETE') { await env.TICKETS.put('feedback', JSON.stringify(list.filter((x) => String(x.id) !== parts[1]))); return json({ deleted: parts[1] }) }
+  }
+  return json({ error: 'Not found' }, 404)
+}
+
 function cleanManual(input) {
   if (!input || typeof input !== 'object') throw new Error('No manual was sent.')
   const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
@@ -127,6 +195,7 @@ async function pollOnce(env, stats) {
     if ((auto && auto !== 'no') || /^(bulk|junk|list)$/i.test(header(m, 'precedence'))) { stats.automatic++; continue } // out-of-office and bulk mail: never answer
     const entry = { inbound: true, from, text: stripQuote(bodyText(m.payload)) || m.snippet, at: new Date(+m.internalDate).toISOString(), messageId: header(m, 'message-id') }
     let t = await getTicket(env, m.threadId)
+    if (!t) { const alias = await env.TICKETS.get('thread:' + m.threadId); if (alias) t = await getTicket(env, alias) } // a reply to a chat hand-off email
     if (t) { t.replies.push(entry); stats.followUps++; if (t.status === 'Closed') t.status = 'Open' }
     else {
       if (await alreadyRepliedIn(env, token, m.threadId, me, +m.internalDate)) { stats.alreadyAnswered++; continue } // already answered by someone: leave it alone
@@ -135,6 +204,7 @@ async function pollOnce(env, stats) {
       if (!/no-?reply|mailer-daemon/i.test(from)) {
         // New conversation: decide who answers, then send the automatic email.
         const res = await decide(env, t.subject, entry.text, { corpus })
+        await noteUses(env, res.refs)
         const name = (from.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || from
         const agent = AGENTS.find((a) => a.id === res.assignee)
         const reply = res.resolved ? res.answer + FOOTER : ackText(name, agent.name, res.urgent, res.sensitive, res.extra)
@@ -158,20 +228,165 @@ export async function sendReply(env, id, text, auto = false) {
   const to = (t.customer.match(/<(.+)>/) || [null, t.customer])[1]
   const subject = /^re:/i.test(t.subject) ? t.subject : 'Re: ' + t.subject
   const lines = [`To: ${to}`, `Subject: ${subject.replace(/[\r\n]/g, ' ')}`, 'Content-Type: text/plain; charset=UTF-8']
-  if (last?.messageId) lines.push(`In-Reply-To: ${last.messageId}`, `References: ${last.messageId}`)
+  if (last?.messageId?.startsWith('<')) lines.push(`In-Reply-To: ${last.messageId}`, `References: ${last.messageId}`)
   const token = await accessToken(env)
-  await gmail(env, token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw: b64u(lines.join('\r\n') + '\r\n\r\n' + text), threadId: id }) })
+  // A ticket from the chat has no email thread until its first email; after that, replies stay in one thread.
+  const threadId = t.source === 'chat' ? t.gmailThreadId : id
+  const sent = await gmail(env, token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw: b64u(lines.join('\r\n') + '\r\n\r\n' + text), ...(threadId ? { threadId } : {}) }) })
+  if (t.source === 'chat' && !t.gmailThreadId && sent?.threadId) { t.gmailThreadId = sent.threadId; await env.TICKETS.put('thread:' + sent.threadId, t.id) }
   t.replies.push({ outbound: true, text, at: new Date().toISOString() })
   await saveTicket(env, t)
   return t
+}
+
+// ---- the chat (public) ----
+// About one hour per window: a visitor can ask `max` questions per hour. Kept loose on purpose; it only stops runaway use.
+async function underLimit(env, req, kind, max) {
+  const who = req.headers.get('cf-connecting-ip') || 'unknown'
+  const key = `rl:${kind}:${who}:${Math.floor(Date.now() / 3600000)}`
+  const n = Number((await env.TICKETS.get(key)) || 0)
+  if (n >= max) return false
+  await env.TICKETS.put(key, String(n + 1), { expirationTtl: 3700 })
+  return true
+}
+
+// ---- every chat is a ticket ----
+const chatId = (cid) => (/^[a-z0-9-]{8,64}$/i.test(String(cid || '')) ? 'chat-' + String(cid).toLowerCase() : null)
+const contactOf = (input) => {
+  const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
+  const name = line(input?.name, 80).replace(/[<>"]/g, '')
+  const email = line(input?.email, 120).toLowerCase()
+  if (!/^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email)) return null
+  return { name, email, customer: name ? `${name} <${email}>` : email }
+}
+// Re-reads the whole chat and sets status, owner, priority and tags, the same way every time.
+function refreshChatTicket(t) {
+  const state = chatTicketState(t.turns || [], { askedForPerson: Boolean(t.askedForPerson) })
+  t.subject = state.subject
+  t.focus = state.focus
+  t.status = state.resolved ? 'Closed' : 'Open'
+  t.triage = { ...(t.triage || {}), resolved: state.resolved, topic: state.topic, urgent: state.urgent, assignee: state.assignee, sensitive: !state.resolved && (t.turns || []).some((x) => x.kind === 'person'), tags: state.tags, note: state.note }
+  return t
+}
+async function logChat(env, input, res) {
+  const id = chatId(input?.conversationId)
+  const who = contactOf(input)
+  const message = String(input?.message ?? '').replace(/\s+/g, ' ').trim().slice(0, 1000)
+  if (!id || !who || !message) return null
+  const at = new Date().toISOString()
+  const t = (await getTicket(env, id)) || { id, source: 'chat', customer: who.customer, createdAt: at, turns: [], replies: [] }
+  t.customer = who.customer
+  const n = t.turns.length
+  t.turns.push({ role: 'user', text: message, at }, { role: 'assistant', text: String(res.text || '').slice(0, 4000), kind: res.kind, urgent: Boolean(res.urgent), topic: res.topic, assignee: res.assignee, at })
+  t.replies.push({ inbound: true, from: who.customer, text: message, at, messageId: `${id}-${n}` }, { chatAnswer: true, kind: res.kind, text: String(res.text || '').slice(0, 4000), at })
+  await saveTicket(env, refreshChatTicket(t))
+  return { id, status: t.status }
+}
+// "Submit a ticket" when the chat already is one: it is handed to a person, and the employee gets an email saying who will reply.
+async function escalateChat(env, input) {
+  const id = chatId(input?.conversationId)
+  if (!id) return null
+  const t = await getTicket(env, id)
+  if (!t) return null
+  const who = contactOf(input)
+  if (who) t.customer = who.customer
+  const note = String(input?.note ?? '').trim().slice(0, 1500)
+  const at = new Date().toISOString()
+  if (note) { t.turns.push({ role: 'user', text: note, at }); t.replies.push({ inbound: true, from: t.customer, text: note, at, messageId: `${id}-${t.turns.length}` }) }
+  t.askedForPerson = true
+  refreshChatTicket(t)
+  const agent = AGENTS.find((a) => a.id === t.triage.assignee) || AGENTS[0]
+  const name = (t.customer.match(/^\s*"?([^"<]*?)"?\s*</) || [])[1] || 'there'
+  t.triage.replyText = ackText(name, agent.name, t.triage.urgent, t.triage.sensitive, null)
+  await saveTicket(env, t)
+  if (!t.ackSent) { try { await sendReply(env, id, t.triage.replyText, true); const fresh = await getTicket(env, id); fresh.ackSent = true; await saveTicket(env, fresh) } catch { /* the ticket is with the team either way */ } }
+  return t
+}
+
+// "Talk to a person" in the chat: the conversation becomes a ticket for the HR team, and the employee gets an email
+// saying who will reply. The HR person answers it on the desk like any email ticket.
+async function chatTicket(env, input) {
+  const bad = (msg) => Object.assign(new Error(msg), { status: 400 })
+  const line = (x, n) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
+  const name = line(input?.name, 80)
+  const email = line(input?.email, 120).toLowerCase()
+  if (!/^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(email)) throw bad('Please enter a valid email address, so the HR team can reply.')
+  const note = String(input?.note ?? '').trim().slice(0, 1500)
+  const turns = (Array.isArray(input?.transcript) ? input.transcript : []).slice(-20)
+    .map((m) => ({ who: m?.role === 'user' ? 'Employee' : 'Chat assistant', text: String(m?.text ?? '').trim().slice(0, 1500) })).filter((m) => m.text)
+  const question = turns.filter((m) => m.who === 'Employee').map((m) => m.text).pop() || note
+  if (!question) throw bad('There is no question to pass on yet.')
+  const transcript = turns.map((m) => `${m.who}: ${m.text}`).join('\n\n')
+  const text = [note && `Message from the employee: ${note}`, transcript && `Chat so far:\n${transcript}`].filter(Boolean).join('\n\n') || question
+  const customer = name ? `${name.replace(/[<>"]/g, '')} <${email}>` : email
+  const subject = `Chat: ${line(question, 70)}`
+  // The same routing as an email: the safety rules first, then the topic decides who gets it.
+  const r = mustGoToPerson(subject, `${question}\n${note}`) || triage(subject, `${question}\n${note}`)
+  const agent = AGENTS.find((a) => a.id === r.assignee) || AGENTS[0]
+  const at = new Date().toISOString()
+  const id = chatId(input?.conversationId) || 'chat-' + crypto.randomUUID()
+  const reply = ackText(name || 'there', agent.name, r.urgent, r.sensitive, r.extra)
+  const t = { id, source: 'chat', subject, customer, status: 'Open', createdAt: at,
+    replies: [{ inbound: true, from: customer, text, at, messageId: id }],
+    triage: { resolved: false, topic: r.topic, urgent: Boolean(r.urgent), assignee: agent.id, sensitive: Boolean(r.sensitive), tags: [...(r.tags || []), 'from-chat'],
+      note: `${r.note || ''} Handed over from the chat by the employee.`.trim(), replyText: reply } }
+  await saveTicket(env, t)
+  try { await sendReply(env, id, reply, true) } catch { /* the ticket exists either way; the HR person can reply */ }
+  return t
+}
+
+// Starts a NEW email conversation for a ticket an HR person opened by hand. The conversation is saved as a ticket here too,
+// so when the employee writes back, their reply joins the same ticket instead of making a new one.
+const NEW_PER_DAY = 25 // a safety limit on emails started from the website per day
+const clean = (v, max) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').replace(/[<>",;]/g, '').trim().slice(0, max)
+export async function startConversation(env, input = {}) {
+  const email = String(input.to ?? '').trim().toLowerCase()
+  const name = clean(input.name, 80)
+  const subject = clean(input.subject, 150)
+  const text = String(input.text ?? '').trim()
+  if (!/^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/.test(email) || email.length > 120) throw Object.assign(new Error('That email address does not look right.'), { status: 400 })
+  if (email === env.BURNER_EMAIL.toLowerCase()) throw Object.assign(new Error('That is the help desk\'s own address.'), { status: 400 })
+  if (!subject || !text || text.length > 10000) throw Object.assign(new Error('A subject and a message are required.'), { status: 400 })
+  const day = 'newsent:' + new Date().toISOString().slice(0, 10)
+  const used = Number(await env.TICKETS.get(day)) || 0
+  if (used >= NEW_PER_DAY) throw Object.assign(new Error(`Today's limit of ${NEW_PER_DAY} new emails from the website has been reached.`), { status: 429 })
+  await env.TICKETS.put(day, String(used + 1), { expirationTtl: 60 * 60 * 48 })
+  const encoded = /^[\x20-\x7e]*$/.test(subject) ? subject : `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(subject)))}?=`
+  const lines = [`To: ${email}`, `Subject: ${encoded}`, 'Content-Type: text/plain; charset=UTF-8']
+  const token = await accessToken(env)
+  const sent = await gmail(env, token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw: b64u(lines.join('\r\n') + '\r\n\r\n' + text) }) })
+  const at = new Date().toISOString()
+  await saveTicket(env, { id: sent.threadId, subject, customer: name ? `${name} <${email}>` : email, status: 'Open', createdAt: at, autoReplied: true, replies: [{ outbound: true, text, at }] })
+  return { threadId: sent.threadId }
 }
 
 export default {
   async scheduled(_e, env, ctx) { ctx.waitUntil(pollInbox(env)) },
   async fetch(req, env, ctx) {
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors })
-    if (req.headers.get('authorization') !== 'Bearer ' + env.HELPER_TOKEN) return json({ error: 'Not allowed' }, 401)
     const url = new URL(req.url)
+    // The chat page and bubble are open to any employee without a password, so these two routes are public
+    // and limited per visitor. They can only ask questions and hand a question to a person: they can never read tickets.
+    if (url.pathname === '/chat' && req.method === 'POST') {
+      try {
+        if (!(await underLimit(env, req, 'chat', 40))) return json({ error: 'Too many questions in a short time. Please wait a few minutes.' }, 429)
+        const input = await req.json()
+        const res = await chatAnswer(env, input && typeof input === 'object' ? input : {}, { corpus: await activeCorpus(env) })
+        // Every chat is a ticket: the question and answer are added to this conversation's ticket on the desk.
+        let ticket = null
+        try { ticket = await logChat(env, input, res) } catch { /* the employee still gets the answer */ }
+        return json({ ...res, ticket })
+      } catch (e) { return json({ error: e.message }, 500) }
+    }
+    if (url.pathname === '/chat/escalate' && req.method === 'POST') {
+      try {
+        if (!(await underLimit(env, req, 'esc', 6))) return json({ error: 'Too many requests in a short time. Please wait a few minutes.' }, 429)
+        const input = await req.json()
+        const t = (await escalateChat(env, input)) || (await chatTicket(env, input))
+        return json({ ok: true, assignee: AGENTS.find((a) => a.id === t.triage.assignee)?.name, urgent: t.triage.urgent })
+      } catch (e) { return json({ error: e.message }, e.status || 500) }
+    }
+    if (req.headers.get('authorization') !== 'Bearer ' + env.HELPER_TOKEN) return json({ error: 'Not allowed' }, 401)
     try {
       if (url.pathname === '/tickets' && req.method === 'GET') {
         if (url.searchParams.get('refresh')) await pollInbox(env)
@@ -182,7 +397,9 @@ export default {
       if (url.pathname === '/suggest' && req.method === 'POST') {
         const input = await req.json()
         if (!input || typeof input !== 'object') return json({ error: 'Nothing to suggest a reply for' }, 400)
-        return json(await suggestReply(env, input, { corpus: await activeCorpus(env) }))
+        const out = await suggestReply(env, input, { corpus: await activeCorpus(env) })
+        await noteUses(env, out.refs)
+        return json(out)
       }
       if (url.pathname === '/manual') {
         if (req.method === 'GET') return json(manualInfo(await env.TICKETS.get('manual', 'json')))
@@ -194,7 +411,11 @@ export default {
           return json(manualInfo(m))
         }
       }
+      if (/^\/(lessons|feedback)(\/|$)/.test(url.pathname)) return lessonRoute(env, req, url)
       if (url.pathname === '/status' && req.method === 'GET') return json((await env.TICKETS.get('status', 'json')) || { never: true })
+      if (url.pathname === '/tickets/new' && req.method === 'POST') {
+        try { return json(await startConversation(env, await req.json())) } catch (e) { return json({ error: e.message }, e.status || 500) }
+      }
       const m = url.pathname.match(/^\/tickets\/([^/]+)\/reply$/)
       if (m && req.method === 'POST') {
         const { text, auto } = await req.json()

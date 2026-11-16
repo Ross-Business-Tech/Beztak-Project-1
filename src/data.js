@@ -11,6 +11,10 @@ export const agentForAccount = (email) => {
   return AGENTS.find((a) => local === a.id || letters(local) === letters(a.name.toLowerCase())) || null
 }
 
+// Employee logins (not HR people) see only the chat, never the desk. In the demo these are emails that start with
+// "employee", for example employee@beztak.example. On Beztak's intranet this would come from their own staff directory.
+export const isEmployeeAccount = (email) => /^employee/i.test(String(email || '').split('@')[0]) && !agentForAccount(email)
+
 export const AGENTS = [
   { id: 'dana', name: 'Dana Whitfield', skill: 'Benefits', topics: ['benefits'] },
   { id: 'omar', name: 'Omar Haddad', skill: 'Payroll', topics: ['payroll'] },

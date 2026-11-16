@@ -8,7 +8,7 @@
 // reply through the real gates, so the checks on AI-written answers run without an AI key.
 // `draft` checks the suggested reply HR gets for tickets a person must answer.
 import { AGENTS } from './data'
-import { buildCorpus, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
+import { BUILTIN_MANUAL, buildCorpus, chatAnswer, chatTicketState, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
 import { ackText } from './triage'
 import { followUp } from './escalate'
 import { dueIn } from './util'
@@ -22,6 +22,8 @@ export const LANES = [
   { id: 'followup', title: 'After the AI answered: the employee writes back', blurb: 'If the answer did not help, or they ask for a person, a person gets it with a fresh deadline, near the top of their list, and the employee is emailed who will reply and when. A plain "thanks" leaves the ticket closed. A new question is never dropped.' },
   { id: 'suggest', title: 'The "Suggest AI reply" button', blurb: 'HR can ask the AI for a reply. "Draft with blanks" may leave [blanks] for things only HR knows. "Complete message" must have none. Either way the AI only uses the manuals and the employee\'s own words, can never approve or decide anything, and never sees private or safety emails. A person reads, edits and sends it.' },
   { id: 'manual', title: 'Answering from an uploaded manual PDF', blurb: 'A team member can make the assistant read their own PDF instead of the built-in manual. The same rules apply: it only repeats what that manual says, cites real sections of it, every number must be in the section it cites, and personal, approval and safety questions still go to a person.' },
+  { id: 'lessons', title: 'Team lessons taught by HR', blurb: 'A lesson only counts once a second person approves it. The AI must cite it and may not add facts to it, turned-off or deleted lessons are never used, a lesson is never sent without the AI, and no lesson can override a safety rule.' },
+  { id: 'chat', title: 'The Ask Beztak chat (page and bubble)', blurb: 'The chat uses the same rules and manuals as an email. Safety and personal questions are judged on the new message alone, so a harmless earlier question can never unblock them. Follow-up questions are read with the question before them. When the manual has no clear answer, the chat says so and offers related topics or a person, never a guess.' },
   { id: 'drafts', title: 'Suggested replies for HR to check', blurb: 'When a person must answer, Beztakets suggests a reply from the manuals when one fits. The HR person reads it, edits it and sends it. No suggestions for emergencies, personal records, approvals or confidential matters.' },
 ]
 
@@ -33,6 +35,8 @@ const UPLOADED = buildCorpus({ title: 'Acme Site Manual', version: '2 pages, rea
   { n: 1, title: 'Visitor Parking', items: [{ q: 'Visitor Parking (page 3)', a: 'Visitors may park in the 14 marked visitor spaces beside the leasing office. Visitor parking permits cost $25 per month and are issued by the site manager.' }] },
   { n: 2, title: 'Package Lockers', items: [{ q: 'Package Lockers (page 5)', a: 'Packages are held in the package locker for 7 days. Residents receive an email with a pickup code.' }] },
 ] })
+const LESSONED = buildCorpus(BUILTIN_MANUAL, [{ id: 1, status: 'approved', question: 'Does Beztak pay for relocation expenses?', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off.' }])
+const MOVING = { subject: 'Relocation', body: 'Does Beztak pay for relocation expenses?' }
 const PARKING = { subject: 'Visitor parking', body: 'Where can my guests park, and what does a visitor permit cost?' }
 
 export const EVALS = [
@@ -224,7 +228,7 @@ export const EVALS = [
     ai: { body: 'Your vacation has been approved. Enjoy the time off.', sections: ['HR-2'] } },
   { id: 'S6', lane: 'suggest', suggest: { mode: 'draft', notSource: 'AI', notContains: ['999.1'] }, subject: 'Time off', body: 'How do I request vacation?', tests: 'Citing a manual section that does not exist is blocked',
     ai: { body: 'Request it in Paycor.', sections: ['999.1'] } },
-  { id: 'S7', lane: 'suggest', suggest: { mode: 'draft', source: 'AI', blanks: false }, subject: 'Overtime', body: 'I worked 45 hours this week. How does overtime work?', tests: "The employee's own numbers may be repeated",
+  { id: 'S7', lane: 'suggest', suggest: { mode: 'complete', source: 'AI', blanks: false }, subject: 'Overtime', body: 'I worked 45 hours this week. How does overtime work?', tests: "The employee's own numbers may be repeated",
     ai: { body: 'Hourly employees get one and one-half times their hourly rate for time worked over 40 hours in a week. Thanks for telling me about your 45 hours, I will look into it and follow up.', sections: ['13.4'] } },
   { id: 'S8', lane: 'suggest', variants: ['Can you tell me my PTO balance?', 'How many sick days do I have left?'], suggest: { mode: 'draft', source: 'template', aiCalled: false, blanks: true, notContains: ['$'] }, subject: 'My balance', body: 'How many vacation days do I personally have left?', tests: 'Personal records: never sent to the AI, HR gets a template with blanks',
     ai: { body: 'You have 9 vacation days left.', sections: [] } },
@@ -254,6 +258,47 @@ export const EVALS = [
   { id: 'U5', lane: 'manual', corpus: UPLOADED, subject: 'Parking', body: 'Where do visitors park? Also how many vacation days do I personally have left?', variants: ['Where can guests park, and what is my own PTO balance?'], tests: 'A personal question hidden behind a manual question still goes to a person',
     ai: { answerable: true, topic: 'general', answer: 'Visitors may park in the 14 marked visitor spaces [1.1].', sections: ['1.1'], draft: '', draft_sections: [] },
     expect: { by: 'person' } },
+
+  // ---- Team lessons ----
+  { id: 'L1', lane: 'lessons', corpus: LESSONED, ...MOVING, tests: 'An approved lesson can be used and cited, and its facts are checked against the lesson',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'ai', contains: ['$500'] } },
+  { id: 'L2', lane: 'lessons', ...MOVING, tests: 'A lesson that is waiting, turned off or deleted is not in the AI\'s reading, so citing it is blocked',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'person', notContains: ['$500'] } },
+  { id: 'L3', lane: 'lessons', corpus: LESSONED, ...MOVING, tests: 'A number that is not in the lesson ($900) is blocked',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $900 [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'person', notContains: ['$900'] } },
+  { id: 'L4', lane: 'lessons', corpus: LESSONED, ...MOVING, tests: 'Without the AI, a lesson is never sent on its own: a person answers',
+    expect: { by: 'person', notContains: ['$500'] } },
+  { id: 'L5', lane: 'lessons', corpus: LESSONED, subject: 'Gas', body: 'I smell gas near the moving truck at my property. Does Beztak pay for relocation expenses?', tests: 'A safety rule still comes first, whatever lessons exist',
+    ai: { answerable: true, topic: 'general', answer: 'Relocation expenses are reimbursed up to $500 with manager sign-off [L-1].', sections: ['L-1'], draft: '', draft_sections: [] },
+    expect: { by: 'person', tag: 'danger', notContains: ['$500'] } },
+  // ---- The Ask Beztak chat ----
+  { id: 'C1', lane: 'chat', subject: 'Chat', body: 'When do I get paid?', variants: ['when is payday', 'How often do we get paid?'], tests: 'Answers a general question from the manual',
+    chat: { history: [], kind: 'answer', contains: ['every other Friday'] } },
+  { id: 'C2', lane: 'chat', subject: 'Chat', body: 'there is water pouring through the ceiling in unit 4', variants: ['the furnace is not working and it is freezing'], tests: 'An emergency in the middle of a chat gets the safety step at once, even after a harmless question',
+    chat: { history: [{ role: 'user', text: 'When do I get paid?' }, { role: 'assistant', text: 'Payroll is bi-weekly, with paydays every other Friday.' }], kind: 'person', urgent: true, contains: ['on-call maintenance line'] } },
+  { id: 'C3', lane: 'chat', subject: 'Chat', body: 'How many PTO hours do I have left?', variants: ['why was my paycheck short this week'], tests: 'A personal question after a general one goes to a person, never answered',
+    chat: { history: [{ role: 'user', text: 'How do I request time off?' }, { role: 'assistant', text: 'PTO requests go through Paycor, and your manager approves them.' }], kind: 'person', notContains: ['hours left', 'approved'] } },
+  { id: 'C4', lane: 'chat', subject: 'Chat', body: 'Can I bring my dog to work?', tests: 'Not in the manual: says so and offers a person, never a guess',
+    chat: { history: [], kind: 'unknown', contains: ["won't guess"], notContains: ['yes', 'allowed'] } },
+  { id: 'C5', lane: 'chat', subject: 'Chat', body: 'how far ahead?', tests: 'A short follow-up is read with the question before it',
+    chat: { history: [{ role: 'user', text: 'How do I request time off?' }, { role: 'assistant', text: 'PTO requests go through Paycor.' }], kind: 'answer', ai: true, contains: ['Paycor'] },
+    ai: { answerable: true, topic: 'timeoff', answer: 'PTO requests go through Paycor, and your manager approves them [HR-2].', sections: ['HR-2'], draft: '', draft_sections: [] } },
+  { id: 'C7', lane: 'chat', subject: 'Chat', body: 'hey', variants: ['Hi there!', 'good morning', 'thanks!', 'ok'], tests: 'Greetings and thanks get a friendly reply, not "not in the manual"',
+    chat: { history: [], kind: 'smalltalk', notContains: ["won't guess", 'could not find'] } },
+  { id: 'C8', lane: 'chat', subject: 'Chat', body: 'When is rent due?', tests: 'Every chat is a ticket: an answered chat is closed as answered by the AI',
+    ticket: { turns: ['When is rent due?', 'thanks!'], resolved: true } },
+  { id: 'C9', lane: 'chat', subject: 'Chat', body: 'my paycheck was short this week', tests: 'Every chat is a ticket: a chat that needs a person stays open for the team, routed like an email',
+    ticket: { turns: ['When is rent due?', 'my paycheck was short this week'], resolved: false, assignee: 'omar' } },
+  { id: 'C10', lane: 'chat', subject: 'Chat', body: 'there is water pouring through the ceiling', tests: 'Every chat is a ticket: an emergency in a chat is open and urgent',
+    ticket: { turns: ['there is water pouring through the ceiling'], resolved: false, urgent: true } },
+  { id: 'C11', lane: 'chat', subject: 'Chat', body: 'When is rent due?', tests: 'Every chat is a ticket: asking for a person reopens an answered chat for the team',
+    ticket: { turns: ['When is rent due?'], askedForPerson: true, resolved: false } },
+  { id: 'C6', lane: 'chat', subject: 'Chat', body: 'How many vacation days do I get?', tests: 'With the AI on: an AI chat answer with an invented number is blocked',
+    chat: { history: [], ai: true, notKind: 'answer-ai', notContains: ['15 days'] },
+    ai: { answerable: true, topic: 'timeoff', answer: 'You get 15 days of vacation each year [HR-2].', sections: ['HR-2'], draft: '', draft_sections: [] } },
 ]
 
 const GENERAL = { one_person: false, approval_or_decision: false, sensitive: false, reason: 'general policy question' }
@@ -302,7 +347,7 @@ async function checkSuggest(c, body) {
   const e = c.suggest
   let called = false
   const ask = async () => { called = true; return c.ai }
-  const env = { ANTHROPIC_API_KEY: 'test-only' }
+  const env = { UMGPT_API_KEY: 'test-only' }
   const res = await suggestReply(env, { subject: c.subject, body, thread: [], mode: e.mode, customer: 'Alex Kim', agent: 'Priya Nair' }, { ask })
   const text = res.text || ''
   const has = (s) => text.toLowerCase().includes(s.toLowerCase())
@@ -322,10 +367,46 @@ async function checkSuggest(c, body) {
   return { body, pass: problems.length === 0, problems, reply: res.ok ? text : res.reason, res: { resolved: false, assignee: 'priya', urgent: false, tags: [], note: res.note || res.reason || '', label: res.ok ? `${e.mode === 'complete' ? 'Complete message' : 'Draft with blanks'} from ${res.source}` : 'No message offered' } }
 }
 
+// The chat: what the employee sees for one message in a conversation.
+async function checkChat(c, body) {
+  const e = c.chat
+  const env = e.ai ? { UMGPT_API_KEY: 'test-only' } : {}
+  const res = await chatAnswer(env, { message: body, history: e.history }, { ask: async () => c.ai, scope: async () => GENERAL })
+  const has = (s) => res.text.toLowerCase().includes(s.toLowerCase())
+  const problems = []
+  if (e.kind && res.kind !== e.kind) problems.push(`should be "${e.kind}", was "${res.kind}"`)
+  if (e.notKind === 'answer-ai' && res.kind === 'answer' && res.source === 'AI') problems.push('the AI answer should have been blocked')
+  if (e.urgent && !res.urgent) problems.push('should be marked urgent')
+  for (const s of e.contains || []) if (!has(s)) problems.push(`is missing "${s}"`)
+  for (const s of e.notContains || []) if (new RegExp(`\\b${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(res.text)) problems.push(`must not contain "${s}"`)
+  return { body, pass: problems.length === 0, problems, reply: res.text,
+    res: { resolved: res.kind === 'answer', assignee: res.assignee || 'dana', urgent: Boolean(res.urgent), tags: [], note: `Chat result: ${res.kind}${res.source ? ` (${res.source})` : ''}.`, label: res.kind === 'answer' ? 'Answered in the chat' : res.kind === 'person' ? 'Offered a person' : 'Said it could not find it' } }
+}
+
+// Every chat is a ticket: how the ticket for a whole chat looks on the desk.
+async function checkChatTicket(c, body) {
+  const e = c.ticket
+  const turns = []
+  for (const q of e.turns) {
+    const r = await chatAnswer({}, { message: q, history: turns })
+    turns.push({ role: 'user', text: q }, { role: 'assistant', text: r.text, kind: r.kind, urgent: r.urgent, topic: r.topic, assignee: r.assignee })
+  }
+  const t = chatTicketState(turns, { askedForPerson: e.askedForPerson })
+  const problems = []
+  if (t.resolved !== e.resolved) problems.push(e.resolved ? 'should be closed as answered by the AI' : 'should be open for a person')
+  if (e.assignee && t.assignee !== e.assignee) problems.push(`should go to ${nameOf(e.assignee)}, went to ${nameOf(t.assignee)}`)
+  if (e.urgent && !t.urgent) problems.push('should be marked urgent')
+  if (!t.tags.includes('from-chat')) problems.push('should be tagged "from-chat"')
+  return { body, pass: problems.length === 0, problems, reply: `${t.subject} (${t.resolved ? 'closed, answered by the AI' : 'open for ' + nameOf(t.assignee)})`,
+    res: { resolved: t.resolved, assignee: t.assignee, urgent: t.urgent, tags: t.tags, note: t.note, label: t.resolved ? 'Ticket closed (AI answered)' : `Ticket open for ${nameOf(t.assignee)}` } }
+}
+
 async function check(c, subject, body) {
+  if (c.ticket) return checkChatTicket(c, body)
+  if (c.chat) return checkChat(c, body)
   if (c.follow) return checkFollowUp(c, body)
   if (c.suggest) return checkSuggest(c, body)
-  const env = c.ai ? { ANTHROPIC_API_KEY: 'test-only' } : {}
+  const env = c.ai ? { UMGPT_API_KEY: 'test-only' } : {}
   const res = await decide(env, subject, body, { ask: async () => c.ai, scope: async () => c.scope || GENERAL, corpus: c.corpus })
   const reply = replyFor(res)
   const e = c.expect

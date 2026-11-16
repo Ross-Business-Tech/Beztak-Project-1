@@ -10,8 +10,21 @@ lets the AI agent answer what it safely can (sent by email), and sends replies w
 
 ## Secrets (set in Cloudflare, never in this repo)
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `BURNER_EMAIL`, `HELPER_TOKEN`
-and, to turn the AI on, `ANTHROPIC_API_KEY`. Without that last one the helper still works and uses the
+and, to turn the AI on, `UMGPT_API_KEY` (the U-M GPT Toolkit key). Without it the helper still works and uses the
 simple keyword answers.
+
+## Tickets HR opens by hand
+On the website, the "+" button creates a ticket for an employee. The first reply HR sends on it starts a new email to the employee
+(`POST /tickets/new`: the helper sends the email and saves it as a ticket here, so the employee's answer joins the same ticket).
+Later replies use the normal reply route. To limit mistakes, the helper refuses bad addresses and its own address, and sends at most 25 such
+new emails per day. Use made-up employees only while testing.
+
+## Team lessons and feedback
+The website's **Learned** page lets the team teach the agent short answers ("lessons"). A lesson is saved here (Cloudflare KV) as waiting for approval;
+a second person approves it before the AI can read or cite it (`[L-3]`). Lessons can be turned off or deleted at any time and stop being used at once.
+The AI never changes by itself: it only reads the manuals plus the approved lessons, every fact in its answer must appear in what it cites, and the
+safety rules still run first. 👍/👎 feedback on AI replies is stored here for review only. Routes: `/lessons`, `/lessons/:id`, `/feedback`.
+Lessons and feedback must never contain real personal information.
 
 ## Only new email is handled
 - The helper remembers when it was first switched on and ignores every email from before that, so the old inbox is never read or answered.
@@ -21,7 +34,7 @@ simple keyword answers.
 
 ## Suggest AI reply
 The website's "Suggest AI reply" button on a ticket calls the helper at `/suggest`, because the AI key lives here.
-It needs the newest `worker.js` and the `ANTHROPIC_API_KEY` secret. Without them the button still works but offers the closest
+It needs the newest `worker.js` and the `UMGPT_API_KEY` secret. Without them the button still works but offers the closest
 manual answer or a template with [blanks] instead of an AI-written reply. Personal, approval and safety emails are never
 sent to the AI.
 
@@ -40,3 +53,14 @@ pages) have no text and cannot be read. The text is stored here and sent to the 
    check must agree it is a general question (not about one person, an approval, or anything sensitive).
    If not, a person takes over and gets a suggested reply to check, edit and send.
 3. Everything else gets a short "we passed this to ..." email.
+
+## The employee chat (Ask Beztak)
+The chat page (`/ask`), the chat bubble on other websites (`ask-widget.js`) and the bubble in the desk call the helper at
+`POST /chat` (one question plus the conversation so far) and `POST /chat/escalate` ("Submit a ticket": the employee gets an email
+saying who will reply). **Every chat is a ticket:** each conversation is saved as one ticket (`chat-<id>`) with the employee's name and
+email, updated after every question. Answered chats are closed as answered by the AI; a chat with a personal question, a question the
+manual doesn't cover, or "Submit a ticket" is open for the right person (`chatTicketState` in `src/aiAgent.js`). These two routes need **no helper password**, because employees use the
+chat without signing in. They can only ask questions and create a ticket, never read tickets, and each visitor is limited
+(40 questions and 6 hand-offs per hour). Answers use exactly the same rules and manual as email (`chatAnswer` in `src/aiAgent.js`).
+**After pulling this change, rebuild and redeploy the helper** (`npm run build:helper`, then paste `helper/bundle/worker.js` in Cloudflare).
+Until then the chat still answers from the manual in the browser (no AI), and "Pass to a person" asks the employee to email HR instead.

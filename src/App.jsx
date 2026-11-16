@@ -3,13 +3,15 @@ import { AGENTS, SEED_DOCS, SEED_TICKETS, agentForAccount } from './data'
 import { Dashboard, Documents, Profile, Setup } from './Pages'
 import GapTracker from './GapTracker'
 import Guardrails from './Guardrails'
-import { Detail, List, VIEW_NAMES } from './Tickets'
+import { Detail, List, NewTicket, VIEW_NAMES } from './Tickets'
+import Learned from './Lessons'
 import { clearFiles } from './fileStore'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
 import { followUp } from './escalate'
 import { setActiveManualTitles } from './activeManual'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
+import ChatBubble from './chat/ChatBubble'
 
 const store = (key, fallback) => {
   try { const v = JSON.parse(localStorage.getItem(key)); if (v) return v } catch { /* ignore */ }
@@ -20,6 +22,7 @@ const NAV = [
   ['tickets', 'M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z', 'Tickets'],
   ['dashboard', 'M4 20V10M10 20V4M16 20v-7M22 20H2', 'Reports'],
   ['gaps', 'M12 3l9 16H3zM12 10v4M12 17h.01', 'Gaps'],
+  ['lessons', 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z', 'Learned'],
   ['kb', 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7', 'Documents'],
   ['settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z', 'Setup'],
 ]
@@ -33,11 +36,12 @@ export default function App({ account, signOut }) {
   const [docs, setDocs] = useState(() => store('hr-desk-docs-v2', SEED_DOCS))
   const [prefs, setPrefs] = useState(() => ({ theme: 'light', notify: true, ooo: false, ...store('hr-desk-prefs', {}) }))
   const [helper, setHelper] = useState(() => ({ url: DEFAULT_HELPER_URL, token: '', ...store('hr-desk-helper', {}) }))
-  const [nav, setNav] = useState({ view: 'mine' })
+  const [nav, setNav] = useState({ view: 'check' })
   // Guardrails is a back-office page for the project team: not in the menu, opened from Setup or /#guardrails.
   const [page, setPage] = useState(() => (location.hash === '#guardrails' ? 'guardrails' : 'tickets'))
   useEffect(() => { if (page !== 'guardrails' && location.hash === '#guardrails') history.replaceState(null, '', location.pathname + location.search) }, [page])
   const [openId, setOpenId] = useState(null)
+  const [creating, setCreating] = useState(false)
   useEffect(() => { const f = () => { if (location.hash === '#guardrails') { setPage('guardrails'); setOpenId(null) } }; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f) }, [])
   const [toast, setToast] = useState('')
   useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v5', JSON.stringify(tickets)); localStorage.setItem('hr-desk-docs-v2', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, docs, prefs, helper])
@@ -81,8 +85,39 @@ export default function App({ account, signOut }) {
         const cur = ticketsRef.current
         const created = []
         const follow = {}
+        const chatUpd = {}
         let nextId = Math.max(1000, ...cur.map((x) => x.id))
         for (const r of [...remote].reverse()) {
+          // Every chat is a ticket. Its conversation comes from the helper and is kept up to date while the employee chats;
+          // the desk's own notes, events and replies stay as they are.
+          if (r.source === 'chat') {
+            const turns = r.replies || []
+            const firstIn = turns.find((m) => m.inbound)
+            if (!firstIn) continue
+            const { name, email } = parse(r.customer)
+            const res = r.triage || {}
+            const fromChat = turns.slice(turns.indexOf(firstIn) + 1).filter((m) => m.inbound || m.chatAnswer)
+              .map((m) => (m.inbound ? { inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId, fromChat: true } : { from: 'Ask Beztak chat (automated)', text: m.text, at: m.at, ai: true, fromChat: true }))
+            const local = cur.find((x) => x.threadId === r.id)
+            if (!local) {
+              if (new Date(firstIn.at).getTime() < cutoff) { older++; continue }
+              created.unshift({
+                id: ++nextId, threadId: r.id, firstMessageId: firstIn.messageId, subject: r.subject, body: firstIn.text, customer: name, email,
+                status: r.status, urgent: Boolean(res.urgent), topic: res.topic, assignee: res.assignee, createdAt: firstIn.at, dueAt: dueIn(Boolean(res.urgent), firstIn.at),
+                resolvedByAI: Boolean(res.resolved), channel: 'Chat', note: res.note, advice: [], tags: res.tags || ['from-chat'], chatLen: turns.length, replies: fromChat,
+              })
+            } else if ((local.chatLen || 0) !== turns.length || (r.status === 'Open' && local.status === 'Closed')) {
+              const reopen = r.status === 'Open' && local.status === 'Closed'
+              const auto = local.resolvedByAI || reopen // still the chat's own routing: a person has not taken it over yet
+              chatUpd[local.id] = {
+                chatLen: turns.length, subject: r.subject,
+                replies: [...local.replies.filter((m) => !m.fromChat), ...fromChat].sort((a, b) => new Date(a.at) - new Date(b.at)),
+                ...(reopen ? { status: 'Open', resolvedByAI: false, dueAt: dueIn(Boolean(res.urgent), new Date()) } : {}),
+                ...(auto ? { urgent: Boolean(res.urgent), assignee: res.assignee, topic: res.topic, tags: res.tags || local.tags, note: res.note } : {}),
+              }
+            }
+            continue
+          }
           const inbound = r.replies.filter((m) => m.inbound)
           const local = cur.find((x) => x.threadId === r.id)
           if (local) {
@@ -103,13 +138,14 @@ export default function App({ account, signOut }) {
             created.unshift({
               id: ++nextId, threadId: r.id, firstMessageId: inbound[0].messageId, subject: r.subject, body: inbound[0].text, customer: name, email,
               status: res.resolved ? 'Closed' : 'Open', urgent: res.urgent, topic: res.topic, assignee: res.assignee, createdAt: inbound[0].at, dueAt: dueIn(res.urgent, inbound[0].at),
-              resolvedByAI: res.resolved, channel: 'Email', note: res.note, advice: [], draft: res.draft || undefined,
+              resolvedByAI: res.resolved, channel: r.source === 'chat' ? 'Chat' : 'Email', note: res.note, advice: [], draft: res.draft || undefined,
               tags: [...(res.resolved ? ['ai-resolved'] : []), ...(res.tags || (res.sensitive ? ['sensitive'] : []))],
               replies: [{ from: 'HR Assistant (automated)', text: reply, at: now, email: true, ai: true }, ...inbound.slice(1).map((m) => ({ inbound: true, from: name, text: m.text, at: m.at, messageId: m.messageId }))],
             })
           }
         }
         const ids = Object.keys(follow)
+        const chatIds = Object.keys(chatUpd)
         setHelperStatus({ at: new Date().toISOString(), ok: true, remote: remote.length, imported: created.length, older, hidden, newest, mail })
         // An employee wrote back after the AI answered: a person gets it if they asked for one (or asked something new),
         // and the employee gets an email saying who will reply and when. A plain "thanks" leaves the ticket closed.
@@ -120,8 +156,9 @@ export default function App({ account, signOut }) {
           const { confirmation } = followUp(t, follow[id], when)
           if (confirmation && t.threadId) { try { await helperCall(helper, `/tickets/${t.threadId}/reply`, { method: 'POST', body: JSON.stringify({ text: confirmation }) }) } catch { /* the ticket is still escalated */ } }
         }
-        if (created.length || ids.length) {
+        if (created.length || ids.length || chatIds.length) {
           setTickets((p) => [...created.filter((c) => !p.some((x) => x.threadId === c.threadId)), ...p.map((t) => {
+            if (chatUpd[t.id]) return { ...t, ...chatUpd[t.id] }
             const f = follow[t.id]
             if (!f) return t
             if (t.resolvedByAI) return { ...t, ...followUp(t, f, when).patch }
@@ -130,7 +167,7 @@ export default function App({ account, signOut }) {
               note: reopen ? 'The employee replied after the automatic answer, so a person needs to look at it.' : t.note,
               replies: [...t.replies, ...f.map((m) => ({ inbound: true, from: t.customer, text: m.text, at: m.at, messageId: m.messageId }))] }
           })])
-          setToast(`${created.length ? `${created.length} new email ticket${created.length > 1 ? 's' : ''}` : ''}${created.length && ids.length ? ' and ' : ''}${ids.length ? `${ids.length} customer repl${ids.length > 1 ? 'ies' : 'y'}` : ''}.`)
+          if (created.length || ids.length) setToast(`${created.length ? `${created.length} new ticket${created.length > 1 ? 's' : ''}` : ''}${created.length && ids.length ? ' and ' : ''}${ids.length ? `${ids.length} customer repl${ids.length > 1 ? 'ies' : 'y'}` : ''}.`)
         }
       } catch (e) { setHelperStatus({ at: new Date().toISOString(), ok: false, error: e.message === 'Failed to fetch' ? 'Could not reach the helper. Check the helper address, and that the helper is deployed in Cloudflare.' : e.message }) /* try again next time */ }
       syncing.current = false
@@ -159,6 +196,21 @@ export default function App({ account, signOut }) {
     setOpenId(target.id)
     setToast(`Ticket #${src.id} merged into #${target.id}.`)
   }
+  const createTicket = (v) => {
+    const res = triage(v.subject, v.body) // sets the topic and whether it is urgent, by the team's own rules
+    const id = Math.max(1000, ...tickets.map((x) => x.id)) + 1
+    const now = new Date().toISOString()
+    setTickets((p) => [{
+      id, subject: v.subject, body: v.body, customer: v.customer, email: v.email,
+      status: 'Open', urgent: res.urgent, topic: res.topic, assignee: me, createdAt: now, dueAt: dueIn(res.urgent, now),
+      resolvedByAI: false, channel: 'Created by HR', note: `Created by ${agentName(me)}.${res.urgent ? ' Marked urgent by the team rules.' : ''}`,
+      advice: [], tags: ['created-by-hr'], replies: [],
+    }, ...p])
+    setNav({ view: 'check' })
+    setCreating(false)
+    setOpenId(id)
+    setToast(`Ticket #${id} created and assigned to you.`)
+  }
   const go = (k) => { setPage(k); setOpenId(null) }
 
   return (
@@ -177,8 +229,9 @@ export default function App({ account, signOut }) {
         <div className="content">
           {page === 'tickets' && (openId
             ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
-            : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} />)}
+            : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} onNew={() => setCreating(true)} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
+          {page === 'lessons' && <Learned helper={helper} me={me} toast={setToast} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} manualAt={manualAt} />}
           {page === 'guardrails' && <Guardrails />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} helper={helper} />}
@@ -186,6 +239,12 @@ export default function App({ account, signOut }) {
           {page === 'settings' && <Setup me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
+      {creating && <NewTicket onCreate={createTicket} onClose={() => setCreating(false)} />}
+      <ChatBubble user={{ name: agentName(me), email: account }} onUseInReply={(text) => {
+        if (page !== 'tickets' || !openId) { setToast('Open a ticket first, then use "Use in reply" to add this answer to your reply.'); return }
+        window.dispatchEvent(new CustomEvent('beztakets:use-in-reply', { detail: text }))
+        setToast('Added to your reply. Check it before sending.')
+      }} />
       {toast && <div className="toast" role="status" onClick={() => setToast('')}>{toast}</div>}
     </div>
   )
