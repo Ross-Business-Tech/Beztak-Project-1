@@ -1,0 +1,6 @@
+{
+  "name": "question-analytics-dashboard",
+  "private": true,
+  "type": "commonjs",
+  "description": "Standalone analytics dashboard. Opens in a browser with no build step; tests run with node --test."
+}
