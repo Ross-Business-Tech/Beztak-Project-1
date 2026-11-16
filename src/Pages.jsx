@@ -183,6 +183,9 @@ export function Documents({ docs, setDocs, helper }) {
 export function Setup({ me, account, linked, openGuardrails }) {
   return (
     <>
+      <section className="panel pad"><h2>What the AI learns from HR</h2>
+        <p>The AI prepares a reply for every ticket a person must answer, flagged "Needs verification". Sending it does not teach the AI by itself. To teach it, choose "Save as a lesson" on a reply you sent: a second person approves it on the Learned page, and then the whole team's AI may use it (and must cite it). Lessons can be turned off or deleted there.</p>
+      </section>
       <section className="panel pad"><h2>For the project team: AI guardrails</h2>
         <p>The checks that prove the AI assistant only answers what it safely can, and hands everything else to a person. This is a back-office page, so it is not in the main menu.</p>
         <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>

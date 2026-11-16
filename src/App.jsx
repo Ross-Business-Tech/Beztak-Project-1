@@ -36,7 +36,7 @@ export default function App({ account, signOut }) {
   const [docs, setDocs] = useState(() => store('hr-desk-docs-v2', SEED_DOCS))
   const [prefs, setPrefs] = useState(() => ({ theme: 'light', notify: true, ooo: false, ...store('hr-desk-prefs', {}) }))
   const [helper, setHelper] = useState(() => ({ url: DEFAULT_HELPER_URL, token: '', ...store('hr-desk-helper', {}) }))
-  const [nav, setNav] = useState({ view: 'mine' })
+  const [nav, setNav] = useState({ view: 'check' })
   // Guardrails is a back-office page for the project team: not in the menu, opened from Setup or /#guardrails.
   const [page, setPage] = useState(() => (location.hash === '#guardrails' ? 'guardrails' : 'tickets'))
   useEffect(() => { if (page !== 'guardrails' && location.hash === '#guardrails') history.replaceState(null, '', location.pathname + location.search) }, [page])
@@ -206,7 +206,7 @@ export default function App({ account, signOut }) {
       resolvedByAI: false, channel: 'Created by HR', note: `Created by ${agentName(me)}.${res.urgent ? ' Marked urgent by the team rules.' : ''}`,
       advice: [], tags: ['created-by-hr'], replies: [],
     }, ...p])
-    setNav({ view: 'mine' })
+    setNav({ view: 'check' })
     setCreating(false)
     setOpenId(id)
     setToast(`Ticket #${id} created and assigned to you.`)

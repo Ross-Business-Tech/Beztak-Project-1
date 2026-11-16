@@ -76,7 +76,7 @@ RULES
 - Copy every number, date, time, phone number and email exactly as the manuals write it. Use "- " bullets, never numbered steps. Any fact not found word for word in the entries you cite blocks your answer.
 - Cite the manual entries you used in square brackets inside the answer, like [HR-2] or [6.3]. Only cite entries that exist.
 
-- If "answerable" is false but the manuals hold something relevant, write a suggested reply in "draft" for an HR person to check, edit and send. Same rules: only facts from the manuals, with citations in "draft_sections". Leave it empty if nothing relevant exists.
+- If "answerable" is false, ALWAYS write a suggested reply in "draft" for an HR person to check, edit and send, so they never start from a blank page. Use only facts from the manuals, with citations in "draft_sections". Where the manuals do not have a fact the reply needs, do not guess: leave a blank in square brackets for HR, like [HR: add the plan's orthodontic coverage]. If nothing in the manuals is relevant, write a short, friendly reply made of blanks like that and leave "draft_sections" empty.
 
 OUTPUT: reply with one JSON object and nothing else:
 {"answerable": true or false, "topic": "benefits|payroll|timeoff|onboarding|relations|general", "answer": "the reply text, or empty if not answerable", "sections": ["HR-2", "6.3"], "draft": "suggested reply for HR, or empty", "draft_sections": ["HR-2"]}
@@ -198,7 +198,7 @@ const stem = (w) => {
   return x
 }
 const SHORT = new Set(['po', 'id', 'hr', 'it'])
-const words = (t) => [...new Set(t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => (w.length > 2 || SHORT.has(w)) && !STOP.has(w)).map(stem))]
+export const words = (t) => [...new Set(t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => (w.length > 2 || SHORT.has(w)) && !STOP.has(w)).map(stem))]
 const entry = (ref, title, text, qText, kText) => {
   const qw = new Set(words(qText))
   return { ref, title, text, qw, kw: new Set(words(kText).filter((w) => !qw.has(w))) }
@@ -278,7 +278,10 @@ export async function decide(env, subject, body, { ask = askModel, scope = askSc
         note: `AI agent answered from the manuals (${check.refs.join(', ')}). The second check confirmed it is a general question. No person needed.` }
     }
     const d = checkAiReply(check.ok ? ai : { answerable: true, answer: ai?.draft, sections: ai?.draft_sections }, corpus)
-    const draft = d.ok ? { text: d.answer, refs: d.refs, source: 'AI' } : manualDraft(subject, body, corpus)
+    // A draft with no citations is still kept when it states no facts at all (only blanks for HR).
+    const raw = typeof ai?.draft === 'string' ? ai.draft.trim() : ''
+    const blanksOnly = !d.ok && raw && raw.length <= 1800 && !(ai?.draft_sections || []).length && ungroundedFacts(raw, [], '', corpus).length === 0
+    const draft = d.ok ? { text: d.answer, refs: d.refs, source: 'AI', unsure: /\[HR:/.test(d.answer) } : blanksOnly ? { text: raw, refs: [], source: 'AI', unsure: true } : manualDraft(subject, body, corpus)
     const why = flag ? `the second check found it is ${flag}` : check.reason
     return { ...local, resolved: false, answer: undefined, draft, tags: [...(local.tags || []), flag ? 'ai-second-check' : 'ai-declined'],
       note: `${local.note || ''} The AI agent did not send an answer because ${why}, so a person will reply.`.trim() }

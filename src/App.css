@@ -259,3 +259,15 @@ mark.blank{background:#fff3bf;color:inherit;padding:0 3px;border-radius:3px;box-
 .lesson{border-top:1px solid var(--line);padding:12px 0;display:flex;flex-direction:column;gap:6px}.lesson p{margin:0}
 .fb{margin-top:6px;gap:8px;align-items:center}.fb input{flex:1;min-width:0}
 .btn.danger{color:#b42318;border-color:color-mix(in srgb,#b42318 40%,var(--line))}
+/* AI reply waiting for a person's check */
+.verify-box{margin:14px 16px 0;border:2px solid #e8a23a;background:color-mix(in srgb,#f5b94a 10%,var(--surface));border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.verify-box p{margin:0}
+.verify-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.verify-flag{background:#b45309;color:#fff;font-weight:700;font-size:13px;border-radius:4px;padding:3px 8px}
+.verify-email{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.verify-email p{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.verify-edit{font:inherit;line-height:1.45;background:var(--surface)}
+.btn.ok{background:#15803d;border-color:#15803d;color:#fff}.btn.ok:hover{background:#166534}
+.btn:disabled{opacity:.6;cursor:default}
+.verify-box .nl{white-space:normal;height:auto;min-height:20px;padding:3px 6px}
+.badge.green{background:#dcfce7;color:#166534}
