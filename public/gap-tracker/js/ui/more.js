@@ -18,11 +18,12 @@
     const avg = ready.length ? ready.reduce(function (a, x) { return a + Math.max(0, 1 - x.after / x.before); }, 0) / ready.length : null;
     const lede = r.rows.length
       ? 'About ' + U.hours(r.hours) + ' staff hours saved so far' + (avg != null ? ', with ' + A.round(avg * 100) + '% fewer tickets a week on average where we can measure it' : '') + '. Estimate: tickets that no longer happen × ' + b.cfg.minutesPerTicket + ' minutes.'
-      : 'Once a manual update goes live, or you mark a gap Done with the date it went live, the before-and-after ticket count shows up here.';
+      : 'Once a manual update goes live, or someone reports an update using the form below, the before-and-after ticket count shows up here.';
     const page = h('div', { class: 'page' }, A.pageHead('Results', 'Did the fixes work?'),
       h('section', { class: 'tile wide' }, h('h2', {}, 'Staff time saved'), h('p', { class: 'big' }, r.rows.length ? '≈ ' + U.hours(r.hours) : '—', h('small', {}, ' hours')), h('p', { class: 'sub' }, lede)));
+    page.append(reportForm(root, b));
     if (!r.rows.length) {
-      page.append(A.empty('No fixes tracked yet', 'Open a gap in the Fix list, mark it Done and say when it went live.', h('button', { type: 'button', class: 'btn primary', onclick: function () { A.actions.go('fixes'); } }, 'Go to the Fix list')));
+      page.append(A.empty('No updates reported yet', 'Use the form above when someone has updated the manual. It shows up here, and in the downloadable deck.'));
     } else {
       const tb = h('tbody', {});
       r.rows.forEach(function (x) {
@@ -42,6 +43,35 @@
         h('thead', {}, h('tr', {}, h('th', {}, 'Fix'), h('th', {}, 'Live since'), h('th', {}, 'Tickets a week'), h('th', {}, 'Change'), h('th', { class: 'hide-sm' }, 'Time saved'))), tb))));
     }
     root.replaceChildren(page);
+  }
+
+  // "I updated the manual": anyone on the team can say a gap has been fixed, so it shows up below and in the deck.
+  function reportForm(root, b) {
+    const open = svc.openItems();
+    const card = h('section', { class: 'card pad report' }, h('h2', {}, 'Did you update the manual?'),
+      h('p', { class: 'sub' }, 'Tell us which gap you fixed. It moves to Done, appears in the results below, and is included in the downloadable deck. We start measuring tickets from the date it went live.'));
+    if (!open.length) { card.append(h('p', { class: 'muted' }, 'There are no open gaps right now. Every gap has been reported or dismissed.')); return card; }
+    const pick = h('select', { id: 'r-gap' }, open.map(function (c) { return h('option', { value: c.key }, c.theme + ' (' + U.n0(c.tickets) + ' tickets)'); }));
+    const who = h('input', { type: 'text', id: 'r-who', list: 'r-people', maxlength: '80', placeholder: 'Your name', autocomplete: 'off' });
+    const when = h('input', { type: 'date', id: 'r-when', value: U.todayIso(), max: U.todayIso() });
+    const what = h('textarea', { id: 'r-what', rows: '2', maxlength: '500', placeholder: 'What did you add or change? (optional)' });
+    const msg = h('span', { class: 'saved', role: 'status' }, '');
+    const go = h('button', { type: 'button', class: 'btn primary', onclick: function () {
+      if (!who.value.trim()) { msg.textContent = 'Please add your name.'; who.focus(); return; }
+      const c = svc.find(pick.value);
+      if (!c) return;
+      svc.reportUpdate(c, { by: who.value, liveOn: when.value, note: what.value });
+      U.toast('Thanks. “' + c.theme + '” is now listed as updated.');
+      results(root, b);
+    } }, 'I updated the manual');
+    card.append(
+      h('label', { class: 'field', for: 'r-gap' }, 'Which gap did you fix?'), pick,
+      h('div', { class: 'two-f' },
+        h('div', {}, h('label', { class: 'field', for: 'r-who' }, 'Updated by'), who, h('datalist', { id: 'r-people' }, svc.settings.people().map(function (n) { return h('option', { value: n }); }))),
+        h('div', {}, h('label', { class: 'field', for: 'r-when' }, 'Went live on'), when)),
+      h('label', { class: 'field', for: 'r-what' }, 'What changed'), what,
+      h('div', { class: 'row-gap' }, go, msg));
+    return card;
   }
 
   // ---------- Manual health ----------
@@ -75,7 +105,7 @@
       h('div', { class: 'toolbar' }, tabs),
       rows.length ? h('div', { class: 'card flush' }, h('div', { class: 'scroll' }, h('table', { class: 'tbl' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Section'), h('th', {}, 'Health'), h('th', {}, 'Times cited'), h('th', { class: 'hide-sm' }, 'Did not settle it'))), tb))) : A.empty('No section data', 'Your questions file does not say which manual section was cited.'),
-      h('p', { class: 'foot' }, '“Did not settle it” is the share of questions where the bot cited the section but still sent the question to a person. A section is flagged when it is cited 5+ times and at least 25% did not settle it.'));
+      h('p', { class: 'foot' }, '“Did not settle it” is the share of questions where the Beztakets Agent cited the section but still sent the question to a person. A section is flagged when it is cited 5+ times and at least 25% did not settle it.'));
     root.replaceChildren(page);
   }
 
@@ -151,7 +181,7 @@
     dlg.replaceChildren(h('form', { method: 'dialog', class: 'sheet-in' },
       h('div', { class: 'sheet-h' }, h('h2', { id: 'settings-h' }, 'Settings'), h('button', { type: 'submit', class: 'icon-btn', 'aria-label': 'Close settings' }, A.icon('close'))),
       h('p', { class: 'sub' }, 'Saved in this browser. Changes apply straight away.'),
-      field('goal', 'Goal: share of questions the bot answers', h('div', { class: 'unit' }, num('goal', 'goal', 1, 100, s.goal), h('b', {}, '%'))),
+      field('goal', 'Goal: share of questions the Beztakets Agent answers', h('div', { class: 'unit' }, num('goal', 'goal', 1, 100, s.goal), h('b', {}, '%'))),
       field('minutesPerTicket', 'Minutes a person spends on a ticket', h('div', { class: 'unit' }, num('minutesPerTicket', 'minutesPerTicket', 1, 600, s.minutesPerTicket), h('b', {}, 'min'))),
       field('team', 'Team members', txt('team', 'team', s.team, 'Priya, Marcus, Dana'), 'Separate names with commas. They appear as owner shortcuts.'),
       h('details', { class: 'more', open: true }, h('summary', {}, 'Leadership deck'),
@@ -179,7 +209,7 @@
       drop, msg,
       h('p', { class: 'alt' }, 'No file handy? ', h('button', { type: 'button', class: 'linkbtn', id: 'sample', onclick: function () { svc.loadSample(); } }, 'Try it with sample data'), ' (made-up questions)'),
       h('ul', { class: 'gets' },
-        h('li', {}, h('b', {}, 'Overview'), 'Is the bot answering more on its own, and are tickets and staff time going down?'),
+        h('li', {}, h('b', {}, 'Overview'), 'Is the Beztakets Agent answering more on its own, and are tickets and staff time going down?'),
         h('li', {}, h('b', {}, 'Fix list'), 'What to add or clarify in the manual, biggest first, with an owner for each.'),
         h('li', {}, h('b', {}, 'Results'), 'Tickets before and after each fix, so you can see what worked.')),
       h('p', { class: 'sub priv' }, 'Your file is read in this browser and never uploaded.')));
