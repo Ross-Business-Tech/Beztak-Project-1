@@ -23,9 +23,9 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
 // Blanks left in a reply: [like this], {like this} or TBD. A reply with blanks cannot be sent.
 const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
-const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
+const TAG_NAMES = { 'from-chat': 'From AI chatbot', 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
 const TAG_COLORS = { 'Due soon': 'red', 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange', 'AI draft: check': 'orange' }
-export const VIEW_NAMES = { mine: 'My open tickets', closed: 'Closed', all: 'All tickets' }
+export const VIEW_NAMES = { mine: 'My open tickets', closed: 'Closed', chat: 'From AI chatbot', all: 'All tickets' }
 
 // "New ticket": an HR person opens a ticket themselves (a phone call, a chat in the hallway, a walk-up).
 export function NewTicket({ onCreate, onClose }) {
@@ -60,7 +60,7 @@ export function NewTicket({ onCreate, onClose }) {
   )
 }
 
-export function List({ tickets, me, open, nav, setNav, onNew }) {
+export function List({ tickets, everyone = tickets, me, open, nav, setNav, onNew }) {
   // The view lives in App so it survives opening a ticket and coming back.
   const { view } = nav
   const setView = (v) => setNav({ ...nav, view: v })
@@ -76,6 +76,8 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const VIEWS = [
     ['mine', 'My open tickets', mineOpen, 'Most urgent first.'],
     ['closed', 'Closed', [...tickets.filter((t) => t.resolvedByAI), ...owned.filter((t) => !live(t) && !t.resolvedByAI)], 'Answered by the AI or closed by you.'],
+    // Every Ask Beztak chat conversation is a ticket: answered ones (closed) and ones that need a person (open), newest first.
+    ['chat', 'From AI chatbot', everyone.filter((t) => t.channel === 'Chat' || (t.tags || []).includes('from-chat')), 'Tickets submitted through the Ask Beztak chatbot, newest first: chats it answered on its own (closed) and chats that need a person (open, also in the owner\'s list). Shows the whole team\'s chat tickets, whoever owns them. Open one to read the whole conversation.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
   const known = VIEWS.some((v) => v[0] === view)
@@ -84,7 +86,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const rows = list
     .filter((t) => !tag || (t.tags || []).includes(tag))
     .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort(view === 'all' || view === 'closed' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
+    .sort(view === 'all' || view === 'closed' || view === 'chat' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
   const checking = (t) => t.assignee === me && needsCheck(t)
   const sections = view === 'mine' || !known
     ? [['Needs your check', rows.filter(checking)], ['Other open tickets', rows.filter((t) => !checking(t))]].filter(([, r]) => r.length)
