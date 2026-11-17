@@ -17,14 +17,14 @@
     const open = svc.openItems().slice(0, 3);
     if (b.rate == null) return { head: 'No questions in ' + b.range.label + '.', sub: 'Pick another month, or add a file that covers it.' };
     const met = b.rate >= b.goal;
-    let head = A.round(b.rate) + '% of questions were answered by the bot in ' + b.range.name;
-    if (b.delta != null && Math.abs(b.delta) >= 0.5) head += ', ' + (b.delta > 0 ? 'up ' : 'down ') + U.n0(Math.abs(b.delta)) + ' points from ' + b.prevRange.name;
-    head += met ? '. That meets your ' + b.goal + '% goal.' : '. That is ' + Math.max(1, Math.ceil(b.goal - b.rate)) + ' points short of your ' + b.goal + '% goal.';
+    let head = A.round(b.rate) + '% of questions were answered by the Beztakets Agent in ' + b.range.name;
+    if (b.delta != null && Math.abs(b.delta) >= 0.5) head += ', ' + (b.delta > 0 ? 'up ' : 'down ') + U.n0(Math.abs(b.delta)) + '% from ' + b.prevRange.name;
+    head += met ? '. That meets your ' + b.goal + '% goal.' : '. That is ' + Math.max(1, Math.ceil(b.goal - b.rate)) + '% short of your ' + b.goal + '% goal.';
     let sub;
     if (open.length) {
       const gain = open.reduce(function (a, c) { return a + c.more; }, 0);
       const lifted = b.eligible ? ((b.b.answered + gain) / b.eligible) * 100 : null;
-      sub = 'The top ' + (open.length === 1 ? 'fix' : open.length + ' fixes') + ' could let the bot answer about ' + U.n0(gain) + ' more questions a month' + (lifted != null ? ', lifting the rate to about ' + A.round(lifted) + '%.' : '.');
+      sub = 'The top ' + (open.length === 1 ? 'fix' : open.length + ' fixes') + ' could let the Beztakets Agent answer about ' + U.n0(gain) + ' more questions a month' + (lifted != null ? ', lifting the rate to about ' + A.round(lifted) + '%.' : '.');
     } else {
       sub = b.changes.length ? 'Every gap has been picked up or dismissed. Nice work.' : 'No topic reached three tickets, so there is nothing to fix right now.';
     }
@@ -46,11 +46,11 @@
       h('i', { class: 'goal', style: 'left:' + Math.min(100, b.goal) + '%' }));
     return h('section', { class: 'kpis', 'aria-label': 'Key numbers' },
       h('article', { class: 'tile' },
-        h('h2', {}, 'Answered by the bot'),
+        h('h2', {}, 'Answered by the Beztakets Agent'),
         h('p', { class: 'big' }, b.rate == null ? '—' : A.round(b.rate) + '%'),
         meter,
-        h('p', { class: 'sub' }, 'Goal ' + b.goal + '%' + (b.rate != null ? (met ? ' · met' : ' · ' + Math.max(1, Math.ceil(b.goal - b.rate)) + ' points to go') : '')),
-        A.delta(b.rate, b.prevRate, { upIsGood: true, prev: prev, fmt: function (d) { return U.n0(d) + ' pts'; }, min: 0.5 })),
+        h('p', { class: 'sub' }, 'Goal ' + b.goal + '%' + (b.rate != null ? (met ? ' · met' : ' · ' + Math.max(1, Math.ceil(b.goal - b.rate)) + '% to go') : '')),
+        A.delta(b.rate, b.prevRate, { upIsGood: true, prev: prev, fmt: function (d) { return U.n0(d) + '%'; }, min: 0.5 })),
       h('article', { class: 'tile' },
         h('h2', {}, 'Tickets from manual gaps'),
         h('p', { class: 'big' }, U.n0(gapNow)),
@@ -124,7 +124,7 @@
         const show = function () {
           const prevP = i > 0 ? b.series[i - 1].rate : null;
           tip.show(xAt(i), cy, [h('b', {}, p.label + ': ' + A.round(p.rate) + '%'), h('span', {}, U.n0(p.answered) + ' answered of ' + U.n0(p.eligible) + ' the manual should cover'),
-            prevP != null ? h('span', {}, (p.rate - prevP >= 0 ? '▲ ' : '▼ ') + U.n1(Math.abs(p.rate - prevP)) + ' pts vs ' + b.series[i - 1].label) : null]);
+            prevP != null ? h('span', {}, (p.rate - prevP >= 0 ? '▲ ' : '▼ ') + U.n1(Math.abs(p.rate - prevP)) + '% vs ' + b.series[i - 1].label) : null]);
         };
         const hit = S('rect', { x: xAt(i) - Math.max(14, step / 2), y: T - 6, width: Math.max(28, step), height: H - T - Bt + 6, class: 'hit', tabindex: '0', 'aria-label': p.label + ' ' + A.pct(p.rate) });
         hit.addEventListener('mouseenter', show);
@@ -179,7 +179,7 @@
         h('span', { class: 'num' }, h('b', {}, U.n0(r.count)), h('span', { class: 'sub' }, A.round(r.pctOfTickets) + '%'))));
     });
     card.append(list);
-    card.append(h('p', { class: 'foot' }, 'Only the fixable tickets count against the bot. ' + U.n0(b.byDesign) + ' went to a person on purpose, so the rate is ' + U.n0(b.b.answered) + ' ÷ ' + U.n0(b.eligible) + '.'));
+    card.append(h('p', { class: 'foot' }, 'Only the fixable tickets count against the Beztakets Agent. ' + U.n0(b.byDesign) + ' went to a person on purpose, so the rate is ' + U.n0(b.b.answered) + ' ÷ ' + U.n0(b.eligible) + '.'));
     return card;
   }
 

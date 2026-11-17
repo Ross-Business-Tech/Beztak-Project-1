@@ -93,7 +93,7 @@
     const n = svc.counts();
     const open = svc.openItems();
     const gain = open.reduce(function (a, c) { return a + c.more; }, 0);
-    const lede = open.length ? n.open + ' open. Doing them all could let the bot answer about ' + U.n0(gain) + ' more questions a month. Ranked by tickets over ' + b.window.label + '.' : 'Nothing is waiting right now.';
+    const lede = open.length ? n.open + ' open. Doing them all could let the Beztakets Agent answer about ' + U.n0(gain) + ' more questions a month. Ranked by tickets over ' + b.window.label + '.' : 'Nothing is waiting right now.';
     tabsEl = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Filter by status' });
     const search = h('input', { type: 'search', id: 'fix-search', placeholder: 'Search topics or questions  (press /)', 'aria-label': 'Search fixes', value: ui.search });
     search.addEventListener('input', function () { ui.search = search.value; ui.hi = 0; paintRows(); });

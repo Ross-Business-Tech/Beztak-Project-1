@@ -175,7 +175,7 @@
     state.pptx = null;
     try {
       state.brief = B.build(state.records, state.ym, s, state.sections);
-      state.deck = Q.slides.build(state.brief);
+      refreshDeck();
     } catch (e) {
       say('Could not build the numbers: ' + e.message, 'err');
       return;
@@ -242,8 +242,25 @@
   /** Save a change to a gap's status / owner / due date / notes / go-live date. */
   function decide(c, patch) {
     const a = decision.put(c, patch);
+    if (state.brief) refreshDeck(); // the downloadable deck follows the team's reported updates
     emit('decisions', { key: c.key, decision: a });
     return a;
+  }
+  /** Manual updates the team reported (marked Done), as the slide deck lists them. */
+  function reportedUpdates() {
+    return doneItems().map(function (d) {
+      const t = d.tr || {};
+      return { title: d.title, by: d.a.owner || '', liveMs: d.liveMs, note: d.a.notes || '', before: t.beforePerWeek, after: t.ready ? t.afterPerWeek : null, ready: !!t.ready, cutPct: t.ready ? t.cutPct : null };
+    }).sort(function (a, z) { return (z.liveMs || 0) - (a.liveMs || 0); });
+  }
+  function refreshDeck() {
+    state.brief.reported = reportedUpdates();
+    state.pptx = null;
+    state.deck = Q.slides.build(state.brief);
+  }
+  /** "I updated the manual": marks a gap Done with who did it, when it went live and what changed. */
+  function reportUpdate(c, info) {
+    return decide(c, { status: 'done', owner: (info.by || '').trim(), liveOn: info.liveOn || U.todayIso(), notes: (info.note || '').trim() });
   }
   /** Did a fix marked Done work? */
   function trackFor(c) {
@@ -275,7 +292,7 @@
     });
     doneItems().forEach(function (d) {
       rows.push({ title: d.title, live: d.liveMs, before: d.tr.beforePerWeek, after: d.tr.ready ? d.tr.afterPerWeek : null, ready: d.tr.ready, answered: null,
-        hours: d.tr.ready ? d.tr.hours : 0, src: 'Marked done by your team', detected: false, key: d.key, cutPct: d.tr.ready ? d.tr.cutPct : null });
+        hours: d.tr.ready ? d.tr.hours : 0, src: d.a.owner ? 'Reported by ' + d.a.owner : 'Reported by your team', by: d.a.owner, note: d.a.notes, detected: false, key: d.key, cutPct: d.tr.ready ? d.tr.cutPct : null });
     });
     rows.sort(function (a, z) { return z.live - a.live; });
     return { rows: rows, hours: rows.reduce(function (a, r) { return a + (r.hours || 0); }, 0) };
@@ -397,7 +414,7 @@
     { v: '4', label: 'Every 4 months' }, { v: '6', label: 'Every 6 months' }, { v: '12', label: 'Once a year' }, { v: 'custom', label: 'Custom…' }
   ];
   const KINDS = {
-    deck: { title: 'Progress deck', blurb: 'A slide deck: is the bot answering more on its own, and did the fixes work?', file: 'PowerPoint deck attached' },
+    deck: { title: 'Progress deck', blurb: 'A slide deck: is the Beztakets Agent answering more on its own, and did the fixes work?', file: 'PowerPoint deck attached' },
     list: { title: 'Manual update list', blurb: 'A reminder of what is still to add or clarify in the manual, with owners and due dates.', file: 'Fix list spreadsheet attached' }
   };
   const fresh = function () { return { on: false, freq: '3', custom: 3, emails: '', startedOn: U.todayIso(), lastSent: '' }; };
@@ -476,7 +493,7 @@
     on: on, state: state, init: init,
     settings: { get: settingsGet, set: settingsSet, team: teamList, people: people },
     loadFile: loadFile, loadSample: loadSample, loadRows: loadRows, forgetSaved: forgetSaved, setMonth: setMonth,
-    find: find, itemsFor: itemsFor, openItems: openItems, counts: counts, decide: decide, trackFor: trackFor, doneItems: doneItems,
+    find: find, itemsFor: itemsFor, openItems: openItems, counts: counts, decide: decide, reportUpdate: reportUpdate, trackFor: trackFor, doneItems: doneItems,
     results: results, dataChecks: dataChecks, sections: sections, severity: severity, typeWords: typeWords, verb: verb,
     csvText: csvText, downloadCsv: downloadCsv, downloadDeck: downloadDeck, deckHtml: deckHtml, pptxBytes: pptxBytes,
     backup: backup, restore: restore, updates: updates
