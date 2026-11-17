@@ -191,7 +191,7 @@ export function Setup({ me, account, linked, openGuardrails }) {
         <button className="btn primary" onClick={openGuardrails}>Open guardrails checks</button>
       </section>
       <section className="panel pad"><h2>Ask Beztak: the employee chat</h2>
-        <p>Employees ask questions in a chat and get answers from the Operations Manual, with the same safety rules as email. <b>Every chat is saved as a ticket here</b> (one per conversation): answered chats are filed as AI answered, and anything that needs a person (a personal question, something the manual doesn't cover, or "Submit a ticket") lands in the right person's list. The round chat button at the bottom right of the desk is the same chat; the one extra is "Use in reply", which adds an answer to the ticket you have open.</p>
+        <p>Employees ask questions in a chat and get answers from the Operations Manual, with the same safety rules as email. <b>Every chat is saved as a ticket here</b> (one per conversation): answered chats are filed as AI answered, and anything that needs a person (a personal question, something the manual doesn't cover, or "Submit a ticket") lands in the right person's list. The round chat button at the bottom right of the desk is the same chat. It asks for a name and email first, so each chat becomes a ticket for the person who asked; the one extra is "Use in reply", which adds an answer to the ticket you have open.</p>
         <div className="row">
           <a className="btn primary" href="/ask" target="_blank" rel="noreferrer">Open the chat page</a>
         </div>

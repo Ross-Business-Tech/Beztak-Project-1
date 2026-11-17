@@ -17,8 +17,10 @@ const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${
 // and the bubble inside the HR and Ops desk. Every conversation is saved as one ticket for the HR and Ops team:
 // answered chats are filed as "AI answered", anything that needs a person lands in the team's ticket list.
 // `user` fills in the name and email for people who are signed in. `onUseInReply` (desk only) adds an answer to the open ticket.
-export default function Chat({ user, onUseInReply, compact = false }) {
+// `alwaysAsk` (the desk's bubble) asks for a name and email every time a chat starts and does not remember them.
+export default function Chat({ user, onUseInReply, compact = false, alwaysAsk = false }) {
   const [contact, setContact] = useState(() => {
+    if (alwaysAsk) return { name: '', email: '' }
     const saved = readContact()
     return { name: user?.name || saved.name || '', email: user?.email || saved.email || '' }
   })
@@ -37,7 +39,7 @@ export default function Chat({ user, onUseInReply, compact = false }) {
     const c = { name: contact.name.trim(), email: contact.email.trim() }
     if (!c.name || !validEmail(c.email)) return
     setContact(c)
-    if (!user?.email) saveContact(c)
+    if (!user?.email && !alwaysAsk) saveContact(c)
     setReady(true)
     setTimeout(() => inputRef.current?.focus(), 0)
   }
@@ -78,7 +80,7 @@ export default function Chat({ user, onUseInReply, compact = false }) {
         {!ready ? (
           <form className="chat-hello chat-start" onSubmit={start}>
             <p><b>Hi! Ask me about Beztak policies and procedures.</b></p>
-            <p className="mute small">I answer only from the Beztak Operations Manual. Each chat is saved as a ticket so the HR and Ops team can follow up, so first tell us who you are. We'll remember it on this device.</p>
+            <p className="mute small">I answer only from the Beztak Operations Manual. Each chat is saved as a ticket so the HR and Ops team can follow up, so first tell us who you are.{alwaysAsk ? '' : " We'll remember it on this device."}</p>
             <label className="field">Your name<input value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} autoComplete="name" required /></label>
             <label className="field">Your work email<input type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} autoComplete="email" required /></label>
             <button className="btn primary" disabled={!contact.name.trim() || !validEmail(contact.email)}>Start chat</button>

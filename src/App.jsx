@@ -239,7 +239,7 @@ export default function App({ account, signOut }) {
         </div>
       </div>
       {creating && <NewTicket onCreate={createTicket} onClose={() => setCreating(false)} />}
-      <ChatBubble user={{ name: agentName(me), email: account }} onUseInReply={(text) => {
+      <ChatBubble onUseInReply={(text) => {
         if (page !== 'tickets' || !openId) { setToast('Open a ticket first, then use "Use in reply" to add this answer to your reply.'); return }
         window.dispatchEvent(new CustomEvent('beztakets:use-in-reply', { detail: text }))
         setToast('Added to your reply. Check it before sending.')
