@@ -1661,7 +1661,7 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		};
 	}
 	const prev = [...history].reverse().find((m) => m?.role === "user" && typeof m.text === "string")?.text?.slice(0, 500);
-	const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message));
+	const followUp = Boolean(prev) && (message.split(/\s+/).length <= 3 || FOLLOW_UP_RE.test(message));
 	const stop = mustGoToPerson("", message);
 	const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message));
 	if (stop && safety) return {
@@ -1713,7 +1713,7 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		handoff: true,
 		text: HANDOFF_TEXT
 	};
-	const withContext = `${prev}\n\nFollow-up question: ${message}`;
+	const withContext = `Earlier question (already answered; context only, do not answer it again): ${prev}\n\nNew question (answer only this one): ${message}`;
 	let res;
 	if (followUp && aiConnected(env)) res = await decide(env, "Chat question", withContext, {
 		...opts,

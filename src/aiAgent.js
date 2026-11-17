@@ -470,7 +470,9 @@ export async function chatAnswer(env, input = {}, opts = {}) {
     return { kind: 'smalltalk', refs: [], related: [], text: `I answer general questions from the ${corpus.title}${topics ? ', which covers:\n' + topics : '.'}\nAsk me how something works, a deadline, or who to contact. Questions about your own pay, schedule or records, approvals, and anything the manual doesn't cover go to a person on the HR and Ops team, who will reply by email.` }
   }
   const prev = [...history].reverse().find((m) => m?.role === 'user' && typeof m.text === 'string')?.text?.slice(0, 500)
-  const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message))
+  // A follow-up is a very short message ("how far ahead?") or one that points back ("what about it?"). Counted on the words as
+  // typed: "how to deal with a maintenance order" is a new question, even though only a few of its words are meaningful.
+  const followUp = Boolean(prev) && (message.split(/\s+/).length <= 3 || FOLLOW_UP_RE.test(message))
   const stop = mustGoToPerson('', message)
   const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message))
   // safety rules (911, 988, the on-call line) keep their exact wording
@@ -495,7 +497,8 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   // With the AI, a follow-up is sent together with the question before it, so "it" makes sense.
   // Without the AI (word matching), the new message is tried on its own first, and only joined to the
   // earlier question when it can't be answered alone ("how far ahead?").
-  const withContext = `${prev}\n\nFollow-up question: ${message}`
+  // The earlier question is context only: the answer covers the new question alone, so each answer stays its own.
+  const withContext = `Earlier question (already answered; context only, do not answer it again): ${prev}\n\nNew question (answer only this one): ${message}`
   let res
   if (followUp && aiConnected(env)) res = await decide(env, 'Chat question', withContext, { ...opts, corpus })
   else {

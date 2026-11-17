@@ -236,4 +236,5 @@ The chat uses the same decision as an email (`chatAnswer` calls `decide`), so ev
 | C9 | "When is rent due?" then "my paycheck was short this week" | A chat that needs a person | Open, routed to Payroll (Omar) |
 | C10 | "There is water pouring through the ceiling" | An emergency in a chat | Open and urgent |
 | C11 | "When is rent due?", then "Submit a ticket" | Asking for a person | Reopened for the team |
+| C18 | "When is rent due?", then "how to deal with maintence order" | A new question after an answered one | Its own answer; the rent answer is not repeated |
 | C17 | "wait so what can u answer" | Asking what the chat can do | Lists the manual's topics; no ticket for a person |

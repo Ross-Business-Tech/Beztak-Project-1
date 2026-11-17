@@ -314,6 +314,8 @@ export const EVALS = [
     ticket: { turns: ['there is water pouring through the ceiling'], resolved: false, urgent: true } },
   { id: 'C11', lane: 'chat', subject: 'Chat', body: 'When is rent due?', tests: 'Every chat is a ticket: asking for a person reopens an answered chat for the team',
     ticket: { turns: ['When is rent due?'], askedForPerson: true, resolved: false } },
+  { id: 'C18', lane: 'chat', subject: 'Chat', body: 'how to deal with maintence order', variants: ['How fast must work orders be completed?', 'what do I do with a work order'], tests: 'A new question after an answered one gets its own answer, without repeating the earlier answer',
+    chat: { history: [{ role: 'user', text: 'When is rent due?' }, { role: 'assistant', kind: 'answer', text: 'Rent is due on or before the first day of each month.' }], notContains: ['Rent is due'] } },
   { id: 'C17', lane: 'chat', subject: 'Chat', body: 'wait so what can u answer', variants: ['What can you help with?', 'what kind of questions can I ask', 'help'], tests: '"What can you answer?" lists the manual\'s topics instead of making a ticket for a person',
     chat: { history: [], kind: 'smalltalk', contains: ['Rent Collections', 'Work Orders and On-Call'], notContains: ["can't answer that one"] } },
   { id: 'C6', lane: 'chat', subject: 'Chat', body: 'How many vacation days do I get?', tests: 'With the AI on: an AI chat answer with an invented number is blocked',
