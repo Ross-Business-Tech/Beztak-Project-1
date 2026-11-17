@@ -3,7 +3,6 @@ import { AGENTS } from './data'
 import { topicLabel } from './triage'
 import { suggestReply } from './aiAgent'
 import { CONFIDENCE, draftFor, hasBlanks, isSensitive, needsCheck } from './drafts'
-import { WORK } from './hours'
 import { helperCall } from './helper'
 import { FeedbackBar, LessonModal } from './Lessons'
 import { agentName, ago, byUrgency, dueInfo, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
@@ -75,8 +74,8 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   // "My open tickets" holds my own open tickets plus ones where a teammate asked for my advice (tagged), split into sections.
   const mineOpen = human.filter((t) => live(t) && (t.assignee === me || pendingAdviceFor(t, me).length))
   const VIEWS = [
-    ['mine', 'My open tickets', mineOpen, 'Tickets a person needs to answer, most urgent first. Tickets with an AI reply waiting come first, so you can check them.'],
-    ['closed', 'Closed', owned.filter((t) => !live(t)), 'Tickets you have closed.'],
+    ['mine', 'My open tickets', mineOpen, 'Most urgent first.'],
+    ['closed', 'Closed', [...tickets.filter((t) => t.resolvedByAI), ...owned.filter((t) => !live(t) && !t.resolvedByAI)], 'Answered by the AI or closed by you.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
   const known = VIEWS.some((v) => v[0] === view)
@@ -85,11 +84,13 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const rows = list
     .filter((t) => !tag || (t.tags || []).includes(tag))
     .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort(view === 'all' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
+    .sort(view === 'all' || view === 'closed' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
   const checking = (t) => t.assignee === me && needsCheck(t)
   const sections = view === 'mine' || !known
     ? [['Needs your check', rows.filter(checking)], ['Other open tickets', rows.filter((t) => !checking(t))]].filter(([, r]) => r.length)
-    : [['', rows]]
+    : view === 'closed'
+      ? [['AI answered', rows.filter((t) => t.resolvedByAI)], ['Closed by you', rows.filter((t) => !t.resolvedByAI)]].filter(([, r]) => r.length)
+      : [['', rows]]
 
   return (
     <>
@@ -100,7 +101,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
         <button className="plus" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg></button>
       </div>
       <div className="ntools">
-        <p className="mute small">{note}{view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
+        <p className="mute small">{note}{view === 'mine' && <> Deadlines count team hours only.</>}</p>
         <div className="nfind">
           <select className="tagfilter" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filter by tag">
             <option value="">All tags</option>{tags.map((g) => <option key={g} value={g}>#{g}</option>)}
@@ -136,7 +137,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
               })}
             </Fragment>
           ))}
-          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : view === 'closed' ? 'Nothing closed yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
         </div>
       </div>
       <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span></p>
