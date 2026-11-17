@@ -11,6 +11,28 @@ const CONTACT_KEY = 'ask-beztak-contact'
 const readContact = () => { try { return JSON.parse(localStorage.getItem(CONTACT_KEY)) || {} } catch { return {} } }
 const saveContact = (c) => { try { localStorage.setItem(CONTACT_KEY, JSON.stringify(c)) } catch { /* private window: asked again next time */ } }
 const validEmail = (e) => /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/i.test(String(e || '').trim())
+// Keeps each bubble to its own answer: a paragraph that repeats an earlier answer in this chat (same manual section, or
+// mostly the same words) is left out, as long as something new is left to show.
+const wordsOf = (t) => new Set(String(t).toLowerCase().replace(/\[[^\]]*\]/g, ' ').match(/[a-z0-9$.:]+/g) || [])
+const refsOf = (t) => [...String(t).matchAll(/\[([A-Z0-9][\w.-]*)\]/g)].map((x) => x[1])
+function withoutRepeats(res, earlier) {
+  const before = earlier.filter((m) => m.role === 'assistant' && m.kind === 'answer')
+  if (res.kind !== 'answer' || !before.length) return res
+  const oldRefs = new Set(before.flatMap((m) => [...(m.refs || []).map((r) => r.ref), ...refsOf(m.text)]))
+  const oldWords = wordsOf(before.map((m) => m.text).join(' '))
+  const repeats = (p) => {
+    const refs = refsOf(p)
+    if (refs.length && refs.every((r) => oldRefs.has(r))) return true
+    const w = [...wordsOf(p)]
+    return w.length >= 4 && w.filter((x) => oldWords.has(x)).length / w.length >= 0.8
+  }
+  const paras = String(res.text).split(/\n+/)
+  const kept = paras.filter((p) => !repeats(p))
+  if (!kept.length || kept.length === paras.length) return res
+  const text = kept.join('\n')
+  const used = new Set(refsOf(text))
+  return { ...res, text, refs: (res.refs || []).filter((r) => used.has(r.ref) || !oldRefs.has(r.ref)) }
+}
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`)
 
 // One chat, the same everywhere: the "Ask Beztak" page, the bubble on other sites, the employee view after sign-in,
@@ -51,7 +73,7 @@ export default function Chat({ user, onUseInReply, compact = false, alwaysAsk = 
     const history = messages.filter((m) => m.role === 'user' || m.role === 'assistant')
     setMessages((m) => [...m, { role: 'user', text }])
     setBusy(true)
-    let res = await askChat(text, history, { conversationId, ...contact })
+    let res = withoutRepeats(await askChat(text, history, { conversationId, ...contact }), history)
     // "I've created a ticket" is only said when the help desk really saved one
     if (res.handoff && !(res.via === 'helper' && res.ticket)) res = { ...res, text: `I can't answer that one, and I couldn't reach the help desk to create a ticket. Please email your question to ${HR_ADDRESS}, or try again in a few minutes.` }
     setMessages((m) => [...m, { role: 'assistant', ...res }])
