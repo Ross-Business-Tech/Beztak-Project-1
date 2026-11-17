@@ -91,7 +91,7 @@ export const SENSITIVE_WORDS = ['harass', 'discriminat', 'bully', 'assault', 're
 // calling their own email urgent. The sender's own words ("urgent", "asap", "emergency") are listed in SELF_URGENT
 // and are ignored for priority.
 export const SELF_URGENT = /\b(urgent(ly)?|asap|immediately|emergency|right away|as soon as possible|top priority|time[- ]sensitive|drop everything)\b/i
-export const URGENT_WORDS = ['unpaid', 'was not paid', 'did not get paid', "didn't get paid", 'never got paid', 'not been paid', "wasn't paid", 'missing paycheck', 'harass', 'assault', 'unsafe', 'retaliat', 'deadline today', 'coverage ends', 'lost coverage', 'hospital']
+export const URGENT_WORDS = ['unpaid', 'was not paid', 'did not get paid', "didn't get paid", 'never got paid', 'not been paid', "wasn't paid", "haven't been paid", 'havent been paid', "hasn't been paid", "haven't gotten paid", "haven't got paid", "didn't receive my pay", 'didnt receive my pay', 'did not receive my pay', "didn't get my pay", 'didnt get paid', 'havent gotten paid', "haven't received my pay", 'have not received my pay', 'no paycheck', 'missing paycheck', 'harass', 'assault', 'unsafe', 'retaliat', 'deadline today', 'coverage ends', 'lost coverage', 'hospital']
 
 const d = (mins) => new Date(Date.now() - mins * 60000).toISOString()
 const ai = (text, at) => ({ from: 'HR Assistant (automated)', text, at, email: true, ai: true })
