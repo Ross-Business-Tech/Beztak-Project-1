@@ -1,6 +1,6 @@
 # Exit email (send after the presentation)
 
-**Before sending, fill in the two things in [square brackets]** and delete this note. The GitHub links below start working once pull request 8 is merged into `development`.
+**Before sending:** add the recipients, and delete this note. The GitHub links below work once pull request 8 is merged into `development`.
 
 ---
 
@@ -15,7 +15,7 @@ Thank you for the opportunity to build Beztakets for Beztak. Below is everything
 
 | What | Link |
 |---|---|
-| The working app (sign in with the account we gave you) | [paste the Render site address here] |
+| The working app (sign in with the account we gave you) | https://beztak-project-1.onrender.com |
 | User guide: step by step, with screenshots | https://github.com/Ross-Business-Tech/Beztak-Project-1/blob/development/docs/USER-GUIDE.md |
 | User guide as a PDF (easy to attach or print) | https://github.com/Ross-Business-Tech/Beztak-Project-1/blob/development/docs/USER-GUIDE.pdf |
 | README: how it works and how to keep it running | https://github.com/Ross-Business-Tech/Beztak-Project-1/blob/development/README.md |
@@ -46,4 +46,5 @@ Thank you for the opportunity to build Beztakets for Beztak. Below is everything
 Thank you again. Please reply with any questions.
 
 Best regards,
-[Your name and team]
+Sangheethaa Gnanaprakash
+Beztak team 1

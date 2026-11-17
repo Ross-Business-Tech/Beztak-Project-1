@@ -1,6 +1,6 @@
 # Beztakets
 
-**An HR and Operations help desk with an AI assistant, built for Beztak.** Employee questions arrive by email or chat and become tickets. The assistant answers what it safely can from the Beztak Operations Manual. Everything else goes to the right person, with a suggested reply to check. How to *use* it: [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
+**An HR and Operations help desk with an AI assistant, built for Beztak.** Employee questions arrive by email or chat and become tickets. The assistant answers what it safely can from the Beztak Operations Manual. Everything else goes to the right person, with a suggested reply to check. Live site: https://beztak-project-1.onrender.com. How to *use* it: [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
 
 ## How it works
 
