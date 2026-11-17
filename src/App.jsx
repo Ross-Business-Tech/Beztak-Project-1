@@ -229,7 +229,7 @@ export default function App({ account, signOut }) {
         <div className="content">
           {page === 'tickets' && (openId
             ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
-            : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} onNew={() => setCreating(true)} />)}
+            : <List nav={nav} setNav={setNav} tickets={mine} everyone={tickets} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} onNew={() => setCreating(true)} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'lessons' && <Learned helper={helper} me={me} toast={setToast} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} manualAt={manualAt} />}
