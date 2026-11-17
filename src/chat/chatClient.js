@@ -20,9 +20,13 @@ const post = async (path, body, ms = 30000) => {
 // or a reply after the chat passed the question to a person (to say it is urgent). A new question is sent on its own,
 // so its answer never mixes in the answer to the question before it.
 const POINTS_BACK = /\b(it|that|this|they|them|those|these|there|same|one|what about|how about|what if|and if|also)\b/i
+const URGENCY_REPLY = /\b(urgent|urgently|emergency|asap|right away|immediately|today|tonight|tomorrow|deadline|because|since)\b/i
 const needsHistory = (message, history) => {
   const lastBot = [...history].reverse().find((m) => m.role === 'assistant')
-  return Boolean(lastBot) && (lastBot.kind === 'person' || lastBot.kind === 'unknown' || String(message).trim().split(/\s+/).length <= 3 || POINTS_BACK.test(message))
+  if (!lastBot) return false
+  // after a hand-off: only a reply about it (urgent or not, the reason, yes/no) goes with the earlier messages, not a new question
+  const afterHandOff = (lastBot.kind === 'person' || lastBot.kind === 'unknown') && (URGENCY_REPLY.test(message) || /^(yes|yeah|yep|yup|no|nope)\b/i.test(String(message).trim()))
+  return afterHandOff || String(message).trim().split(/\s+/).length <= 3 || POINTS_BACK.test(message)
 }
 
 export async function askChat(message, history, meta = {}) {
