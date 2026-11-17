@@ -238,4 +238,7 @@ The chat uses the same decision as an email (`chatAnswer` calls `decide`), so ev
 | C11 | "When is rent due?", then "Submit a ticket" | Asking for a person | Reopened for the team |
 | C18 | "When is rent due?", then "how to deal with maintence order" | A new question after an answered one | Its own answer; the rent answer is not repeated |
 | C19 | Each suggested question the chat shows (rent, work orders, purchase orders, timecards) | The chat's own suggestions | Every one is answered from the manual, never handed off |
+| C20 | "wen is rnt due", "when do i need a purchse order" and other rushed typing | Spelling mistakes | Answered from the manual |
+| C21 | "theres water floding my kitchn", "emergancy, pipe bursted in unit 4" | A misspelled emergency | Safety step at once, marked urgent |
+| C22 | "my coworker keeps harrasing me" | A misspelled harassment report | Goes to a person |
 | C17 | "wait so what can u answer" | Asking what the chat can do | Lists the manual's topics; no ticket for a person |

@@ -985,6 +985,114 @@ function triage(subject, body) {
 function ackText(name, agentName, urgent, sensitive, extra) {
 	return `Hi ${(name || "there").split(" ")[0]}, thanks for contacting HR. ` + (extra ? `${extra} ` : sensitive ? `This is a confidential matter, so a person on the team will handle it personally. ` : "") + `We passed your message to ${agentName}.` + (urgent ? " It is marked urgent, so it will be looked at first. Our HR team works Monday to Friday, 9am to 5pm." : " You can expect a reply within one business day.");
 }
+//#endregion
+//#region src/spelling.js
+var SAFETY_WORDS = `emergency emergencies urgent flood flooding flooded leak leaking leaks burst pipe pipes sewage
+  water pouring ceiling furnace heater heat broken fire smoke smell gas carbon monoxide alarm weapon knife threat threatened
+  threatening attack attacked assault assaulted violence violent stalking stalked danger dangerous unsafe scared injury injured
+  injuries accident bleeding slipped fell hurt harassment harassed harassing discrimination discriminated retaliation retaliated
+  hostile bullying bullied sexual inappropriate touching unwanted suicide suicidal lawsuit lawyer attorney illegal diagnosis
+  symptoms medication dosage treatment password social security routing account hacked phishing suspicious breach stolen lost
+  paycheck payroll paid salary wages missing short overtime locked lockout eviction evicted deadline insurance coverage`;
+var COMMON = new Set(`a an and are as at be but by can do for from has have he her him his how i if in is it its me my no not of on
+  or our she so that the their them then there they this to up us was we what when where which who why will with you your yes
+  ok okay hi hey hello thanks thank please bye sorry just also any some much many get got need want like know tell help ask
+  about after before again all am been being both did does done each few here into more most other over same should than too
+  under until very while would could might must shall may let say said see saw use used make made take took give gave go went
+  come came think thought look find found work works worked job day days week weeks month months year years time today tomorrow
+  dog dogs cat cats car cars kid kids home house good bad new old big small way thing things lot fine hire hired lead leads
+  pay rent due fee fees order orders form forms lease leases unit units door doors key keys card cards bank bill bills cash
+  question questions answer answers reset login logout log sign email emails phone call text message app site page link
+  password account profile update change changed start starts end ends leave left early late sick sorry wrong right left
+  name number address office desk boss team coworker manager parking gym lunch break shift shifts swap schedule calendar
+  holiday vacation trip family baby school doctor dentist appointment birthday party coffee kitchen bathroom laptop computer
+  printer internet wifi train training class test meeting call calls lost found send sent read write wrote open close closed
+  need needs needed still yet ever never always often sometimes maybe really sure please thanks question asking asked`.split(/\s+/).filter(Boolean));
+var tokens = (t) => String(t).toLowerCase().match(/[a-z]+/g) || [];
+function distance(a, b, max) {
+	if (Math.abs(a.length - b.length) > max) return max + 1;
+	let prev2 = null;
+	let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+	for (let i = 1; i <= a.length; i++) {
+		const cur = [i];
+		let best = i;
+		for (let j = 1; j <= b.length; j++) {
+			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+			let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+			if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+			cur.push(v);
+			if (v < best) best = v;
+		}
+		if (best > max) return max + 1;
+		prev2 = prev;
+		prev = cur;
+	}
+	return prev[b.length];
+}
+var cache = /* @__PURE__ */ new Map();
+function vocabulary(corpusText = "") {
+	const key = corpusText.length + ":" + corpusText.slice(0, 200);
+	if (cache.has(key)) return cache.get(key);
+	const count = /* @__PURE__ */ new Map();
+	const add = (text, weight = 1) => {
+		for (const w of tokens(text)) if (w.length >= 3) count.set(w, (count.get(w) || 0) + weight);
+	};
+	add(corpusText);
+	add(KNOWLEDGE.map((k) => `${(k.keys || []).join(" ")} ${k.answer || ""}`).join(" "));
+	add([...SENSITIVE_WORDS, ...URGENT_WORDS].join(" "), 3);
+	add(JSON.stringify(TOPIC_WORDS), 3);
+	add(ESCALATIONS.map((e) => e.test.source.replace(/\\[a-z]/gi, " ")).join(" "), 2);
+	add(SELF_URGENT.source.replace(/\\[a-z]/gi, " "), 2);
+	add(SAFETY_WORDS, 3);
+	const vocab = {
+		count,
+		safety: new Set(tokens(SAFETY_WORDS)),
+		list: [...count.keys()]
+	};
+	cache.set(key, vocab);
+	return vocab;
+}
+function closest(w, vocab) {
+	const max = w.length >= 7 ? 2 : 1;
+	let best = null;
+	for (const v of vocab.list) {
+		if (!(v[0] === w[0] || v[0] === w[1] && v[1] === w[0])) continue;
+		if (w.length === 3 && v.length !== 4) continue;
+		if (vocab.safety.has(v) && v.length < 5) continue;
+		const d = distance(w, v, max);
+		if (d > max) continue;
+		const score = d * 1e3 - (vocab.count.get(v) || 0);
+		if (!best || score < best.score) best = {
+			v,
+			score
+		};
+	}
+	return best?.v || null;
+}
+function fixSpelling(text, corpusText = "") {
+	const s = String(text || "");
+	if (!s.trim()) return s;
+	const vocab = vocabulary(corpusText);
+	return s.replace(/[A-Za-z]+/g, (word) => {
+		const w = word.toLowerCase();
+		if (w.length < 3 || COMMON.has(w) || vocab.count.has(w)) return word;
+		if ([
+			"s",
+			"es",
+			"ed",
+			"d",
+			"ing",
+			"er",
+			"ers"
+		].some((x) => vocab.count.has(w + x))) return word;
+		if (/(s|es|ed|ing|ly)$/.test(w) && [
+			w.replace(/(es|s)$/, ""),
+			w.replace(/(ed|ing|ly)$/, ""),
+			w.replace(/(ed|ing)$/, "e")
+		].some((x) => vocab.count.has(x))) return word;
+		return closest(w, vocab) || word;
+	});
+}
 var FOOTER = "\n\nThis answer was prepared automatically by Beztakets, the HR assistant, from the Beztak Operations Manual. If it did not help, reply to this email and say you would like a person: someone from HR will reply within one business day.";
 var HARD_STOPS = [
 	[
@@ -1355,12 +1463,14 @@ function manualDraft(subject, body, corpus = BUILTIN) {
 	} : null;
 }
 async function decide(env, subject, body, { ask = askModel, scope = askScope, corpus = BUILTIN } = {}) {
-	const stop = mustGoToPerson(subject, body);
+	const fs = fixSpelling(subject, corpus.text);
+	const fb = fixSpelling(body, corpus.text);
+	const stop = mustGoToPerson(subject, body) || mustGoToPerson(fs, fb);
 	if (stop) return stop;
-	const local = triage(subject, body);
+	const local = triage(fs, fb);
 	const withDraft = (r) => {
 		if (r.resolved) return r;
-		const e = manualAnswer(subject, body, corpus);
+		const e = manualAnswer(fs, fb, corpus);
 		if (e) {
 			const a = agentFor(r.topic);
 			return {
@@ -1376,7 +1486,7 @@ async function decide(env, subject, body, { ask = askModel, scope = askScope, co
 		}
 		return {
 			...r,
-			draft: manualDraft(subject, body, corpus)
+			draft: manualDraft(fs, fb, corpus)
 		};
 	};
 	if (!aiConnected(env)) return withDraft({
@@ -1385,7 +1495,7 @@ async function decide(env, subject, body, { ask = askModel, scope = askScope, co
 	});
 	try {
 		const [ai, sc] = await Promise.all([ask(env, subject, body, corpus), scope(env, subject, body)]);
-		const flag = sc && sc.sensitive === true && sc.one_person === false && sc.approval_or_decision === false && !local.urgent && !local.sensitive && Boolean(manualAnswer(subject, body, corpus)) ? null : scopeFlag(sc);
+		const flag = sc && sc.sensitive === true && sc.one_person === false && sc.approval_or_decision === false && !local.urgent && !local.sensitive && Boolean(manualAnswer(fs, fb, corpus)) ? null : scopeFlag(sc);
 		const check = checkAiReply(ai, corpus);
 		if (check.ok && !flag) {
 			const topic = TOPIC_LABELS[ai.topic] ? ai.topic : local.topic;
@@ -1419,7 +1529,7 @@ async function decide(env, subject, body, { ask = askModel, scope = askScope, co
 			refs: [],
 			source: "AI",
 			unsure: true
-		} : manualDraft(subject, body, corpus);
+		} : manualDraft(fs, fb, corpus);
 		const why = flag ? `the second check found it is ${flag}` : check.reason;
 		return {
 			...local,
@@ -1632,7 +1742,8 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		refs: [],
 		related: []
 	};
-	const small = message.toLowerCase().replace(/[^a-z' ]+/g, " ").replace(/\s+/g, " ").trim();
+	const fixed = fixSpelling(message, corpus.text);
+	const small = fixed.toLowerCase().replace(/[^a-z' ]+/g, " ").replace(/\s+/g, " ").trim();
 	if (/^(hey+|hi+|hello+|hiya|yo|howdy|good (morning|afternoon|evening)|hey there|hi there|hello there)( (there|team|bot|beztak|ask beztak))?$/.test(small)) return {
 		kind: "smalltalk",
 		refs: [],
@@ -1662,8 +1773,8 @@ async function chatAnswer(env, input = {}, opts = {}) {
 	}
 	const prev = [...history].reverse().find((m) => m?.role === "user" && typeof m.text === "string")?.text?.slice(0, 500);
 	const followUp = Boolean(prev) && (message.split(/\s+/).length <= 3 || FOLLOW_UP_RE.test(message));
-	const stop = mustGoToPerson("", message);
-	const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message));
+	const stop = mustGoToPerson("", message) || mustGoToPerson("", fixed);
+	const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message) || re.test(fixed));
 	if (stop && safety) return {
 		kind: "person",
 		urgent: Boolean(stop.urgent),
@@ -1676,9 +1787,9 @@ async function chatAnswer(env, input = {}, opts = {}) {
 	const lastBot = [...history].reverse().find((m) => m?.role === "assistant");
 	const needsPerson = Boolean(lastBot) && (lastBot.kind === "person" || lastBot.kind === "unknown");
 	const askedWhy = needsPerson && String(lastBot.text || "").startsWith(ASK_PREFIX);
-	const claims = SELF_URGENT.test(message) || words(message).length <= 3 && YES_URGENT.test(message);
+	const claims = SELF_URGENT.test(fixed) || words(fixed).length <= 3 && YES_URGENT.test(fixed);
 	if (needsPerson && words(message).length <= 40 && (claims || askedWhy)) {
-		if (!askedWhy && NOT_URGENT.test(message)) return {
+		if (!askedWhy && NOT_URGENT.test(fixed)) return {
 			kind: "smalltalk",
 			urgent: false,
 			refs: [],
@@ -1687,14 +1798,22 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		};
 		const said = (m) => m?.role === "user" && typeof m.text === "string";
 		const firstNeed = history.findIndex((m) => m?.role === "assistant" && (m.kind === "person" || m.kind === "unknown"));
-		if (judgeUrgent([...history.filter(said).map((m) => m.text), message].join(" "), [...history.slice(firstNeed + 1).filter(said).map((m) => m.text), message].join(" "))) return {
+		if (judgeUrgent([
+			...history.filter(said).map((m) => m.text),
+			message,
+			fixed
+		].join(" "), [
+			...history.slice(firstNeed + 1).filter(said).map((m) => m.text),
+			message,
+			fixed
+		].join(" "))) return {
 			kind: "person",
 			urgent: true,
 			refs: [],
 			related: [],
 			text: URGENT_TEXT
 		};
-		const detail = words(message.replace(SELF_URGENT, " ").replace(/\b(yes|yeah|yep|yup|please|it'?s|it is|this is|is)\b/gi, " ")).length;
+		const detail = words(fixed.replace(SELF_URGENT, " ").replace(/\b(yes|yeah|yep|yup|please|it'?s|it is|this is|is)\b/gi, " ")).length;
 		return {
 			kind: "person",
 			urgent: false,

@@ -13,6 +13,7 @@
 import { AGENTS, KNOWLEDGE, SELF_URGENT, TOPIC_LABELS } from './data'
 import { MANUAL, SECTIONS } from './data/beztakManual.js'
 import { triage } from './triage'
+import { fixSpelling } from './spelling'
 
 // The AI is the U-M GPT Toolkit (an OpenAI-style service). It is switched on when the helper has a UMGPT_API_KEY secret.
 export const UM_BASE_URL = 'https://api.toolkit.umgpt.umich.edu/v1'
@@ -251,21 +252,25 @@ export function manualDraft(subject, body, corpus = BUILTIN) {
 // The main entry point. Always returns a result; never throws.
 // `ask` and `scope` are the two model calls; tests pass stand-ins so the gates can be checked without a key.
 export async function decide(env, subject, body, { ask = askModel, scope = askScope, corpus = BUILTIN } = {}) {
-  const stop = mustGoToPerson(subject, body)
+  // Rushed typing: the rules and the manual matching also read the email with its spelling fixed ("purchse" -> "purchase",
+  // "emergancy" -> "emergency"). The AI reads exactly what was written.
+  const fs = fixSpelling(subject, corpus.text)
+  const fb = fixSpelling(body, corpus.text)
+  const stop = mustGoToPerson(subject, body) || mustGoToPerson(fs, fb)
   if (stop) return stop
-  const local = triage(subject, body)
+  const local = triage(fs, fb)
   // Without the AI: the short HR answers first, then any manual entry that clearly matches.
   // Everything else goes to a person, with the closest manual entry as a suggested reply.
   const withDraft = (r) => {
     if (r.resolved) return r
-    const e = manualAnswer(subject, body, corpus)
+    const e = manualAnswer(fs, fb, corpus)
     if (e) {
       const a = agentFor(r.topic)
       return { resolved: true, topic: r.topic, urgent: false, assignee: a.id, tags: ['manual-answer'], manualAnswered: true,
         answer: `${e.text}\n\n(From the ${corpus.title}, ${e.ref}: ${e.title})`,
         note: `Answered automatically from the ${corpus.title} (${e.ref}: ${e.title}). The match was clear, so no person was needed.${r.note?.includes('AI') ? ` ${r.note.slice(r.note.indexOf('('))}` : ''}` }
     }
-    return { ...r, draft: manualDraft(subject, body, corpus) }
+    return { ...r, draft: manualDraft(fs, fb, corpus) }
   }
   if (!aiConnected(env)) return withDraft({ ...local, note: `${local.note || ''} (AI not connected: used the simple rules.)`.trim() })
   try {
@@ -274,7 +279,7 @@ export async function decide(env, subject, body, { ask = askModel, scope = askSc
     // respond to an emergency?"). That flag alone is set aside when the keyword safety rules found nothing, nothing in the
     // email is urgent, and the manual has one clear entry for the question. "About one person" or "an approval" always stops it.
     const topicOnly = sc && sc.sensitive === true && sc.one_person === false && sc.approval_or_decision === false
-      && !local.urgent && !local.sensitive && Boolean(manualAnswer(subject, body, corpus))
+      && !local.urgent && !local.sensitive && Boolean(manualAnswer(fs, fb, corpus))
     const flag = topicOnly ? null : scopeFlag(sc)
     const check = checkAiReply(ai, corpus)
     if (check.ok && !flag) {
@@ -287,7 +292,7 @@ export async function decide(env, subject, body, { ask = askModel, scope = askSc
     // A draft with no citations is still kept when it states no facts at all (only blanks for HR).
     const raw = typeof ai?.draft === 'string' ? ai.draft.trim() : ''
     const blanksOnly = !d.ok && raw && raw.length <= 1800 && !(ai?.draft_sections || []).length && ungroundedFacts(raw, [], '', corpus).length === 0
-    const draft = d.ok ? { text: d.answer, refs: d.refs, source: 'AI', unsure: /\[HR:/.test(d.answer) } : blanksOnly ? { text: raw, refs: [], source: 'AI', unsure: true } : manualDraft(subject, body, corpus)
+    const draft = d.ok ? { text: d.answer, refs: d.refs, source: 'AI', unsure: /\[HR:/.test(d.answer) } : blanksOnly ? { text: raw, refs: [], source: 'AI', unsure: true } : manualDraft(fs, fb, corpus)
     const why = flag ? `the second check found it is ${flag}` : check.reason
     return { ...local, resolved: false, answer: undefined, draft, tags: [...(local.tags || []), flag ? 'ai-second-check' : 'ai-declined'],
       note: `${local.note || ''} The AI agent did not send an answer because ${why}, so a person will reply.`.trim() }
@@ -456,7 +461,9 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   const history = (Array.isArray(input.history) ? input.history : []).slice(-10)
   if (!message) return { kind: 'unknown', text: 'Type a question about Beztak policies or procedures.', refs: [], related: [] }
   // Greetings, thanks and goodbyes get a friendly reply, not "I could not find that in the manual".
-  const small = message.toLowerCase().replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()
+  // Rushed typing: the rules below read the message with its spelling fixed; the AI still gets what was typed.
+  const fixed = fixSpelling(message, corpus.text)
+  const small = fixed.toLowerCase().replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()
   if (/^(hey+|hi+|hello+|hiya|yo|howdy|good (morning|afternoon|evening)|hey there|hi there|hello there)( (there|team|bot|beztak|ask beztak))?$/.test(small)) {
     return { kind: 'smalltalk', refs: [], related: [], text: 'Hi! I can help with Beztak operations questions, like rent, work orders, purchasing and timecards. What would you like to know?' }
   }
@@ -477,8 +484,8 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   // A follow-up is a very short message ("how far ahead?") or one that points back ("what about it?"). Counted on the words as
   // typed: "how to deal with a maintenance order" is a new question, even though only a few of its words are meaningful.
   const followUp = Boolean(prev) && (message.split(/\s+/).length <= 3 || FOLLOW_UP_RE.test(message))
-  const stop = mustGoToPerson('', message)
-  const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message))
+  const stop = mustGoToPerson('', message) || mustGoToPerson('', fixed)
+  const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message) || re.test(fixed))
   // safety rules (911, 988, the on-call line) keep their exact wording
   if (stop && safety) return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee, text: stop.extra }
   // After a hand-off the employee can say it is urgent. In the chat only, that is checked: it is marked urgent when the situation
@@ -486,15 +493,15 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   const lastBot = [...history].reverse().find((m) => m?.role === 'assistant')
   const needsPerson = Boolean(lastBot) && (lastBot.kind === 'person' || lastBot.kind === 'unknown')
   const askedWhy = needsPerson && String(lastBot.text || '').startsWith(ASK_PREFIX)
-  const claims = SELF_URGENT.test(message) || (words(message).length <= 3 && YES_URGENT.test(message))
+  const claims = SELF_URGENT.test(fixed) || (words(fixed).length <= 3 && YES_URGENT.test(fixed))
   if (needsPerson && words(message).length <= 40 && (claims || askedWhy)) {
-    if (!askedWhy && NOT_URGENT.test(message)) return { kind: 'smalltalk', urgent: false, refs: [], related: [], text: NOT_URGENT_TEXT }
+    if (!askedWhy && NOT_URGENT.test(fixed)) return { kind: 'smalltalk', urgent: false, refs: [], related: [], text: NOT_URGENT_TEXT }
     const said = (m) => m?.role === 'user' && typeof m.text === 'string'
     const firstNeed = history.findIndex((m) => m?.role === 'assistant' && (m.kind === 'person' || m.kind === 'unknown'))
-    const whole = [...history.filter(said).map((m) => m.text), message].join(' ')
-    const explain = [...history.slice(firstNeed + 1).filter(said).map((m) => m.text), message].join(' ')
+    const whole = [...history.filter(said).map((m) => m.text), message, fixed].join(' ')
+    const explain = [...history.slice(firstNeed + 1).filter(said).map((m) => m.text), message, fixed].join(' ')
     if (judgeUrgent(whole, explain)) return { kind: 'person', urgent: true, refs: [], related: [], text: URGENT_TEXT }
-    const detail = words(message.replace(SELF_URGENT, ' ').replace(/\b(yes|yeah|yep|yup|please|it'?s|it is|this is|is)\b/gi, ' ')).length
+    const detail = words(fixed.replace(SELF_URGENT, ' ').replace(/\b(yes|yeah|yep|yup|please|it'?s|it is|this is|is)\b/gi, ' ')).length
     return { kind: 'person', urgent: false, refs: [], related: [], text: !askedWhy && detail === 0 ? ASK_URGENT_TEXT : NOT_JUDGED_TEXT }
   }
   if (stop) return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee, handoff: true, text: HANDOFF_TEXT }
