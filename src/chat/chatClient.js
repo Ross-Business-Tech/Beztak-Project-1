@@ -16,8 +16,17 @@ const post = async (path, body, ms = 30000) => {
 }
 
 // `meta` = { conversationId, name, email }: the helper saves the conversation as one ticket for the HR and Ops team.
+// The earlier messages go along only when they are needed: a question that points back ("what about it?", "how far ahead?")
+// or a reply after the chat passed the question to a person (to say it is urgent). A new question is sent on its own,
+// so its answer never mixes in the answer to the question before it.
+const POINTS_BACK = /\b(it|that|this|they|them|those|these|there|same|one|what about|how about|what if|and if|also)\b/i
+const needsHistory = (message, history) => {
+  const lastBot = [...history].reverse().find((m) => m.role === 'assistant')
+  return Boolean(lastBot) && (lastBot.kind === 'person' || lastBot.kind === 'unknown' || String(message).trim().split(/\s+/).length <= 3 || POINTS_BACK.test(message))
+}
+
 export async function askChat(message, history, meta = {}) {
-  const input = { message, history: history.map((m) => ({ role: m.role, text: m.text, kind: m.kind })), conversationId: meta.conversationId, name: meta.name, email: meta.email }
+  const input = { message, history: (needsHistory(message, history) ? history : []).map((m) => ({ role: m.role, text: m.text, kind: m.kind })), conversationId: meta.conversationId, name: meta.name, email: meta.email }
   try {
     const res = await post('/chat', input)
     if (res && typeof res.text === 'string' && res.kind) return { ...res, via: 'helper' }
