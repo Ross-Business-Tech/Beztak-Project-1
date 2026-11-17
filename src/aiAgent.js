@@ -421,6 +421,14 @@ const refsIn = (text, corpus) => [...new Set([...String(text).matchAll(/\[([A-Z]
   .filter((r) => corpus.valid.has(r)).map((ref) => ({ ref, title: titleOf(ref, corpus) }))
 
 // Always returns { kind: 'answer' | 'person' | 'unknown', text, refs, source, urgent, related }; never throws.
+// What the chat says when it cannot answer: the question becomes a ticket (the helper saves every chat as one) and a person replies.
+// The employee can then say it is urgent in the chat, which marks the ticket urgent. Emergencies keep their own safety wording.
+export const HANDOFF_TEXT = "I can't answer that one, so I'm passing it to a person on the HR and Ops team. I've created a ticket with your question, your name and your email, and please expect a reply within 24 hours.\n\nIf this is an emergency or urgent, please reply here and say so, and I'll mark your ticket as urgent. If not, I hope you have a good day!"
+const URGENT_TEXT = "Thank you for telling me. I've marked your ticket as urgent, so the team will look at it first. If anyone is in danger, please call 911 right away."
+const NOT_URGENT_TEXT = "Okay, no problem. A person will reply within 24 hours. I hope you have a good day!"
+const NOT_URGENT = /\b(not|isn'?t|is not|no|nope|non)[ -]+(that |very |really |too |so )?(urgent|an emergency|emergency)\b/i
+const YES_URGENT = /^(yes|yeah|yep|yup|it is|it's|its)\b/i
+
 export async function chatAnswer(env, input = {}, opts = {}) {
   const corpus = opts.corpus || BUILTIN
   const message = String(input.message || '').replace(/\s+/g, ' ').trim().slice(0, 1000)
@@ -439,20 +447,17 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   }
   const prev = [...history].reverse().find((m) => m?.role === 'user' && typeof m.text === 'string')?.text?.slice(0, 500)
   const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message))
-  // Related topics are only offered when they share a meaningful word with the question ("lockout", "vendor"), not just
-  // a general word like "process" or "work": an unrelated suggestion looks careless and sends people the wrong way.
-  const GENERIC = new Set(['process', 'procedur', 'policy', 'polic', 'work', 'rule', 'standard', 'happen', 'step', 'way', 'type', 'thing', 'resident', 'employee', 'apartment', 'property'].map(stem))
-  const askedWords = words(followUp ? `${prev} ${message}` : message).filter((w) => !GENERIC.has(w))
-  const related = rankManual('', followUp ? `${prev} ${message}` : message, corpus).slice(0, 5)
-    .filter((x) => x.score >= 2 && askedWords.some((w) => x.e.qw.has(w))).slice(0, 3).map((x) => ({ ref: x.e.ref, title: x.e.title }))
-
   const stop = mustGoToPerson('', message)
-  if (stop) {
-    return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee,
-      // safety rules (911, 988, the on-call line) keep their exact wording; personal and approval questions get the reason
-      text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR and Ops team.`
-        : stop.extra || 'This is a personal or confidential matter, so a person on the HR and Ops team needs to answer it. I can pass it to them.' }
+  const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message))
+  // safety rules (911, 988, the on-call line) keep their exact wording
+  if (stop && safety) return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee, text: stop.extra }
+  // After a hand-off the employee can say it is urgent: in the chat only, that marks the ticket urgent.
+  const lastBot = [...history].reverse().find((m) => m?.role === 'assistant')
+  if (lastBot && (lastBot.kind === 'person' || lastBot.kind === 'unknown') && words(message).length <= 40 && (SELF_URGENT.test(message) || (words(message).length <= 3 && YES_URGENT.test(message)))) {
+    if (NOT_URGENT.test(message)) return { kind: 'smalltalk', urgent: false, refs: [], related: [], text: NOT_URGENT_TEXT }
+    return { kind: 'person', urgent: true, refs: [], related: [], text: URGENT_TEXT }
   }
+  if (stop) return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee, handoff: true, text: HANDOFF_TEXT }
   // With the AI, a follow-up is sent together with the question before it, so "it" makes sense.
   // Without the AI (word matching), the new message is tried on its own first, and only joined to the
   // earlier question when it can't be answered alone ("how far ahead?").
@@ -475,10 +480,7 @@ export async function chatAnswer(env, input = {}, opts = {}) {
     return { kind: 'answer', text, refs: refsIn(full, corpus), source: res.aiAnswered ? 'AI' : 'manual', urgent: false, related: [], topic: res.topic, assignee: res.assignee }
   }
   const personal = res.sensitive || (res.tags || []).some((t) => ['ai-second-check'].includes(t))
-  return { kind: personal ? 'person' : 'unknown', urgent: Boolean(res.urgent), refs: [], related, topic: res.topic, assignee: res.assignee,
-    text: personal
-      ? `This needs a person${res.reason ? `: ${res.reason}` : ', because it is about one person\'s situation, an approval, or a sensitive matter'}. I can pass it to the HR and Ops team.`
-      : `I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. ${related.length ? 'You can try one of the related topics below, or I can pass your question to a person.' : 'I can pass your question to a person.'}` }
+  return { kind: personal ? 'person' : 'unknown', urgent: Boolean(res.urgent), refs: [], related: [], topic: res.topic, assignee: res.assignee, handoff: true, text: HANDOFF_TEXT }
 }
 
 // ---- Every chat is a ticket ----

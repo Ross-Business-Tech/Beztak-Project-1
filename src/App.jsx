@@ -112,6 +112,7 @@ export default function App({ account, signOut }) {
                 chatLen: turns.length, subject: r.subject,
                 replies: [...local.replies.filter((m) => !m.fromChat), ...fromChat].sort((a, b) => new Date(a.at) - new Date(b.at)),
                 ...(reopen ? { status: 'Open', resolvedByAI: false, dueAt: dueIn(Boolean(res.urgent), new Date()) } : {}),
+                ...(res.urgent && !local.urgent ? { urgent: true, tags: [...new Set([...(local.tags || []), 'urgent'])], dueAt: dueIn(true, new Date()), note: `${local.note || ''} Marked urgent in the chat.`.trim() } : {}),
                 ...(auto ? { urgent: Boolean(res.urgent), assignee: res.assignee, topic: res.topic, tags: res.tags || local.tags, note: res.note } : {}),
               }
             }
