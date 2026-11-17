@@ -26,6 +26,8 @@ HR person ◀── website (this repo) ◀──┘        │ Cloudflare Worke
 
 **Changing the site.** Work on a branch, open a pull request into `development`, get it approved and merged. Render rebuilds `development` automatically in a few minutes (`npm ci && npm run build`, publishing `dist/`). Never commit directly to `main`.
 
+**AI suggestions for the manual.** On Gaps, Fix list, **Suggest wording** asks the helper (`POST /manual/suggest`) to draft a manual entry from what staff already said. Facts the AI was not given must be `[blanks]`; invented ones are thrown away (see the *AI suggestions for the manual* checks).
+
 **Updating the email helper.** The helper does not update with the site. After any change to `src/aiAgent.js`, `src/data.js` or `helper/`:
 1. `npm run build:helper` writes `helper/bundle/worker.js`.
 2. In Cloudflare open the worker, **Edit code**, replace everything with that file, **Deploy**.
