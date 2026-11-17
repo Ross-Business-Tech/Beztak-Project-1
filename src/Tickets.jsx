@@ -24,9 +24,9 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
 // Blanks left in a reply: [like this], {like this} or TBD. A reply with blanks cannot be sent.
 const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
-const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
+const TAG_NAMES = { 'from-chat': 'From AI chatbot', 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
 const TAG_COLORS = { 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange', 'AI draft: check': 'orange' }
-export const VIEW_NAMES = { check: 'Needs your check', mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
+export const VIEW_NAMES = { check: 'Needs your check', mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', chat: 'From AI chatbot', all: 'All tickets' }
 
 // "New ticket": an HR person opens a ticket themselves (a phone call, a chat in the hallway, a walk-up).
 export function NewTicket({ onCreate, onClose }) {
@@ -79,6 +79,8 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
     ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length), 'Teammates asked for your advice on these.'],
     ['closed', 'Closed', owned.filter((t) => !live(t)), 'Tickets you have closed.'],
     ['ai', 'Answered automatically', tickets.filter((t) => t.resolvedByAI), 'Answered automatically from the Beztak manual (by the AI when it is connected) and closed. Open one to read the reply that was sent.'],
+    // Every Ask Beztak chat conversation is a ticket: answered ones (closed) and ones that need a person (open), newest first.
+    ['chat', 'From AI chatbot', tickets.filter((t) => t.channel === 'Chat' || (t.tags || []).includes('from-chat')), 'Tickets submitted through the Ask Beztak chatbot, newest first: chats it answered on its own (closed) and chats that need a person (open, also in the owner\'s list). Open one to read the whole conversation.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
   const [, , list, note] = VIEWS.find((v) => v[0] === view) || VIEWS[0]
@@ -86,7 +88,7 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
   const rows = list
     .filter((t) => !tag || (t.tags || []).includes(tag))
     .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort(view === 'ai' || view === 'all' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
+    .sort(view === 'ai' || view === 'all' || view === 'chat' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
 
   return (
     <>
@@ -97,7 +99,7 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
         <button className="plus" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg></button>
       </div>
       <div className="ntools">
-        <p className="mute small">{note}{view !== 'ai' && view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
+        <p className="mute small">{note}{view !== 'ai' && view !== 'all' && view !== 'chat' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
         <div className="row">
           <select className="tagfilter" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filter by tag">
             <option value="">All tags</option>{tags.map((g) => <option key={g} value={g}>#{g}</option>)}
