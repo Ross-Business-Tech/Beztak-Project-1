@@ -423,11 +423,22 @@ const refsIn = (text, corpus) => [...new Set([...String(text).matchAll(/\[([A-Z]
 // Always returns { kind: 'answer' | 'person' | 'unknown', text, refs, source, urgent, related }; never throws.
 // What the chat says when it cannot answer: the question becomes a ticket (the helper saves every chat as one) and a person replies.
 // The employee can then say it is urgent in the chat, which marks the ticket urgent. Emergencies keep their own safety wording.
-export const HANDOFF_TEXT = "I can't answer that one, so I'm passing it to a person on the HR and Ops team. I've created a ticket with your question, your name and your email, and please expect a reply within 24 hours.\n\nIf this is an emergency or urgent, please reply here and say so, and I'll mark your ticket as urgent. If not, I hope you have a good day!"
-const URGENT_TEXT = "Thank you for telling me. I've marked your ticket as urgent, so the team will look at it first. If anyone is in danger, please call 911 right away."
+export const HANDOFF_TEXT = "I can't answer that one, so I'm passing it to a person on the HR and Ops team. I've created a ticket with your question, your name and your email, and please expect a reply within 24 hours.\n\nIf this is an emergency or urgent, please reply here and say so, and I'll take a look and mark your ticket as urgent if it is. If not, I hope you have a good day!"
+const URGENT_TEXT = "Thank you for telling me. Based on what you've described, this does look urgent, so I've marked your ticket as urgent and the team will look at it first. If anyone is in danger, please call 911 right away."
+const ASK_PREFIX = 'Can you tell me what makes it urgent?'
+const ASK_URGENT_TEXT = `${ASK_PREFIX} For example, a deadline today, pay you haven't received, or a safety concern. I'll take a look and mark your ticket as urgent if it is.`
+const NOT_JUDGED_TEXT = "Thanks for explaining. From what you've told me, this doesn't look like an urgent one, so I haven't marked it urgent, but a person will reply within 24 hours. If something changes, like a deadline today, missing pay or a safety concern, tell me and I'll take another look."
 const NOT_URGENT_TEXT = "Okay, no problem. A person will reply within 24 hours. I hope you have a good day!"
 const NOT_URGENT = /\b(not|isn'?t|is not|no|nope|non)[ -]+(that |very |really |too |so )?(urgent|an emergency|emergency)\b/i
 const YES_URGENT = /^(yes|yeah|yep|yup|it is|it's|its)\b/i
+// What the employee says about their situation that makes it time-critical (only read in the explanation they give after the hand-off).
+const TIME_PRESSURE = /\b(today|tonight|this (morning|afternoon|evening)|tomorrow|end of (the )?day|deadline|expires?|expiring|evict\w*|locked out|no (heat|water|power|electricity)|(can'?t|cannot|unable to) (pay|afford|eat)|lose my (coverage|insurance|housing|job|home)|surgery|prescription|stranded)\b/i
+// The employee's claim is checked, not just believed: it counts as urgent only when the situation is urgent by the team's own rules
+// (pay not received, harassment, safety, lost coverage...), a safety rule fired, or they describe a deadline or a serious consequence.
+const judgeUrgent = (whole, explain) =>
+  triage('', whole).urgent
+  || HARD_STOPS.some(([re, kind]) => ['crisis', 'danger', 'emergency', 'injury', 'concern'].includes(kind) && re.test(whole))
+  || TIME_PRESSURE.test(explain)
 
 export async function chatAnswer(env, input = {}, opts = {}) {
   const corpus = opts.corpus || BUILTIN
@@ -451,11 +462,21 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message))
   // safety rules (911, 988, the on-call line) keep their exact wording
   if (stop && safety) return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee, text: stop.extra }
-  // After a hand-off the employee can say it is urgent: in the chat only, that marks the ticket urgent.
+  // After a hand-off the employee can say it is urgent. In the chat only, that is checked: it is marked urgent when the situation
+  // really is (see judgeUrgent). A bare "it's urgent" gets one question back: what makes it urgent?
   const lastBot = [...history].reverse().find((m) => m?.role === 'assistant')
-  if (lastBot && (lastBot.kind === 'person' || lastBot.kind === 'unknown') && words(message).length <= 40 && (SELF_URGENT.test(message) || (words(message).length <= 3 && YES_URGENT.test(message)))) {
-    if (NOT_URGENT.test(message)) return { kind: 'smalltalk', urgent: false, refs: [], related: [], text: NOT_URGENT_TEXT }
-    return { kind: 'person', urgent: true, refs: [], related: [], text: URGENT_TEXT }
+  const needsPerson = Boolean(lastBot) && (lastBot.kind === 'person' || lastBot.kind === 'unknown')
+  const askedWhy = needsPerson && String(lastBot.text || '').startsWith(ASK_PREFIX)
+  const claims = SELF_URGENT.test(message) || (words(message).length <= 3 && YES_URGENT.test(message))
+  if (needsPerson && words(message).length <= 40 && (claims || askedWhy)) {
+    if (!askedWhy && NOT_URGENT.test(message)) return { kind: 'smalltalk', urgent: false, refs: [], related: [], text: NOT_URGENT_TEXT }
+    const said = (m) => m?.role === 'user' && typeof m.text === 'string'
+    const firstNeed = history.findIndex((m) => m?.role === 'assistant' && (m.kind === 'person' || m.kind === 'unknown'))
+    const whole = [...history.filter(said).map((m) => m.text), message].join(' ')
+    const explain = [...history.slice(firstNeed + 1).filter(said).map((m) => m.text), message].join(' ')
+    if (judgeUrgent(whole, explain)) return { kind: 'person', urgent: true, refs: [], related: [], text: URGENT_TEXT }
+    const detail = words(message.replace(SELF_URGENT, ' ').replace(/\b(yes|yeah|yep|yup|please|it'?s|it is|this is|is)\b/gi, ' ')).length
+    return { kind: 'person', urgent: false, refs: [], related: [], text: !askedWhy && detail === 0 ? ASK_URGENT_TEXT : NOT_JUDGED_TEXT }
   }
   if (stop) return { kind: 'person', urgent: Boolean(stop.urgent), refs: [], related: [], topic: stop.topic, assignee: stop.assignee, handoff: true, text: HANDOFF_TEXT }
   // With the AI, a follow-up is sent together with the question before it, so "it" makes sense.
