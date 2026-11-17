@@ -26,7 +26,7 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
 const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
 const TAG_COLORS = { 'Due soon': 'red', 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange', 'AI draft: check': 'orange' }
-export const VIEW_NAMES = { mine: 'My open tickets', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
+export const VIEW_NAMES = { mine: 'My open tickets', closed: 'Closed', all: 'All tickets' }
 
 // "New ticket": an HR person opens a ticket themselves (a phone call, a chat in the hallway, a walk-up).
 export function NewTicket({ onCreate, onClose }) {
@@ -77,7 +77,6 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const VIEWS = [
     ['mine', 'My open tickets', mineOpen, 'Tickets a person needs to answer, most urgent first. Tickets with an AI reply waiting come first, so you can check them.'],
     ['closed', 'Closed', owned.filter((t) => !live(t)), 'Tickets you have closed.'],
-    ['ai', 'Answered automatically', tickets.filter((t) => t.resolvedByAI), 'Answered automatically from the Beztak manual (by the AI when it is connected) and closed. Open one to read the reply that was sent.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
   const known = VIEWS.some((v) => v[0] === view)
@@ -86,7 +85,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const rows = list
     .filter((t) => !tag || (t.tags || []).includes(tag))
     .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort(view === 'ai' || view === 'all' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
+    .sort(view === 'all' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
   const checking = (t) => t.assignee === me && needsCheck(t)
   const sections = view === 'mine' || !known
     ? [['Needs your check', rows.filter(checking)], ['Other open tickets', rows.filter((t) => !checking(t))]].filter(([, r]) => r.length)
@@ -101,7 +100,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
         <button className="plus" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg></button>
       </div>
       <div className="ntools">
-        <p className="mute small">{note}{view !== 'ai' && view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
+        <p className="mute small">{note}{view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
         <div className="row">
           <select className="tagfilter" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filter by tag">
             <option value="">All tags</option>{tags.map((g) => <option key={g} value={g}>#{g}</option>)}
@@ -114,7 +113,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
           <div className="nrow nhead" role="row">
             {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
           </div>
-          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
           {sections.map(([title, items]) => (
             <Fragment key={title}>
               {title && <div className="nsec" role="presentation">{title} <em>{items.length}</em></div>}
