@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { sampleHistory, ticketsToRows } from './gapRows'
+import { ticketsToRows } from './gapRows'
 
 // "Manual gaps": the Manual Gap Tracker, fed live by this desk's tickets.
 // The tracker is a separate page (public/gap-tracker) shown seamlessly in this page: it has no frame,
@@ -19,9 +19,7 @@ const themeMessage = () => {
 export default function GapTracker({ tickets, theme, manualAt }) {
   const frame = useRef(null)
   const [ready, setReady] = useState(false)
-  const [source, setSource] = useState('live')
   const [st, setSt] = useState({ view: 'overview', has: false, fixes: 0, due: false })
-  const sample = useMemo(() => sampleHistory(), [])
   const live = useMemo(() => ticketsToRows(tickets), [tickets, manualAt]) // eslint-disable-line react-hooks/exhaustive-deps
   const send = (m) => frame.current?.contentWindow?.postMessage(m, location.origin)
 
@@ -40,10 +38,8 @@ export default function GapTracker({ tickets, theme, manualAt }) {
 
   useEffect(() => {
     if (!ready) return
-    send(source === 'live'
-      ? { type: 'gap-tracker:rows', rows: live, label: 'the HR desk (live)', sections: [] }
-      : { type: 'gap-tracker:rows', rows: sample.rows, label: 'sample history (made up)', sections: sample.sections })
-  }, [ready, source, live, sample])
+    send({ type: 'gap-tracker:rows', rows: live, label: 'the HR desk (live)', sections: [] })
+  }, [ready, live])
 
   const pick = (v) => { setSt((s) => ({ ...s, view: v })); send({ type: 'gap-tracker:view', view: v }) }
 
@@ -56,10 +52,6 @@ export default function GapTracker({ tickets, theme, manualAt }) {
               {n}{k === 'fixes' && st.fixes > 0 && <em>{st.fixes}</em>}{k === 'reports' && st.due && <em title="An update is due">!</em>}
             </button>
           ))}
-        </div>
-        <div className="seg" role="group" aria-label="Data shown">
-          <button className={source === 'live' ? 'on' : ''} onClick={() => setSource('live')}>Live from the desk ({live.length})</button>
-          <button className={source === 'sample' ? 'on' : ''} onClick={() => setSource('sample')}>Sample history</button>
         </div>
       </div>
       <iframe ref={frame} title="Manual gaps" src={`${import.meta.env.BASE_URL}gap-tracker/index.html?embed=1`} className="gaps-frame" />

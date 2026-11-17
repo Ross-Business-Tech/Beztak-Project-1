@@ -7,7 +7,7 @@ const MAX_BYTES = 10 * 1024 * 1024
 const displayName = (name) => name.replace(/^\d{13}-/, '')
 const isPdf = (name) => /\.pdf$/i.test(name)
 
-// Files saved in Supabase Storage: everyone signed in to the demo sees the same list.
+// Files saved in Supabase Storage: everyone signed in sees the same list.
 export default function SharedFiles({ onUseAsManual, busy: manualBusy }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -66,7 +66,7 @@ export default function SharedFiles({ onUseAsManual, busy: manualBusy }) {
     <section className="panel pad">
       <div className="row between"><h2>Shared files</h2>
         <label className={`btn primary upload${busy ? ' disabled' : ''}`}>{busy ? 'Uploading…' : 'Upload file'}<input type="file" multiple onChange={upload} disabled={busy} hidden /></label></div>
-      <p className="mute">Saved in the team's Supabase storage, so everyone who signs in sees the same files. Any file type, up to 10 MB. PDFs open right here when you click their name. Use sample files only.</p>
+      <p className="mute">Saved in the team's Supabase storage, so everyone who signs in sees the same files. Any file type, up to 10 MB. PDFs open right here when you click their name.</p>
       {msg && <p className="note-line">{msg}</p>}
       <div className="table files">
         <div className="tr th"><span>Name</span><span>Added</span><span>Size</span><span /><span /></div>

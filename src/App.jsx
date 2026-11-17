@@ -5,7 +5,6 @@ import GapTracker from './GapTracker'
 import Guardrails from './Guardrails'
 import { Detail, List, NewTicket, VIEW_NAMES } from './Tickets'
 import Learned from './Lessons'
-import { clearFiles } from './fileStore'
 import { DEFAULT_HELPER_URL, helperCall } from './helper'
 import { followUp } from './escalate'
 import { setActiveManualTitles } from './activeManual'
@@ -229,13 +228,13 @@ export default function App({ account, signOut }) {
         <div className="content">
           {page === 'tickets' && (openId
             ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
-            : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}) }} onNew={() => setCreating(true)} />)}
+            : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} onNew={() => setCreating(true)} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
           {page === 'lessons' && <Learned helper={helper} me={me} toast={setToast} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} manualAt={manualAt} />}
           {page === 'guardrails' && <Guardrails />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} helper={helper} />}
-          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} account={account} linked={Boolean(linked)} signOut={signOut} toast={setToast} reset={() => { setTickets(SEED_TICKETS); setDocs(SEED_DOCS); clearFiles().catch(() => {}); setToast('Sample data reset.') }} />}
+          {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} account={account} linked={Boolean(linked)} signOut={signOut} toast={setToast} />}
           {page === 'settings' && <Setup me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
