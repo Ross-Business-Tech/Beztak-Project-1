@@ -71,7 +71,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const human = tickets.filter((t) => !t.resolvedByAI)
   const owned = human.filter((t) => t.assignee === me)
   const tags = [...new Set(tickets.flatMap((t) => t.tags || []))].sort()
-  const dueSoon = (t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)
+  const dueSoon = (t) => live(t) && dueInfo(t)?.cls === 'amber' // overdue tickets already show in red under Deadline
   // "My open tickets" holds my own open tickets plus ones where a teammate asked for my advice (tagged), split into sections.
   const mineOpen = human.filter((t) => live(t) && (t.assignee === me || pendingAdviceFor(t, me).length))
   const VIEWS = [
@@ -101,7 +101,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
       </div>
       <div className="ntools">
         <p className="mute small">{note}{view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
-        <div className="row">
+        <div className="nfind">
           <select className="tagfilter" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filter by tag">
             <option value="">All tags</option>{tags.map((g) => <option key={g} value={g}>#{g}</option>)}
           </select>
@@ -110,13 +110,12 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
       </div>
       <div className="nwrap">
         <div className="ntable" role="table" aria-label="Tickets">
-          <div className="nrow nhead" role="row">
-            {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
-          </div>
-          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
           {sections.map(([title, items]) => (
             <Fragment key={title}>
-              {title && <div className="nsec" role="presentation">{title} <em>{items.length}</em></div>}
+              {title && <div className="nsec" role="presentation"><span>{title} <em>{items.length}</em></span></div>}
+              <div className="nrow nhead" role="row">
+                {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
+              </div>
               {items.map((t) => {
             const p = priorityOf(t)
             const d = dueInfo(t)
@@ -137,6 +136,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
               })}
             </Fragment>
           ))}
+          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
         </div>
       </div>
       <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span></p>
