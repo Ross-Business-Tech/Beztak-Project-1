@@ -17,6 +17,7 @@ Thank you for the opportunity to build Beztakets for Beztak. Below is everything
 |---|---|
 | The working app (sign in with the account we gave you) | [paste the Render site address here] |
 | User guide: step by step, with screenshots | https://github.com/Ross-Business-Tech/Beztak-Project-1/blob/development/docs/USER-GUIDE.md |
+| User guide as a PDF (easy to attach or print) | https://github.com/Ross-Business-Tech/Beztak-Project-1/blob/development/docs/USER-GUIDE.pdf |
 | README: how it works and how to keep it running | https://github.com/Ross-Business-Tech/Beztak-Project-1/blob/development/README.md |
 | All the code | https://github.com/Ross-Business-Tech/Beztak-Project-1 |
 | The AI's safety checks: what it may answer and what always goes to a person | https://github.com/Ross-Business-Tech/Beztak-Project-1/blob/development/EVALS.md |
