@@ -54,7 +54,6 @@ export function NewTicket({ onCreate, onClose }) {
         <label className="field">Employee email<input type="email" value={f.email} onChange={set('email')} placeholder="name@company.com" maxLength={120} /></label>
         <label className="field">Subject<input value={f.subject} onChange={set('subject')} placeholder="What is this about?" maxLength={150} /></label>
         <label className="field">Details<textarea rows={5} value={f.body} onChange={set('body')} placeholder="What did the employee ask or report?" maxLength={4000} /></label>
-        <p className="mute small">Use made-up names and details only. Do not type real personal information into this demo.</p>
         {err && <p className="err small" role="alert">{err}</p>}
         <div className="row between"><button type="button" className="btn" onClick={onClose}>Cancel</button><button type="submit" className="btn primary">Create ticket</button></div>
       </form>
@@ -62,7 +61,7 @@ export function NewTicket({ onCreate, onClose }) {
   )
 }
 
-export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
+export function List({ tickets, me, open, nav, setNav, onNew }) {
   // The view lives in App so it survives opening a ticket and coming back.
   const { view } = nav
   const setView = (v) => setNav({ ...nav, view: v })
@@ -131,7 +130,7 @@ export function List({ tickets, me, open, reset, nav, setNav, onNew }) {
           })}
         </div>
       </div>
-      <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span><button className="link small" onClick={reset}>Reset sample data</button></p>
+      <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span></p>
     </>
   )
 }

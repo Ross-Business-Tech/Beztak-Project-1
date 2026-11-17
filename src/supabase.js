@@ -1,4 +1,4 @@
-// Connection to the team's demo Supabase project (login + shared file storage).
+// Connection to the team's Supabase project (login + shared file storage).
 //
 // These two values are meant to be public: Supabase's "publishable" key only identifies the
 // project. What people can do is controlled by the security rules in Supabase

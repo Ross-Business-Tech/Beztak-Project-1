@@ -102,7 +102,7 @@ function AssistantManual({ am }) {
       {busy && <p role="status" className="mute">{busy}</p>}
       {msg && <p className="note-line" role="status">{msg}</p>}
       {info?.custom && <button type="button" className="btn sm" disabled={Boolean(busy)} onClick={reset}>Go back to the built-in manual</button>}
-      <p className="mute small">The PDF's text is stored in the email helper and sent to the AI together with each question, so use sample documents only. The same safety checks apply: the assistant can only repeat what the manual says, and personal, approval and safety questions still go to a person.</p>
+      <p className="mute small">The PDF's text is stored in the email helper and sent to the AI together with each question. The same safety checks apply: the assistant can only repeat what the manual says, and personal, approval and safety questions still go to a person.</p>
     </section>
   )
 }
@@ -144,7 +144,7 @@ export function Documents({ docs, setDocs, helper }) {
       <SharedFiles onUseAsManual={am.use} busy={Boolean(am.busy)} />
       <section className="panel pad"><div className="row between"><h2>Documents</h2>
         <label className="btn primary upload">Upload document<input type="file" multiple accept=".pdf,application/pdf,.txt,.md,.csv" onChange={upload} hidden /></label></div>
-        <p className="mute">Policy documents the HR team keeps for reference. PDFs open right here. Uploaded files are kept in this browser only, so use sample documents.</p>
+        <p className="mute">Policy documents the HR team keeps for reference. PDFs open right here. Uploaded files are kept in this browser only.</p>
         {msg && <p className="note-line" role="status">{msg}</p>}
         <div className="table docs">
           <div className="tr th"><span>Name</span><span>Source</span><span>Added</span><span>Size</span><span /></div>
@@ -194,7 +194,6 @@ export function Setup({ me, account, linked, openGuardrails }) {
         <p>Employees ask questions in a chat and get answers from the Operations Manual, with the same safety rules as email. <b>Every chat is saved as a ticket here</b> (one per conversation): answered chats are filed as AI answered, and anything that needs a person (a personal question, something the manual doesn't cover, or "Submit a ticket") lands in the right person's list. The round chat button at the bottom right of the desk is the same chat; the one extra is "Use in reply", which adds an answer to the ticket you have open.</p>
         <div className="row">
           <a className="btn primary" href="/ask" target="_blank" rel="noreferrer">Open the chat page</a>
-          <a className="btn" href="/employee-portal-demo.html" target="_blank" rel="noreferrer">See the bubble on a sample employee page</a>
         </div>
         <p className="mute small">The chat page needs no sign-in; employees type their name and email once. Employee logins (emails that start with <b>employee</b>, for example employee@beztak.example) see only the chat. To add the chat bubble to another website, such as the intranet, its IT team adds one line: <code>{`<script src="${location.origin}/ask-widget.js" defer></script>`}</code></p>
       </section>
@@ -210,7 +209,7 @@ export function Setup({ me, account, linked, openGuardrails }) {
   )
 }
 
-export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets, prefs, setPrefs, account, linked, signOut, reset, toast }) {
+export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets, prefs, setPrefs, account, linked, signOut, toast }) {
   const a = agent(me)
   const mineAll = tickets.filter((t) => t.assignee === me)
   const open = mineAll.filter((t) => t.status !== 'Closed').length
@@ -238,7 +237,7 @@ export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets
           <label><input type="checkbox" checked={prefs.notify} onChange={(e) => set({ notify: e.target.checked })} /> On</label></div>
         <div className="setrow"><div><b>Out of office</b><p className="mute small">Lets teammates know you are away.</p></div>
           <label><input type="checkbox" checked={prefs.ooo} onChange={(e) => set({ ooo: e.target.checked })} /> On</label></div>
-        <p className="mute small">These are saved on this device only (demo).</p>
+        <p className="mute small">These are saved on this device only.</p>
       </section>
       <section className="panel pad"><h2>Email connection</h2>
         <p className="mute small">Connects Beztakets to the email helper so emails become tickets and replies go out by email. The password is saved only in this browser.</p>
@@ -291,7 +290,6 @@ export function Profile({ helper, setHelper, helperStatus, checkNow, me, tickets
       </section>
       <section className="panel pad"><h2>Account</h2>
         <div className="setrow"><div><b>Signed in as {account}</b><p className="mute small">You are {agentName(me)}{linked ? '' : '. This login is not linked to an HR team member, so you see the desk as the first team member. Sign in with your own account to see your own tickets.'}</p></div><button className="btn" onClick={signOut}>Sign out</button></div>
-        <div className="setrow"><div><b>Reset sample data</b><p className="mute small">Puts tickets, replies and documents back to the starting examples.</p></div><button className="btn" onClick={reset}>Reset</button></div>
       </section>
     </>
   )
