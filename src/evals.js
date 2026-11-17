@@ -8,7 +8,7 @@
 // reply through the real gates, so the checks on AI-written answers run without an AI key.
 // `draft` checks the suggested reply HR gets for tickets a person must answer.
 import { AGENTS } from './data'
-import { BUILTIN_MANUAL, buildCorpus, CHAT_STARTERS, chatAnswer, chatTicketState, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
+import { BUILTIN_MANUAL, buildCorpus, CHAT_STARTERS, chatAnswer, chatTicketState, decide, FOOTER, PLACEHOLDER_RE, suggestManualEntry, suggestReply } from './aiAgent'
 import { ackText } from './triage'
 import { followUp } from './escalate'
 import { dueIn } from './util'
@@ -24,11 +24,17 @@ export const LANES = [
   { id: 'manual', title: 'Answering from an uploaded manual PDF', blurb: 'A team member can make the assistant read their own PDF instead of the built-in manual. The same rules apply: it only repeats what that manual says, cites real sections of it, every number must be in the section it cites, and personal, approval and safety questions still go to a person.' },
   { id: 'lessons', title: 'Team lessons taught by HR', blurb: 'A lesson only counts once a second person approves it. The AI must cite it and may not add facts to it, turned-off or deleted lessons are never used, a lesson is never sent without the AI, and no lesson can override a safety rule.' },
   { id: 'chat', title: 'The Ask Beztak chat (page and bubble)', blurb: 'The chat uses the same rules and manuals as an email. Safety and personal questions are judged on the new message alone, so a harmless earlier question can never unblock them. Follow-up questions are read with the question before them. When the manual has no clear answer, the chat says so and offers related topics or a person, never a guess.' },
+  { id: 'manualfix', title: 'AI suggestions for the manual (Gaps)', blurb: 'For a topic the manual does not settle, the AI drafts a manual entry for the team to review. It may only use what staff already said, anything it does not know must be a [blank], an invented number or policy is thrown away, and private details are never sent to it.' },
   { id: 'drafts', title: 'Suggested replies for HR to check', blurb: 'When a person must answer, Beztakets suggests a reply from the manuals when one fits. The HR person reads it, edits it and sends it. No suggestions for emergencies, personal records, approvals or confidential matters.' },
 ]
 
 const APPROVED = ['has been approved', 'is approved', 'you are approved', 'I approve']
 const DONT_GUESS = ['15 days', 'every second Friday', '100%', 'covered', ...APPROVED, 'you are eligible']
+
+// Made-up gaps, shaped like what the Fix list sends.
+const GAP_LEAVE = { kind: 'add', theme: 'Parental leave', category: 'Benefits', section: '', questions: [{ text: 'How does parental leave work?', count: 4 }, { text: 'How many weeks of parental leave do I get?', count: 3 }], notes: [{ text: 'Up to 12 weeks of paid leave, starting any time in the first year.', count: 5 }] }
+const GAP_REMOTE = { kind: 'add', theme: 'Remote work from another state', category: 'General', section: '', questions: [{ text: 'Can I work remotely from another state for a month?', count: 2 }], notes: [] }
+const GAP_PRIVATE = { kind: 'add', theme: 'Direct deposit', category: 'Payroll', section: '', questions: [{ text: 'How do I change direct deposit? my email is sam.jones@example.com', count: 1 }, { text: 'my ssn is 123-45-6789 how do I change my bank', count: 1 }, { text: 'How do I change my direct deposit?', count: 2 }], notes: [] }
 
 // A pretend manual, shaped exactly like one read from an uploaded PDF (see manualFromPdf.js).
 const UPLOADED = buildCorpus({ title: 'Acme Site Manual', version: '2 pages, read from the PDF', sections: [
@@ -304,6 +310,17 @@ export const EVALS = [
     chat: { history: [{ role: 'user', text: 'Can I bring my dog to work?' }, { role: 'assistant', text: 'I can\'t answer that one, so I\'m passing it to a person.', kind: 'unknown' }], kind: 'person', notUrgent: true, contains: ["haven't marked it urgent"], notContains: ['marked your ticket'] } },
   { id: 'C16', lane: 'chat', subject: 'Chat', body: 'I have not been paid this month', tests: 'After the chat asks what makes it urgent, the reason the employee gives is checked and marked urgent',
     chat: { history: [{ role: 'user', text: 'Can I bring my dog to work?' }, { role: 'assistant', text: 'I can\'t answer that one, so I\'m passing it to a person.', kind: 'unknown' }, { role: 'user', text: 'yes it is urgent' }, { role: 'assistant', text: 'Can you tell me what makes it urgent? For example, a deadline today.', kind: 'person' }], kind: 'person', urgent: true, contains: ['marked your ticket as urgent'] } },
+  // ---- AI suggestions for the manual ----
+  { id: 'MF1', lane: 'manualfix', subject: 'Gap', body: 'Parental leave', tests: 'With staff answers on file, the AI drafts the entry from those answers only',
+    manualfix: { connected: true, gap: GAP_LEAVE, ai: { title: 'How does parental leave work?', answer: 'Up to 12 weeks of paid leave, starting any time in the first year. Tell HR [how far ahead to give notice].', why: 'Seven employees asked and the manual does not say.' }, expect: { source: 'AI', contains: ['12 weeks'], blanks: true } } },
+  { id: 'MF2', lane: 'manualfix', subject: 'Gap', body: 'Parental leave', tests: 'A number or policy the AI invented is thrown away: the team gets a starting template instead',
+    manualfix: { connected: true, gap: GAP_LEAVE, ai: { title: 'How does parental leave work?', answer: 'Employees get 16 weeks of paid leave and a $500 bonus.', why: 'Often asked.' }, expect: { source: 'template', notContains: ['16 weeks', '$500'] } } },
+  { id: 'MF3', lane: 'manualfix', subject: 'Gap', body: 'Remote work from another state', tests: 'With no staff answer on file, a finished policy from the AI is thrown away: only an outline with [blanks] is offered',
+    manualfix: { connected: true, gap: GAP_REMOTE, ai: { title: 'Can I work remotely from another state?', answer: 'Yes, up to four weeks a year with manager approval.', why: 'Often asked.' }, expect: { source: 'template', notContains: ['four weeks', 'Yes'], blanks: true } } },
+  { id: 'MF4', lane: 'manualfix', subject: 'Gap', body: 'Parental leave', tests: 'Without the AI switched on, the team still gets a starting template and the AI is never called',
+    manualfix: { connected: false, gap: GAP_LEAVE, ai: null, expect: { source: 'template', aiCalled: false, contains: ['12 weeks'] } } },
+  { id: 'MF5', lane: 'manualfix', subject: 'Gap', body: 'Direct deposit', tests: 'Questions with an email address or an ID number in them are never sent to the AI',
+    manualfix: { connected: true, gap: GAP_PRIVATE, ai: { title: 'How do I change direct deposit?', answer: '[Write the policy here]', why: 'Often asked.' }, expect: { source: 'AI', seenNot: ['sam.jones@example.com', '123-45-6789'] } } },
   { id: 'C7', lane: 'chat', subject: 'Chat', body: 'hey', variants: ['Hi there!', 'good morning', 'thanks!', 'ok'], tests: 'Greetings and thanks get a friendly reply, not "not in the manual"',
     chat: { history: [], kind: 'smalltalk', notContains: ["won't guess", 'could not find'] } },
   { id: 'C8', lane: 'chat', subject: 'Chat', body: 'When is rent due?', tests: 'Every chat is a ticket: an answered chat is closed as answered by the AI',
@@ -432,7 +449,28 @@ async function checkChatTicket(c, body) {
     res: { resolved: t.resolved, assignee: t.assignee, urgent: t.urgent, tags: t.tags, note: t.note, label: t.resolved ? 'Ticket closed (AI answered)' : `Ticket open for ${nameOf(t.assignee)}` } }
 }
 
+// AI suggestions for the manual: what the team sees for one gap.
+async function checkManualFix(c, body) {
+  const e = c.manualfix
+  let called = false
+  let seen = ''
+  const res = await suggestManualEntry(e.connected ? { UMGPT_API_KEY: 'test-only' } : {}, e.gap, { ask: async (_env, g) => { called = true; seen = JSON.stringify(g); return e.ai } })
+  const text = `${res.title || ''}\n${res.answer || ''}`
+  const has = (s) => text.toLowerCase().includes(s.toLowerCase())
+  const x = e.expect
+  const problems = []
+  if (!res.ok) problems.push(`a suggestion should be offered (${res.reason})`)
+  if (x.source && res.source !== x.source) problems.push(`should come from "${x.source}", came from "${res.source}"`)
+  if (x.aiCalled === false && called) problems.push('the AI must not be called here')
+  if (x.blanks === true && res.ok && !res.hasBlanks) problems.push('should have [blanks] for the team to fill in')
+  for (const s of x.contains || []) if (!has(s)) problems.push(`is missing "${s}"`)
+  for (const s of x.notContains || []) if (has(s)) problems.push(`must not contain "${s}"`)
+  for (const s of x.seenNot || []) if (seen.includes(s)) problems.push(`"${s}" must never be sent to the AI`)
+  return { body, pass: problems.length === 0, problems, reply: text.trim(), res: { resolved: false, assignee: 'dana', urgent: false, tags: [], note: res.note || res.reason || '', label: res.source === 'AI' ? 'AI draft for the team to check' : 'Starting template for the team' } }
+}
+
 async function check(c, subject, body) {
+  if (c.manualfix) return checkManualFix(c, body)
   if (c.ticket) return checkChatTicket(c, body)
   if (c.chat) return checkChat(c, body)
   if (c.follow) return checkFollowUp(c, body)

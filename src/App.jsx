@@ -245,7 +245,7 @@ export default function App({ account, signOut }) {
           {page === 'guardrails' && <Guardrails />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} helper={helper} />}
           {page === 'profile' && <Profile helper={helper} setHelper={setHelper} helperStatus={helperStatus} checkNow={() => runNow.current?.(true)} me={me} tickets={tickets} prefs={prefs} setPrefs={setPrefs} account={account} linked={Boolean(linked)} signOut={signOut} toast={setToast} />}
-          {page === 'settings' && <Setup me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
+          {page === 'settings' && <Setup helper={helper} me={me} account={account} linked={Boolean(linked)} openGuardrails={() => go('guardrails')} />}
         </div>
       </div>
       {creating && <NewTicket onCreate={createTicket} onClose={() => setCreating(false)} />}

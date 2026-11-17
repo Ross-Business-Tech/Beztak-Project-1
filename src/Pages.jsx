@@ -180,7 +180,8 @@ export function Documents({ docs, setDocs, helper }) {
   )
 }
 
-export function Setup({ me, account, linked, openGuardrails }) {
+export function Setup({ me, account, linked, openGuardrails, helper }) {
+  const connected = Boolean(helper?.token && helper?.url)
   return (
     <>
       <section className="panel pad"><h2>What the AI learns from HR</h2>
@@ -195,8 +196,8 @@ export function Setup({ me, account, linked, openGuardrails }) {
         <p className="mute small">A login belongs to an HR team member when the start of the email matches their name (for example <b>omar@…</b> or <b>omar.haddad@…</b>). Team members: {AGENTS.map((a) => a.name).join(', ')}. Tickets are still stored only in this browser.</p>
       </section>
       <section className="panel pad"><h2>Email connection</h2>
-        <p><span className="badge red">Not connected</span></p>
-        <p>Tickets are created from real emails. A small helper reads the HR inbox (for example a Gmail test account) and hands each new email to this app. Connect it in your profile.</p>
+        <p><span className={`badge ${connected ? 'violet' : 'red'}`}>{connected ? 'Connected: new emails become tickets' : 'Not connected'}</span></p>
+        <p>Tickets are created from real emails. A small helper reads the HR inbox (for example a Gmail test account) and hands each new email to this app.{connected ? '' : ' Connect it in your profile.'}</p>
       </section>
     </>
   )
