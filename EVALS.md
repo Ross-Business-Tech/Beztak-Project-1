@@ -140,6 +140,8 @@ These feed a pretend AI answer through the real check, so they run without an AI
 | G9 | Correct-looking "PTO depends on length of service [HR-1]" to *"Am I close to using up my days for the year?"* | Personal question in new words | Second check says "about one person": blocked |
 | G10 | Time-off steps [HR-2] to *"Would anyone mind if I took Friday?"* | Approval request in new words | Second check says "asking for approval": blocked |
 | G11 | Correct answer, but the second check gives no clear answer | Unclear check | A person replies |
+| G12 | Correct cited answer to *"How fast must on-call respond to an emergency?"*; the second check says only "sensitive" | A rules question that just mentions an emergency | Answered: the manual covers it clearly and nothing is happening to anyone |
+| G13 | *"A resident just fell on the stairs and is hurt, what do I do?"*; the second check says "sensitive" | A real situation | A person replies |
 
 ## Lane 6: Suggested replies for HR (must pass)
 
@@ -234,3 +236,4 @@ The chat uses the same decision as an email (`chatAnswer` calls `decide`), so ev
 | C9 | "When is rent due?" then "my paycheck was short this week" | A chat that needs a person | Open, routed to Payroll (Omar) |
 | C10 | "There is water pouring through the ceiling" | An emergency in a chat | Open and urgent |
 | C11 | "When is rent due?", then "Submit a ticket" | Asking for a person | Reopened for the team |
+| C17 | "wait so what can u answer" | Asking what the chat can do | Lists the manual's topics; no ticket for a person |
