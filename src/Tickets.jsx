@@ -60,7 +60,7 @@ export function NewTicket({ onCreate, onClose }) {
   )
 }
 
-export function List({ tickets, everyone = tickets, me, open, nav, setNav, onNew }) {
+export function List({ tickets, me, open, nav, setNav, onNew }) {
   // The view lives in App so it survives opening a ticket and coming back.
   const { view } = nav
   const setView = (v) => setNav({ ...nav, view: v })
@@ -77,7 +77,7 @@ export function List({ tickets, everyone = tickets, me, open, nav, setNav, onNew
     ['mine', 'My open tickets', mineOpen, 'Most urgent first.'],
     ['closed', 'Closed', [...tickets.filter((t) => t.resolvedByAI), ...owned.filter((t) => !live(t) && !t.resolvedByAI)], 'Answered by the AI or closed by you.'],
     // Every Ask Beztak chat conversation is a ticket: answered ones (closed) and ones that need a person (open), newest first.
-    ['chat', 'From AI chatbot', everyone.filter((t) => t.channel === 'Chat' || (t.tags || []).includes('from-chat')), 'Tickets submitted through the Ask Beztak chatbot, newest first: chats it answered on its own (closed) and chats that need a person (open, also in the owner\'s list). Shows the whole team\'s chat tickets, whoever owns them. Open one to read the whole conversation.'],
+    ['chat', 'From AI chatbot', tickets.filter((t) => t.channel === 'Chat' || (t.tags || []).includes('from-chat')), 'Chats from the Ask Beztak bubble that are assigned to you, newest first: ones it answered on its own (closed) and ones that need a person (open). Open one to read the whole conversation.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
   const known = VIEWS.some((v) => v[0] === view)

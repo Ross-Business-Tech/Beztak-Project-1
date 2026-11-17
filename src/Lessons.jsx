@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { helperCall } from './helper'
 import { agentName, ago } from './util'
 import { A_MAX, Q_MAX, checkLesson } from './lessons'
+import { pendingFor, reviewerFor } from './lessonOwner'
 
 const Label = ({ color = 'gray', children }) => <span className={`nl ${color}`}>{children}</span>
 
@@ -22,8 +23,8 @@ export function LessonModal({ initial = {}, helper, me, toast, onClose, onSaved 
     setBusy(true)
     setErr('')
     try {
-      await helperCall(helper, '/lessons', { method: 'POST', body: JSON.stringify({ ...c, by: agentName(me), ticketId: initial.ticketId }) })
-      toast('Lesson saved. It is waiting for a second person to approve it before the agent uses it.')
+      const saved = await helperCall(helper, '/lessons', { method: 'POST', body: JSON.stringify({ ...c, by: agentName(me), ticketId: initial.ticketId }) })
+      toast(`Lesson saved. It is assigned to ${reviewerFor({ ...saved, addedBy: agentName(me) }).name} to approve before the agent uses it.`)
       onSaved?.()
       onClose()
     } catch (x) { setErr(x.message); setBusy(false) }
@@ -32,7 +33,7 @@ export function LessonModal({ initial = {}, helper, me, toast, onClose, onSaved 
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <form className="modal" onSubmit={submit} noValidate role="dialog" aria-modal="true" aria-labelledby="les-h">
         <h2 id="les-h">Teach the agent</h2>
-        <p className="mute small">Write the question the way any employee might ask it, and an answer that is right for everyone. A second person has to approve it before the agent uses it.</p>
+        <p className="mute small">Write the question the way any employee might ask it, and an answer that is right for everyone. A teammate is assigned to approve it before the agent uses it.</p>
         <label className="field">Question<textarea rows={2} value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} maxLength={Q_MAX + 50} placeholder="Example: Does Beztak cover moving costs for a transfer?" autoFocus /></label>
         <label className="field">Answer<textarea rows={5} value={f.answer} onChange={(e) => setF({ ...f, answer: e.target.value })} maxLength={A_MAX + 100} placeholder="The answer the agent may give, only facts you are sure of." /></label>
         <p className="mute small">Remove names, ID numbers and anything about one person. The agent will quote this lesson to employees. It can never override the safety rules.</p>
@@ -75,15 +76,15 @@ export function FeedbackBar({ kind, ticketId, text, helper, me, toast }) {
 const STATUS = { pending: ['yellow', 'Waiting for approval'], approved: ['green', 'In use'], off: ['gray', 'Turned off'] }
 
 // "What the agent has learned": every lesson, who taught it, who approved it, how often it was used, with off and delete buttons.
-export default function Learned({ helper, me, toast }) {
+export default function Learned({ helper, me, toast, onPending }) {
   const [data, setData] = useState(null)
   const [err, setErr] = useState('')
   const [adding, setAdding] = useState(null) // null or the starting text of a new lesson
   const you = agentName(me)
   const connected = Boolean(helper?.token)
   const load = useCallback(async () => {
-    try { setData(await helperCall(helper, '/lessons')); setErr('') } catch (e) { setErr(e.message) }
-  }, [helper])
+    try { const d = await helperCall(helper, '/lessons'); setData(d); setErr(''); onPending?.(pendingFor(d.lessons || [], me).length) } catch (e) { setErr(e.message) }
+  }, [helper, me, onPending])
   useEffect(() => { if (connected) load() }, [connected, load])
 
   const act = async (fn, done) => {
@@ -95,26 +96,30 @@ export default function Learned({ helper, me, toast }) {
   if (!connected) return <div className="panel pad"><h2>What the agent has learned</h2><p className="mute">Lessons are kept in the email helper, so the whole team shares them. Connect the helper in your profile first.</p></div>
   const lessons = data?.lessons || []
   const feedback = data?.feedback || []
-  const group = (st) => lessons.filter((l) => l.status === st)
+  const group = (st) => lessons.filter((l) => l.status === st).sort((a, b) => (st === 'pending' ? Number(reviewerFor(b).id === me) - Number(reviewerFor(a).id === me) : 0)) // the ones for you first
 
-  const Card = ({ l }) => (
+  const Card = ({ l }) => {
+    const reviewer = l.status === 'pending' ? reviewerFor(l) : null
+    const mine = reviewer?.id === me
+    return (
     <div className="lesson">
       <div className="row between"><b>{l.question}</b><Label color={STATUS[l.status][0]}>{STATUS[l.status][1]}</Label></div>
       <p>{l.answer}</p>
       <small className="mute">
-        Taught by {l.addedBy} · {ago(l.addedAt)}{l.ticketId ? <> · from ticket #{l.ticketId}</> : null}
+        Taught by {l.addedBy} · {ago(l.addedAt)}{reviewer ? <> · assigned to {mine ? 'you' : reviewer.name}</> : null}{l.ticketId ? <> · from ticket #{l.ticketId}</> : null}
         {l.approvedBy ? <> · approved by {l.approvedBy}</> : null}
         {l.status !== 'pending' ? <> · used {l.uses || 0} time{l.uses === 1 ? '' : 's'}{l.lastUsedAt ? `, last ${ago(l.lastUsedAt)}` : ''}</> : null}
       </small>
       <div className="row">
-        {l.status === 'pending' && <button className="btn sm primary" disabled={l.addedBy === you} title={l.addedBy === you ? 'A second person has to approve it' : ''} onClick={() => act(() => post(l, 'approve'), 'Approved. The agent can use this lesson now.')}>Approve</button>}
-        {l.status === 'pending' && l.addedBy === you && <small className="mute">You wrote this one, so a teammate has to approve it.</small>}
+        {l.status === 'pending' && mine && <button className="btn sm primary" onClick={() => act(() => post(l, 'approve'), 'Approved. The agent can use this lesson now.')}>Approve</button>}
+        {l.status === 'pending' && !mine && <small className="mute">{l.addedBy === you ? `You wrote this one, so ${reviewer.name} will approve it.` : `Waiting for ${reviewer.name} to approve it.`}</small>}
         {l.status === 'approved' && <button className="btn sm" onClick={() => act(() => post(l, 'off'), 'Turned off. The agent no longer uses it.')}>Turn off</button>}
         {l.status === 'off' && <button className="btn sm" onClick={() => act(() => post(l, 'on'), 'Turned back on.')}>Turn on</button>}
         <button className="btn sm danger" onClick={() => del(l)}>Delete</button>
       </div>
     </div>
-  )
+    )
+  }
 
   return (
     <>
