@@ -1,7 +1,7 @@
 // Beztakets email helper. Turns emails sent to the burner Gmail into tickets, lets the AI agent
 // answer what it safely can (and sends that answer by email), and sends ticket replies.
 // All keys come from Cloudflare secrets.
-import { BUILTIN_MANUAL, buildCorpus, chatAnswer, chatTicketState, decide, FOOTER, mustGoToPerson, suggestReply } from '../../src/aiAgent.js'
+import { BUILTIN_MANUAL, buildCorpus, chatAnswer, chatTicketState, decide, FOOTER, mustGoToPerson, suggestManualEntry, suggestReply } from '../../src/aiAgent.js'
 import { checkLesson } from '../../src/lessons.js'
 import { ackText, triage } from '../../src/triage.js'
 import { AGENTS } from '../../src/data.js'
@@ -400,6 +400,9 @@ export default {
         const out = await suggestReply(env, input, { corpus: await activeCorpus(env) })
         await noteUses(env, out.refs)
         return json(out)
+      }
+      if (url.pathname === '/manual/suggest' && req.method === 'POST') {
+        try { return json(await suggestManualEntry(env, await req.json())) } catch (e) { return json({ error: e.message }, 400) }
       }
       if (url.pathname === '/manual') {
         if (req.method === 'GET') return json(manualInfo(await env.TICKETS.get('manual', 'json')))

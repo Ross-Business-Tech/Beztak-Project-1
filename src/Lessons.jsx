@@ -66,7 +66,7 @@ export function FeedbackBar({ kind, ticketId, text, helper, me, toast }) {
   }
   return (
     <div className="fb row">
-      <small className="mute">Was this helpful?</small>
+      <small className="mute">Is this helpful?</small>
       <button type="button" className="btn sm" onClick={() => send(true)} aria-label="Helpful">👍</button>
       <button type="button" className="btn sm" onClick={() => setState('down')} aria-label="Not helpful">👎</button>
     </div>

@@ -105,7 +105,7 @@
       h('div', { class: 'toolbar' }, tabs),
       rows.length ? h('div', { class: 'card flush' }, h('div', { class: 'scroll' }, h('table', { class: 'tbl' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Section'), h('th', {}, 'Health'), h('th', {}, 'Times cited'), h('th', { class: 'hide-sm' }, 'Did not settle it'))), tb))) : A.empty('No section data', 'Your questions file does not say which manual section was cited.'),
-      h('p', { class: 'foot' }, '“Did not settle it” is the share of questions where the Beztakets Agent cited the section but still sent the question to a person. A section is flagged when it is cited 5+ times and at least 25% did not settle it.'));
+      h('p', { class: 'foot' }, '“Did not settle it” is the share of questions where the Beztakets Agent cited the section but still sent the question to a person. A section is flagged when it is cited 5+ times and at least 25% did not settle it. For suggested new wording, open a topic in the Fix list and click Suggest wording.'));
     root.replaceChildren(page);
   }
 

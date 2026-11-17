@@ -107,7 +107,7 @@ Click **Gaps**. This page uses the questions the assistant could and could not a
 ![Gaps overview](screenshots/09-gaps.png)
 
 - **Overview**: the share of questions the Beztakets Agent answered this month against the team's goal, and what to fix next.
-- **Fix list**: topics employees keep asking about that the manual does not cover, most asked first.
+- **Fix list**: topics employees keep asking about that the manual does not cover, most asked first. Click a topic to see how employees word it and what staff answered. **Suggest wording** asks the AI to draft a manual entry from those staff answers. It never invents a number or policy: anything it does not know is a `[blank]` for you to fill in, and a person must check every fact before it goes in the manual. **Copy** puts the draft on your clipboard. Without the AI connected you get a starting template instead.
 - **Results**: did the fixes work? Tickets before and after each fix.
 - **Manual health**: manual sections that are cited often but did not settle the question, and sections that are never cited.
 - **Monthly report**: a summary for sharing progress with leadership and keeping owners on track.

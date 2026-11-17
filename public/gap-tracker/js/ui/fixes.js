@@ -139,6 +139,47 @@
 
   function panelEl() { return document.getElementById('panel'); }
 
+  // ---- Suggested wording from the AI ----
+  // Asks the email helper (where the AI key lives) to draft a manual entry for this fix, using only what staff already said.
+  // The helper's address and password are the ones saved by the desk in this browser.
+  const aiCache = new Map();
+  function helperCfg() { try { const x = JSON.parse(localStorage.getItem('hr-desk-helper')) || {}; return x.url && x.token ? x : null; } catch (e) { return null; } }
+  function suggestBlock(c) {
+    const box = h('div', { role: 'status' });
+    const sec = h('section', { class: 'blk' }, h('h3', {}, 'Suggested wording'));
+    const paint = function (r) {
+      box.replaceChildren();
+      if (!r) return;
+      if (r.error) { box.append(h('p', { class: 'pdf-err' }, r.error)); return; }
+      box.append(h('div', { class: 'tags' }, A.chip(r.source === 'AI' ? 'Written by AI' : 'Starting template', r.source === 'AI' ? 'ok' : 'design'), r.hasBlanks ? A.chip('Fill in the [blanks]', 'warn') : null),
+        h('blockquote', { class: 'quote' }, h('p', {}, h('b', {}, r.title)), h('p', { style: 'white-space:pre-wrap' }, r.answer),
+          h('div', { class: 'quote-f' }, h('span', { class: 'sub' }, r.why), h('button', { type: 'button', class: 'btn sm', onclick: function () { U.copyText(r.title + '\n\n' + r.answer); } }, A.icon('copy'), 'Copy'))),
+        h('p', { class: 'sub' }, r.note));
+    };
+    const go = h('button', { type: 'button', class: 'btn', onclick: function () { run(); } }, 'Suggest wording');
+    function run() {
+      const cfg = helperCfg();
+      if (!cfg) { paint({ error: 'Connect the email helper first (in the desk, open your profile). The AI runs there.' }); return; }
+      go.disabled = true; go.textContent = 'Thinking…';
+      const groups = IM.groupQuestions(c.questions).slice(0, 8).map(function (g) { return { text: g.text, count: g.count }; });
+      const notes = c.notes.slice(0, 3).map(function (n) { return { text: n.text, count: n.count }; });
+      fetch(cfg.url.replace(/\/$/, '') + '/manual/suggest', { method: 'POST', headers: { authorization: 'Bearer ' + cfg.token, 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: c.kind, theme: c.theme, category: c.category, section: c.section, questions: groups, notes: notes }) })
+        .then(function (res) { return res.json().catch(function () { return {}; }).then(function (d) { return { res: res, d: d }; }); })
+        .then(function (x) {
+          if (x.res.status === 401) throw new Error('The helper password is wrong. Check it in your profile.');
+          if (x.res.status === 404) throw new Error('Your email helper in Cloudflare is an older version. Paste the newest worker.js into Cloudflare and Deploy, then try again.');
+          if (!x.res.ok || !x.d.ok) throw new Error(x.d.error || x.d.reason || 'The helper could not make a suggestion.');
+          aiCache.set(c.key, x.d); paint(x.d);
+        })
+        .catch(function (e) { paint({ error: e.message === 'Failed to fetch' ? 'Could not reach the helper. Check its address in your profile.' : e.message }); })
+        .then(function () { go.disabled = false; go.textContent = 'Suggest again'; });
+    }
+    sec.append(h('p', { class: 'sub' }, 'The AI drafts a manual entry from what staff already said about this topic. It never makes up a number or policy: anything it does not know is a [blank] for you to fill in.'), h('div', { style: 'margin:8px 0' }, go), box);
+    if (aiCache.has(c.key)) { paint(aiCache.get(c.key)); go.textContent = 'Suggest again'; }
+    return sec;
+  }
+
   function renderPanel() {
     const p = panelEl();
     const c = ui.panelKey ? svc.find(ui.panelKey) : null;
@@ -238,7 +279,7 @@
       c.questions.length > cap ? h('p', { class: 'sub' }, 'Showing the newest ' + cap + ' of ' + c.questions.length + '.') : null);
 
     p.setAttribute('aria-labelledby', 'panel-title');
-    p.replaceChildren(bar, h('div', { class: 'panel-body' }, head, facts, wording, ctl, asking, every));
+    p.replaceChildren(bar, h('div', { class: 'panel-body' }, head, facts, wording, suggestBlock(c), ctl, asking, every));
   }
 
   function openPanel(key, keepFocus) {
