@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import Chat from './Chat'
 
-// The chat bubble inside the HR and Ops desk: the same Ask Beztak chat employees use (it saves each chat as a ticket and
-// can submit it to a person). The one extra here: "Use in reply" drops an answer into the reply box of the ticket that is open.
-export default function ChatBubble({ user, onUseInReply }) {
+// The chat bubble inside the HR and Ops desk: the same Ask Beztak chat employees use. It asks for a name and email first
+// (whoever is chatting), saves each chat as a ticket and can submit it to a person. The one extra here: "Use in reply" drops an answer into the reply box of the ticket that is open.
+export default function ChatBubble({ onUseInReply }) {
   const [open, setOpen] = useState(false)
   return (
     <>
       {open && (
         <section className="bubble-panel" role="dialog" aria-label="Ask Beztak">
-          <div className="bubble-head"><div><b>Ask Beztak</b><small>The same chat employees use</small></div><button onClick={() => setOpen(false)} aria-label="Close chat">✕</button></div>
-          <Chat user={user} compact onUseInReply={onUseInReply} />
+          <div className="bubble-head"><div><b>Ask Beztak</b><small>Answers from the Beztak Operations Manual</small></div><button onClick={() => setOpen(false)} aria-label="Close chat">✕</button></div>
+          <Chat compact alwaysAsk onUseInReply={onUseInReply} />
+          <p className="ask-foot">An automated assistant. It never answers personal, pay or approval questions; those go to a person. Don't share passwords, ID or bank numbers.</p>
         </section>
       )}
       <button className="bubble-btn" onClick={() => setOpen((o) => !o)} aria-label={open ? 'Close chat' : 'Ask Beztak'} aria-expanded={open}>

@@ -60,7 +60,7 @@
 
   // Why a question went to a person instead of being answered from the manual.
   //  no-match     the manual has nothing on this           (fixable: add a section)
-  //  unclear      the bot cited a section, it did not help  (fixable: clarify the section)
+  //  unclear      the Beztakets Agent cited a section, it did not help  (fixable: clarify the section)
   //  policy       must always go to a person by policy      (by design)
   //  out-of-scope not an operating-procedures topic         (by design, unless you widen the manual)
   const ESCALATION = Object.freeze({ NO_MATCH: 'no-match', UNCLEAR: 'unclear', POLICY: 'policy', SCOPE: 'out-of-scope' });
@@ -287,7 +287,7 @@
     }
     const section = clean(raw.manual_section).slice(0, 200);
     const sectionPublished = parseDate(raw.section_published_at);
-    // The bot's own topic label. Falls back to the question wording so repeats still group together.
+    // The Beztakets Agent's own topic label. Falls back to the question wording so repeats still group together.
     const theme = clean(raw.theme).slice(0, 120) || normalizeText(text).slice(0, 120);
 
     if (errors.length) return { ok: false, errors: errors, warnings: warnings };

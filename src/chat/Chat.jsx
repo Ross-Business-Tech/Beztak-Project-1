@@ -17,8 +17,10 @@ const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${
 // and the bubble inside the HR and Ops desk. Every conversation is saved as one ticket for the HR and Ops team:
 // answered chats are filed as "AI answered", anything that needs a person lands in the team's ticket list.
 // `user` fills in the name and email for people who are signed in. `onUseInReply` (desk only) adds an answer to the open ticket.
-export default function Chat({ user, onUseInReply, compact = false }) {
+// `alwaysAsk` (the desk's bubble) asks for a name and email every time a chat starts and does not remember them.
+export default function Chat({ user, onUseInReply, compact = false, alwaysAsk = false }) {
   const [contact, setContact] = useState(() => {
+    if (alwaysAsk) return { name: '', email: '' }
     const saved = readContact()
     return { name: user?.name || saved.name || '', email: user?.email || saved.email || '' }
   })
@@ -37,7 +39,7 @@ export default function Chat({ user, onUseInReply, compact = false }) {
     const c = { name: contact.name.trim(), email: contact.email.trim() }
     if (!c.name || !validEmail(c.email)) return
     setContact(c)
-    if (!user?.email) saveContact(c)
+    if (!user?.email && !alwaysAsk) saveContact(c)
     setReady(true)
     setTimeout(() => inputRef.current?.focus(), 0)
   }
@@ -49,7 +51,9 @@ export default function Chat({ user, onUseInReply, compact = false }) {
     const history = messages.filter((m) => m.role === 'user' || m.role === 'assistant')
     setMessages((m) => [...m, { role: 'user', text }])
     setBusy(true)
-    const res = await askChat(text, history, { conversationId, ...contact })
+    let res = await askChat(text, history, { conversationId, ...contact })
+    // "I've created a ticket" is only said when the help desk really saved one
+    if (res.handoff && !(res.via === 'helper' && res.ticket)) res = { ...res, text: `I can't answer that one, and I couldn't reach the help desk to create a ticket. Please email your question to ${HR_ADDRESS}, or try again in a few minutes.` }
     setMessages((m) => [...m, { role: 'assistant', ...res }])
     setBusy(false)
     inputRef.current?.focus()
@@ -78,9 +82,9 @@ export default function Chat({ user, onUseInReply, compact = false }) {
         {!ready ? (
           <form className="chat-hello chat-start" onSubmit={start}>
             <p><b>Hi! Ask me about Beztak policies and procedures.</b></p>
-            <p className="mute small">I answer only from the Beztak Operations Manual. Each chat is saved as a ticket so the HR and Ops team can follow up, so first tell us who you are. We'll remember it on this device.</p>
+            <p className="mute small">I answer only from the Beztak Operations Manual. Each chat is saved as a ticket so the HR and Ops team can follow up, so first tell us who you are.{alwaysAsk ? '' : " We'll remember it on this device."}</p>
             <label className="field">Your name<input value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} autoComplete="name" required /></label>
-            <label className="field">Your work email<input type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} autoComplete="email" required /></label>
+            <label className="field">Your email<input type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} autoComplete="email" required /></label>
             <button className="btn primary" disabled={!contact.name.trim() || !validEmail(contact.email)}>Start chat</button>
           </form>
         ) : messages.length === 0 && (
@@ -93,7 +97,7 @@ export default function Chat({ user, onUseInReply, compact = false }) {
         {messages.map((m, i) => (
           m.role === 'user' ? <div key={i} className="cm cm-me">{m.text}</div>
             : m.role === 'system' ? <div key={i} className="cm cm-note">{m.text}</div>
-              : <Answer key={i} m={m} onAsk={ask} onUseInReply={onUseInReply} onHandOff={asked && !handoff ? openHandoff : null} isLast={m === lastBot} />
+              : <Answer key={i} m={m} onAsk={ask} onUseInReply={onUseInReply} isLast={m === lastBot} />
         ))}
         {busy && <div className="cm cm-bot cm-typing" aria-label="Looking it up"><i /><i /><i /></div>}
         {handoff && (
@@ -116,7 +120,7 @@ export default function Chat({ user, onUseInReply, compact = false }) {
   )
 }
 
-function Answer({ m, onAsk, onUseInReply, onHandOff, isLast }) {
+function Answer({ m, onAsk, onUseInReply, isLast }) {
   const lines = m.text.split('\n').map((l) => l.trim()).filter(Boolean)
   const bullets = lines.filter((l) => /^[-•]\s/.test(l))
   return (
@@ -124,11 +128,9 @@ function Answer({ m, onAsk, onUseInReply, onHandOff, isLast }) {
       {lines.map((l, i) => (/^[-•]\s/.test(l) ? null : <p key={i}>{l}</p>))}
       {bullets.length > 0 && <ul>{bullets.map((l, i) => <li key={i}>{l.replace(/^[-•]\s/, '')}</li>)}</ul>}
       {m.refs?.length > 0 && <div className="cm-refs">{m.refs.map((r) => <span key={r.ref} className="cm-ref" title={r.title}>{r.ref} · {r.title}</span>)}</div>}
-      {m.kind === 'answer' && <p className="cm-src">{m.source === 'AI' ? 'Written by AI from the Beztak Operations Manual and checked against the sections above.' : 'From the Beztak Operations Manual.'}</p>}
       {m.related?.length > 0 && isLast && <div className="chat-chips">{m.related.map((r) => <button key={r.ref} className="chip" onClick={() => onAsk(r.title)}>{r.title}</button>)}</div>}
       <div className="cm-actions">
         {m.kind === 'answer' && onUseInReply && <button className="link" onClick={() => onUseInReply(m.text)}>Use in reply</button>}
-        {(m.kind === 'person' || m.kind === 'unknown') && isLast && onHandOff && <button className="btn primary small-btn" onClick={onHandOff}>Pass to a person</button>}
       </div>
     </div>
   )

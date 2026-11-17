@@ -395,12 +395,12 @@
   // Every question is either answered from the manual or sent to a person (a ticket).
   // A ticket has one reason:
   //   no-match / unclear   fixable by changing the manual
-  //   policy / out-of-scope go to a person by design, so they are not held against the bot
+  //   policy / out-of-scope go to a person by design, so they are not held against the Beztakets Agent
   //  - Answer rate = answered / all questions.
-  //  - Fixable rate = answered / (all questions - by-design tickets): how well the bot does
+  //  - Fixable rate = answered / (all questions - by-design tickets): how well the Beztakets Agent does
   //    on the questions the manual is supposed to cover.
   //  - "Up to +x points" for a fix = that topic's tickets / all questions, assuming the update
-  //    lets the bot answer every repeat of it.
+  //    lets the Beztakets Agent answer every repeat of it.
 
   const ESC = D.ESCALATION;
   const ts = function (q) { return Date.parse(q.submitted_at); };
@@ -471,7 +471,7 @@
   }
 
   /**
-   * One row per topic the bot grouped questions under (the "theme"), for a set of questions.
+   * One row per topic the Beztakets Agent grouped questions under (the "theme"), for a set of questions.
    * kind: add (manual has nothing) | clarify (section cited, did not help) | scope | policy.
    * resolved: true when the topic used to have no manual coverage but is now being answered.
    */
@@ -632,7 +632,7 @@
 
   /**
    * How well a new manual section typically works, from your own past updates:
-   * the average share of repeat questions the bot answered after publishing.
+   * the average share of repeat questions the Beztakets Agent answered after publishing.
    * With too little history it falls back to a typical figure.
    */
   function typicalFixSuccess(impacts, fallback) {

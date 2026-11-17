@@ -3,7 +3,6 @@ import { AGENTS } from './data'
 import { topicLabel } from './triage'
 import { suggestReply } from './aiAgent'
 import { CONFIDENCE, draftFor, hasBlanks, isSensitive, needsCheck } from './drafts'
-import { WORK } from './hours'
 import { helperCall } from './helper'
 import { FeedbackBar, LessonModal } from './Lessons'
 import { agentName, ago, byUrgency, dueInfo, initials, pendingAdviceFor, priorityOf, toLocalInput } from './util'
@@ -24,9 +23,9 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 // The ticket list as one Notion-style table. Views are a single row of tabs (no side menu).
 // Blanks left in a reply: [like this], {like this} or TBD. A reply with blanks cannot be sent.
 const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
-const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
+const TAG_NAMES = { 'from-chat': 'From AI chatbot', 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
 const TAG_COLORS = { 'Due soon': 'red', 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange', 'AI draft: check': 'orange' }
-export const VIEW_NAMES = { mine: 'My open tickets', closed: 'Closed', all: 'All tickets' }
+export const VIEW_NAMES = { mine: 'My open tickets', closed: 'Closed', chat: 'From AI chatbot', all: 'All tickets' }
 
 // "New ticket": an HR person opens a ticket themselves (a phone call, a chat in the hallway, a walk-up).
 export function NewTicket({ onCreate, onClose }) {
@@ -71,12 +70,14 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const human = tickets.filter((t) => !t.resolvedByAI)
   const owned = human.filter((t) => t.assignee === me)
   const tags = [...new Set(tickets.flatMap((t) => t.tags || []))].sort()
-  const dueSoon = (t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)
+  const dueSoon = (t) => live(t) && dueInfo(t)?.cls === 'amber' // overdue tickets already show in red under Deadline
   // "My open tickets" holds my own open tickets plus ones where a teammate asked for my advice (tagged), split into sections.
   const mineOpen = human.filter((t) => live(t) && (t.assignee === me || pendingAdviceFor(t, me).length))
   const VIEWS = [
-    ['mine', 'My open tickets', mineOpen, 'Tickets a person needs to answer, most urgent first. Tickets with an AI reply waiting come first, so you can check them.'],
-    ['closed', 'Closed', owned.filter((t) => !live(t)), 'Tickets you have closed.'],
+    ['mine', 'My open tickets', mineOpen, 'Most urgent first.'],
+    ['closed', 'Closed', [...tickets.filter((t) => t.resolvedByAI), ...owned.filter((t) => !live(t) && !t.resolvedByAI)], 'Answered by the AI or closed by you.'],
+    // Every Ask Beztak chat conversation is a ticket: answered ones (closed) and ones that need a person (open), newest first.
+    ['chat', 'From AI chatbot', tickets.filter((t) => t.channel === 'Chat' || (t.tags || []).includes('from-chat')), 'Chats from the Ask Beztak bubble that are assigned to you, newest first: ones it answered on its own (closed) and ones that need a person (open). Open one to read the whole conversation.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
   const known = VIEWS.some((v) => v[0] === view)
@@ -85,11 +86,13 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const rows = list
     .filter((t) => !tag || (t.tags || []).includes(tag))
     .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
-    .sort(view === 'all' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
+    .sort(view === 'all' || view === 'closed' || view === 'chat' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
   const checking = (t) => t.assignee === me && needsCheck(t)
   const sections = view === 'mine' || !known
     ? [['Needs your check', rows.filter(checking)], ['Other open tickets', rows.filter((t) => !checking(t))]].filter(([, r]) => r.length)
-    : [['', rows]]
+    : view === 'closed'
+      ? [['AI answered', rows.filter((t) => t.resolvedByAI)], ['Closed by you', rows.filter((t) => !t.resolvedByAI)]].filter(([, r]) => r.length)
+      : [['', rows]]
 
   return (
     <>
@@ -100,8 +103,8 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
         <button className="plus" onClick={onNew} aria-label="New ticket" title="New ticket"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg></button>
       </div>
       <div className="ntools">
-        <p className="mute small">{note}{view !== 'all' && <> Deadlines count only team hours ({WORK.label}).</>}</p>
-        <div className="row">
+        <p className="mute small">{note}{view === 'mine' && <> Deadlines count team hours only.</>}</p>
+        <div className="nfind">
           <select className="tagfilter" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filter by tag">
             <option value="">All tags</option>{tags.map((g) => <option key={g} value={g}>#{g}</option>)}
           </select>
@@ -110,13 +113,12 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
       </div>
       <div className="nwrap">
         <div className="ntable" role="table" aria-label="Tickets">
-          <div className="nrow nhead" role="row">
-            {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
-          </div>
-          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
           {sections.map(([title, items]) => (
             <Fragment key={title}>
-              {title && <div className="nsec" role="presentation">{title} <em>{items.length}</em></div>}
+              {title && <div className="nsec" role="presentation"><span>{title} <em>{items.length}</em></span></div>}
+              <div className="nrow nhead" role="row">
+                {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
+              </div>
               {items.map((t) => {
             const p = priorityOf(t)
             const d = dueInfo(t)
@@ -137,6 +139,7 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
               })}
             </Fragment>
           ))}
+          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : view === 'closed' ? 'Nothing closed yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
         </div>
       </div>
       <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span></p>

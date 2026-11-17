@@ -282,10 +282,20 @@ export const EVALS = [
   { id: 'C3', lane: 'chat', subject: 'Chat', body: 'How many PTO hours do I have left?', variants: ['why was my paycheck short this week'], tests: 'A personal question after a general one goes to a person, never answered',
     chat: { history: [{ role: 'user', text: 'How do I request time off?' }, { role: 'assistant', text: 'PTO requests go through Paycor, and your manager approves them.' }], kind: 'person', notContains: ['hours left', 'approved'] } },
   { id: 'C4', lane: 'chat', subject: 'Chat', body: 'Can I bring my dog to work?', tests: 'Not in the manual: says so and offers a person, never a guess',
-    chat: { history: [], kind: 'unknown', contains: ["won't guess"], notContains: ['yes', 'allowed'] } },
+    chat: { history: [], kind: 'unknown', contains: ['ticket', '24 hours', 'urgent'], notContains: ['yes', 'allowed'] } },
   { id: 'C5', lane: 'chat', subject: 'Chat', body: 'how far ahead?', tests: 'A short follow-up is read with the question before it',
     chat: { history: [{ role: 'user', text: 'How do I request time off?' }, { role: 'assistant', text: 'PTO requests go through Paycor.' }], kind: 'answer', ai: true, contains: ['Paycor'] },
     ai: { answerable: true, topic: 'timeoff', answer: 'PTO requests go through Paycor, and your manager approves them [HR-2].', sections: ['HR-2'], draft: '', draft_sections: [] } },
+  { id: 'C12', lane: 'chat', subject: 'Chat', body: 'it is urgent, I have not been paid this month', variants: ['urgent! my insurance coverage ends today', 'this is urgent, I am locked out and need in tonight'], tests: 'After a hand-off, an urgent claim with a real reason is checked and marked urgent',
+    chat: { history: [{ role: 'user', text: 'Can I bring my dog to work?' }, { role: 'assistant', text: 'I can\'t answer that one, so I\'m passing it to a person.', kind: 'unknown' }], kind: 'person', urgent: true, contains: ['marked your ticket as urgent'] } },
+  { id: 'C13', lane: 'chat', subject: 'Chat', body: 'no it is not urgent', variants: ['not urgent, thanks'], tests: 'Saying it is NOT urgent never marks the ticket urgent',
+    chat: { history: [{ role: 'user', text: 'Can I bring my dog to work?' }, { role: 'assistant', text: 'I can\'t answer that one, so I\'m passing it to a person.', kind: 'unknown' }], kind: 'smalltalk', notUrgent: true, notContains: ['marked your ticket'] } },
+  { id: 'C14', lane: 'chat', subject: 'Chat', body: 'yes it is urgent', variants: ['URGENT please', 'this is urgent'], tests: 'A bare "it is urgent" is not enough: the chat asks what makes it urgent and does not mark it',
+    chat: { history: [{ role: 'user', text: 'Can I bring my dog to work?' }, { role: 'assistant', text: 'I can\'t answer that one, so I\'m passing it to a person.', kind: 'unknown' }], kind: 'person', notUrgent: true, contains: ['what makes it urgent'], notContains: ['marked your ticket'] } },
+  { id: 'C15', lane: 'chat', subject: 'Chat', body: 'it is urgent because I am just curious about it', variants: ['urgent, I would like to know soon'], tests: 'An urgent claim with no real reason is checked and not marked urgent',
+    chat: { history: [{ role: 'user', text: 'Can I bring my dog to work?' }, { role: 'assistant', text: 'I can\'t answer that one, so I\'m passing it to a person.', kind: 'unknown' }], kind: 'person', notUrgent: true, contains: ["haven't marked it urgent"], notContains: ['marked your ticket'] } },
+  { id: 'C16', lane: 'chat', subject: 'Chat', body: 'I have not been paid this month', tests: 'After the chat asks what makes it urgent, the reason the employee gives is checked and marked urgent',
+    chat: { history: [{ role: 'user', text: 'Can I bring my dog to work?' }, { role: 'assistant', text: 'I can\'t answer that one, so I\'m passing it to a person.', kind: 'unknown' }, { role: 'user', text: 'yes it is urgent' }, { role: 'assistant', text: 'Can you tell me what makes it urgent? For example, a deadline today.', kind: 'person' }], kind: 'person', urgent: true, contains: ['marked your ticket as urgent'] } },
   { id: 'C7', lane: 'chat', subject: 'Chat', body: 'hey', variants: ['Hi there!', 'good morning', 'thanks!', 'ok'], tests: 'Greetings and thanks get a friendly reply, not "not in the manual"',
     chat: { history: [], kind: 'smalltalk', notContains: ["won't guess", 'could not find'] } },
   { id: 'C8', lane: 'chat', subject: 'Chat', body: 'When is rent due?', tests: 'Every chat is a ticket: an answered chat is closed as answered by the AI',
@@ -377,6 +387,7 @@ async function checkChat(c, body) {
   if (e.kind && res.kind !== e.kind) problems.push(`should be "${e.kind}", was "${res.kind}"`)
   if (e.notKind === 'answer-ai' && res.kind === 'answer' && res.source === 'AI') problems.push('the AI answer should have been blocked')
   if (e.urgent && !res.urgent) problems.push('should be marked urgent')
+  if (e.notUrgent && res.urgent) problems.push('must NOT be marked urgent')
   for (const s of e.contains || []) if (!has(s)) problems.push(`is missing "${s}"`)
   for (const s of e.notContains || []) if (new RegExp(`\\b${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(res.text)) problems.push(`must not contain "${s}"`)
   return { body, pass: problems.length === 0, problems, reply: res.text,

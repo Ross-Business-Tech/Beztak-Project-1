@@ -1605,6 +1605,22 @@ var refsIn = (text, corpus) => [...new Set([...String(text).matchAll(/\[([A-Z]+-
 	ref,
 	title: titleOf(ref, corpus)
 }));
+var HANDOFF_TEXT = "I can't answer that one, so I'm passing it to a person on the HR and Ops team. I've created a ticket with your question, your name and your email, and please expect a reply within 24 hours.\n\nIf this is an emergency or urgent, please reply here and say so, and I'll take a look and mark your ticket as urgent if it is. If not, I hope you have a good day!";
+var URGENT_TEXT = "Thank you for telling me. Based on what you've described, this does look urgent, so I've marked your ticket as urgent and the team will look at it first. If anyone is in danger, please call 911 right away.";
+var ASK_PREFIX = "Can you tell me what makes it urgent?";
+var ASK_URGENT_TEXT = `${ASK_PREFIX} For example, a deadline today, pay you haven't received, or a safety concern. I'll take a look and mark your ticket as urgent if it is.`;
+var NOT_JUDGED_TEXT = "Thanks for explaining. From what you've told me, this doesn't look like an urgent one, so I haven't marked it urgent, but a person will reply within 24 hours. If something changes, like a deadline today, missing pay or a safety concern, tell me and I'll take another look.";
+var NOT_URGENT_TEXT = "Okay, no problem. A person will reply within 24 hours. I hope you have a good day!";
+var NOT_URGENT = /\b(not|isn'?t|is not|no|nope|non)[ -]+(that |very |really |too |so )?(urgent|an emergency|emergency)\b/i;
+var YES_URGENT = /^(yes|yeah|yep|yup|it is|it's|its)\b/i;
+var TIME_PRESSURE = /\b(today|tonight|this (morning|afternoon|evening)|tomorrow|end of (the )?day|deadline|expires?|expiring|evict\w*|locked out|no (heat|water|power|electricity)|(can'?t|cannot|unable to) (pay|afford|eat)|lose my (coverage|insurance|housing|job|home)|surgery|prescription|stranded)\b/i;
+var judgeUrgent = (whole, explain) => triage("", whole).urgent || HARD_STOPS.some(([re, kind]) => [
+	"crisis",
+	"danger",
+	"emergency",
+	"injury",
+	"concern"
+].includes(kind) && re.test(whole)) || TIME_PRESSURE.test(explain);
 async function chatAnswer(env, input = {}, opts = {}) {
 	const corpus = opts.corpus || BUILTIN;
 	const message = String(input.message || "").replace(/\s+/g, " ").trim().slice(0, 1e3);
@@ -1636,30 +1652,47 @@ async function chatAnswer(env, input = {}, opts = {}) {
 	};
 	const prev = [...history].reverse().find((m) => m?.role === "user" && typeof m.text === "string")?.text?.slice(0, 500);
 	const followUp = Boolean(prev) && (words(message).length <= 4 || FOLLOW_UP_RE.test(message));
-	const GENERIC = new Set([
-		"process",
-		"procedur",
-		"policy",
-		"polic",
-		"work",
-		"rule",
-		"standard",
-		"happen",
-		"step",
-		"way",
-		"type",
-		"thing",
-		"resident",
-		"employee",
-		"apartment",
-		"property"
-	].map(stem));
-	const askedWords = words(followUp ? `${prev} ${message}` : message).filter((w) => !GENERIC.has(w));
-	const related = rankManual("", followUp ? `${prev} ${message}` : message, corpus).slice(0, 5).filter((x) => x.score >= 2 && askedWords.some((w) => x.e.qw.has(w))).slice(0, 3).map((x) => ({
-		ref: x.e.ref,
-		title: x.e.title
-	}));
 	const stop = mustGoToPerson("", message);
+	const safety = Boolean(stop) && HARD_STOPS.some(([re]) => re.test(message));
+	if (stop && safety) return {
+		kind: "person",
+		urgent: Boolean(stop.urgent),
+		refs: [],
+		related: [],
+		topic: stop.topic,
+		assignee: stop.assignee,
+		text: stop.extra
+	};
+	const lastBot = [...history].reverse().find((m) => m?.role === "assistant");
+	const needsPerson = Boolean(lastBot) && (lastBot.kind === "person" || lastBot.kind === "unknown");
+	const askedWhy = needsPerson && String(lastBot.text || "").startsWith(ASK_PREFIX);
+	const claims = SELF_URGENT.test(message) || words(message).length <= 3 && YES_URGENT.test(message);
+	if (needsPerson && words(message).length <= 40 && (claims || askedWhy)) {
+		if (!askedWhy && NOT_URGENT.test(message)) return {
+			kind: "smalltalk",
+			urgent: false,
+			refs: [],
+			related: [],
+			text: NOT_URGENT_TEXT
+		};
+		const said = (m) => m?.role === "user" && typeof m.text === "string";
+		const firstNeed = history.findIndex((m) => m?.role === "assistant" && (m.kind === "person" || m.kind === "unknown"));
+		if (judgeUrgent([...history.filter(said).map((m) => m.text), message].join(" "), [...history.slice(firstNeed + 1).filter(said).map((m) => m.text), message].join(" "))) return {
+			kind: "person",
+			urgent: true,
+			refs: [],
+			related: [],
+			text: URGENT_TEXT
+		};
+		const detail = words(message.replace(SELF_URGENT, " ").replace(/\b(yes|yeah|yep|yup|please|it'?s|it is|this is|is)\b/gi, " ")).length;
+		return {
+			kind: "person",
+			urgent: false,
+			refs: [],
+			related: [],
+			text: !askedWhy && detail === 0 ? ASK_URGENT_TEXT : NOT_JUDGED_TEXT
+		};
+	}
 	if (stop) return {
 		kind: "person",
 		urgent: Boolean(stop.urgent),
@@ -1667,7 +1700,8 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		related: [],
 		topic: stop.topic,
 		assignee: stop.assignee,
-		text: stop.reason ? `This needs a person: ${stop.reason.charAt(0).toLowerCase()}${stop.reason.slice(1)}. I can pass it to the HR and Ops team.` : stop.extra || "This is a personal or confidential matter, so a person on the HR and Ops team needs to answer it. I can pass it to them."
+		handoff: true,
+		text: HANDOFF_TEXT
 	};
 	const withContext = `${prev}\n\nFollow-up question: ${message}`;
 	let res;
@@ -1702,15 +1736,15 @@ async function chatAnswer(env, input = {}, opts = {}) {
 			assignee: res.assignee
 		};
 	}
-	const personal = res.sensitive || (res.tags || []).some((t) => ["ai-second-check"].includes(t));
 	return {
-		kind: personal ? "person" : "unknown",
+		kind: res.sensitive || (res.tags || []).some((t) => ["ai-second-check"].includes(t)) ? "person" : "unknown",
 		urgent: Boolean(res.urgent),
 		refs: [],
-		related,
+		related: [],
 		topic: res.topic,
 		assignee: res.assignee,
-		text: personal ? `This needs a person${res.reason ? `: ${res.reason}` : ", because it is about one person's situation, an approval, or a sensitive matter"}. I can pass it to the HR and Ops team.` : `I could not find a clear answer to that in the Beztak Operations Manual, so I won't guess. ${related.length ? "You can try one of the related topics below, or I can pass your question to a person." : "I can pass your question to a person."}`
+		handoff: true,
+		text: HANDOFF_TEXT
 	};
 }
 function chatTicketState(turns = [], { askedForPerson = false } = {}) {

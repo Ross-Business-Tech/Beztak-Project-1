@@ -17,7 +17,7 @@ const post = async (path, body, ms = 30000) => {
 
 // `meta` = { conversationId, name, email }: the helper saves the conversation as one ticket for the HR and Ops team.
 export async function askChat(message, history, meta = {}) {
-  const input = { message, history: history.map((m) => ({ role: m.role, text: m.text })), conversationId: meta.conversationId, name: meta.name, email: meta.email }
+  const input = { message, history: history.map((m) => ({ role: m.role, text: m.text, kind: m.kind })), conversationId: meta.conversationId, name: meta.name, email: meta.email }
   try {
     const res = await post('/chat', input)
     if (res && typeof res.text === 'string' && res.kind) return { ...res, via: 'helper' }

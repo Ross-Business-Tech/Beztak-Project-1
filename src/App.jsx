@@ -10,6 +10,7 @@ import { followUp } from './escalate'
 import { setActiveManualTitles } from './activeManual'
 import { ackText, triage } from './triage'
 import { agentName, canSee, dueIn, initials } from './util'
+import { pendingFor } from './lessonOwner'
 import ChatBubble from './chat/ChatBubble'
 
 const store = (key, fallback) => {
@@ -43,6 +44,14 @@ export default function App({ account, signOut }) {
   const [creating, setCreating] = useState(false)
   useEffect(() => { const f = () => { if (location.hash === '#guardrails') { setPage('guardrails'); setOpenId(null) } }; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f) }, [])
   const [toast, setToast] = useState('')
+  const [toApprove, setToApprove] = useState(0) // lessons waiting for this person to approve: shown as a circle on the Learned icon
+  useEffect(() => {
+    if (!helper.token || !helper.url) { setToApprove(0); return undefined }
+    const look = () => helperCall(helper, '/lessons').then((d) => setToApprove(pendingFor(d.lessons || [], me).length)).catch(() => {})
+    look()
+    const id = setInterval(look, 30000)
+    return () => clearInterval(id)
+  }, [helper, me])
   useEffect(() => { try { localStorage.setItem('hr-desk-tickets-v5', JSON.stringify(tickets)); localStorage.setItem('hr-desk-docs-v2', JSON.stringify(docs)); localStorage.setItem('hr-desk-prefs', JSON.stringify(prefs)); localStorage.setItem('hr-desk-helper', JSON.stringify(helper)) } catch { /* ignore */ } }, [tickets, docs, prefs, helper])
   useEffect(() => { document.documentElement.dataset.theme = prefs.theme }, [prefs.theme])
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 4500); return () => clearTimeout(id) }, [toast])
@@ -112,6 +121,7 @@ export default function App({ account, signOut }) {
                 chatLen: turns.length, subject: r.subject,
                 replies: [...local.replies.filter((m) => !m.fromChat), ...fromChat].sort((a, b) => new Date(a.at) - new Date(b.at)),
                 ...(reopen ? { status: 'Open', resolvedByAI: false, dueAt: dueIn(Boolean(res.urgent), new Date()) } : {}),
+                ...(res.urgent && !local.urgent ? { urgent: true, tags: [...new Set([...(local.tags || []), 'urgent'])], dueAt: dueIn(true, new Date()), note: `${local.note || ''} Marked urgent in the chat.`.trim() } : {}),
                 ...(auto ? { urgent: Boolean(res.urgent), assignee: res.assignee, topic: res.topic, tags: res.tags || local.tags, note: res.note } : {}),
               }
             }
@@ -217,7 +227,7 @@ export default function App({ account, signOut }) {
       <aside className="rail">
         <button className={`brand${page === 'profile' ? ' on' : ''}`} onClick={() => go('profile')} aria-label="My profile" title="My profile">{initials(agentName(me))}</button>
         {NAV.map(([k, d, label]) => (
-          <button key={k} className={page === k ? 'on' : ''} onClick={() => go(k)} aria-label={label}><Ico d={d} /><small>{label}</small></button>
+          <button key={k} className={page === k ? 'on' : ''} onClick={() => go(k)} aria-label={k === 'lessons' && toApprove > 0 ? `${label}: ${toApprove} to approve` : label}><Ico d={d} /><small>{label}</small>{k === 'lessons' && toApprove > 0 && <i className="dot" aria-hidden="true">{toApprove}</i>}</button>
         ))}
       </aside>
       <div className="main">
@@ -230,7 +240,7 @@ export default function App({ account, signOut }) {
             ? <Detail backLabel={VIEW_NAMES[nav.view] || 'All tickets'} key={openId} ticket={tickets.find((t) => t.id === openId)} all={mine} me={me} helper={helper} update={update} transfer={transfer} merge={merge} toast={setToast} back={() => setOpenId(null)} />
             : <List nav={nav} setNav={setNav} tickets={mine} me={me} open={setOpenId} onNew={() => setCreating(true)} />)}
           {page === 'dashboard' && <Dashboard tickets={mine} me={me} />}
-          {page === 'lessons' && <Learned helper={helper} me={me} toast={setToast} />}
+          {page === 'lessons' && <Learned helper={helper} me={me} toast={setToast} onPending={setToApprove} />}
           {page === 'gaps' && <GapTracker tickets={tickets} theme={prefs.theme} manualAt={manualAt} />}
           {page === 'guardrails' && <Guardrails />}
           {page === 'kb' && <Documents docs={docs} setDocs={setDocs} helper={helper} />}
@@ -239,7 +249,7 @@ export default function App({ account, signOut }) {
         </div>
       </div>
       {creating && <NewTicket onCreate={createTicket} onClose={() => setCreating(false)} />}
-      <ChatBubble user={{ name: agentName(me), email: account }} onUseInReply={(text) => {
+      <ChatBubble onUseInReply={(text) => {
         if (page !== 'tickets' || !openId) { setToast('Open a ticket first, then use "Use in reply" to add this answer to your reply.'); return }
         window.dispatchEvent(new CustomEvent('beztakets:use-in-reply', { detail: text }))
         setToast('Added to your reply. Check it before sending.')

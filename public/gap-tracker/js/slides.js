@@ -103,7 +103,7 @@
 
   function verdict(b) {
     if (!b.b.total) return 'No questions were recorded in ' + monthOf(b) + '.';
-    const base = 'The bot answered ' + pct0(b.rate) + ' of the questions it should cover in ' + monthOf(b);
+    const base = 'The Beztakets Agent answered ' + pct0(b.rate) + ' of the questions it should cover in ' + monthOf(b);
     return base + (b.vsGoal >= 0 ? ', above the ' + b.goal + '% goal.' : ', short of the ' + b.goal + '% goal.');
   }
   function fromPrev(b) {
@@ -132,7 +132,7 @@
     s.hex({ x: hx + 3.1, y: hy + 3.7, w: 0.9, h: 0.78, fill: tint(blue, 0.35) });
     s.hex({ x: hx, y: hy, w: hw, h: hh, fill: blue });
     s.text({ x: hx, y: hy + 0.75, w: hw, h: 2.0, runs: [{ text: String(rounded(b.rate || 0)), size: 100, bold: true, color: 'FFFFFF' }, { text: '%', size: 44, bold: true, color: 'FFFFFF' }], align: 'center', valign: 'middle' });
-    s.text({ x: hx, y: hy + 2.65, w: hw, h: 0.5, text: 'answered by the bot', size: 18, color: 'FFFFFF', align: 'center' });
+    s.text({ x: hx, y: hy + 2.65, w: hw, h: 0.5, text: 'answered by the Beztakets Agent', size: 18, color: 'FFFFFF', align: 'center' });
     s.text({ x: hx, y: hy + 3.12, w: hw, h: 0.36, text: 'Counting every question: ' + pct0(b.strictRate), size: 14, color: 'DCE9FB', align: 'center' });
     s.rect({ x: 0, y: 2.0, w: 0.3, h: 1.9, fill: blue });
     s.text({ x: M, y: 1.7, w: 7, h: 0.4, text: 'OPERATING MANUAL UPDATE', size: 16, bold: true, color: tint(blue, 0.5) });
@@ -155,7 +155,7 @@
     const d = 3.9; const gx = M + 0.15; const gy = 1.8; const thick = 32;
     s.ring({ x: gx, y: gy, w: d, h: d, thick: thick, color: blue, pct: b.rate || 0 });
     s.text({ x: gx, y: gy + 1.1, w: d, h: 1.1, text: pct0(b.rate), size: 64, bold: true, align: 'center', valign: 'middle' });
-    s.text({ x: gx, y: gy + 2.2, w: d, h: 0.4, text: 'answered by the bot', size: 17, color: GREY, align: 'center' });
+    s.text({ x: gx, y: gy + 2.2, w: d, h: 0.4, text: 'answered by the Beztakets Agent', size: 17, color: GREY, align: 'center' });
     const ang = (Math.min(100, b.goal) * 3.6 - 90) * Math.PI / 180;
     const cx = gx + d / 2; const cy = gy + d / 2;
     const rOut = d / 2 + 0.12; const rIn = d / 2 - thick / 72 - 0.12;
@@ -168,7 +168,7 @@
     const rx = 5.9; const rw = W - M - rx;
     const notAnswered = Math.max(0, b.eligible - bb.answered);
     const parts = [
-      { n: bb.answered, c: GREEN, big: n0(bb.answered), label: 'answered by the bot', sub: '' },
+      { n: bb.answered, c: GREEN, big: n0(bb.answered), label: 'answered by the Beztakets Agent', sub: '' },
       { n: notAnswered, c: RED, big: n0(notAnswered), label: 'not answered: a gap in the manual', sub: '' },
       { n: b.byDesign, c: GREY_MID, big: n0(b.byDesign), label: 'go to a person on purpose, so they are left out', sub: n0(b.byDesignPolicy) + ' personal or approval questions and ' + n0(b.byDesignScope) + ' outside the manual' }
     ];
@@ -187,13 +187,13 @@
       if (p.sub) s.text({ x: rx + 1.9, y: y + 0.43, w: rw - 1.9, h: 0.32, text: p.sub, size: 13, color: GREY });
       s.line({ x1: rx, y1: y + 0.86, x2: rx + rw, y2: y + 0.86 });
     });
-    s.text({ x: rx, y: 5.5, w: rw, h: 0.85, text: 'How it is counted: ' + n0(bb.answered) + ' answered ÷ ' + n0(b.eligible) + ' the manual should cover (' + n0(bb.total) + ' asked − ' + n0(b.byDesign) + ' that go to a person on purpose) = ' + pct0(b.rate) + '. Counting every question against the bot, the rate would be ' + pct0(b.strictRate) + '.', size: 13, color: GREY, valign: 'middle' });
+    s.text({ x: rx, y: 5.5, w: rw, h: 0.85, text: 'How it is counted: ' + n0(bb.answered) + ' answered ÷ ' + n0(b.eligible) + ' the manual should cover (' + n0(bb.total) + ' asked − ' + n0(b.byDesign) + ' that go to a person on purpose) = ' + pct0(b.rate) + '. Counting every question against the Beztakets Agent, the rate would be ' + pct0(b.strictRate) + '.', size: 13, color: GREY, valign: 'middle' });
     takeaway(s, b.vsGoal >= 0
       ? 'We met the ' + b.goal + '% goal' + (fromPrev(b) ? ', ' + fromPrev(b) : '') + '.'
       : 'We reached ' + pct0(b.rate) + ', short of the ' + b.goal + '% goal by about ' + n0(b.needForGoal) + ' answers' + (fromPrev(b) ? ', ' + fromPrev(b) : '') + '.', blue);
     footer(s, b, n, total);
-    s.notes = 'Answer rate = questions answered from the manual ÷ questions the manual should cover. Questions that go to a person on purpose (personal, confidential or approval questions, and topics outside operating procedures) are left out of both sides, because the bot is not meant to answer them. ' +
-      'In ' + b.range.label + ' that was ' + n0(b.byDesign) + ' of ' + n0(bb.total) + '. Counting them against the bot would give ' + pct0(b.strictRate) + '.' + (b.pb ? ' ' + b.prevRange.label + ' was ' + pct0(b.prevRate) + ' on the same basis.' : '');
+    s.notes = 'Answer rate = questions answered from the manual ÷ questions the manual should cover. Questions that go to a person on purpose (personal, confidential or approval questions, and topics outside operating procedures) are left out of both sides, because the Beztakets Agent is not meant to answer them. ' +
+      'In ' + b.range.label + ' that was ' + n0(b.byDesign) + ' of ' + n0(bb.total) + '. Counting them against the Beztakets Agent would give ' + pct0(b.strictRate) + '.' + (b.pb ? ' ' + b.prevRange.label + ' was ' + pct0(b.prevRate) + ' on the same basis.' : '');
     return s;
   }
 
@@ -287,9 +287,9 @@
       s.text({ x: W - M - 1.9, y: y + 0.03, w: 1.9, h: 0.6, text: r.answeredShare == null ? 'asked  ·  to a person' : 'asked  ·  ' + Math.round(r.answeredShare) + '% answered', size: 13, color: GREY, valign: 'middle' });
     });
     const gap = rows.slice().sort(function (a, z) { return z.gaps - a.gaps; })[0];
-    takeaway(s, gap.gaps > 0 ? 'Biggest gap among them: “' + clip(gap.example, 48) + '”, ' + n0(gap.gaps) + ' not answered.' : 'The topics people ask about most are all answered by the bot.', blue);
+    takeaway(s, gap.gaps > 0 ? 'Biggest gap among them: “' + clip(gap.example, 48) + '”, ' + n0(gap.gaps) + ' not answered.' : 'The topics people ask about most are all answered by the Beztakets Agent.', blue);
     footer(s, b, n, total);
-    s.notes = 'The topics people asked about most over ' + tq.label + ', grouped by theme. Green = answered by the bot, red = not answered (a gap in the manual), grey = sent to a person on purpose. ' +
+    s.notes = 'The topics people asked about most over ' + tq.label + ', grouped by theme. Green = answered by the Beztakets Agent, red = not answered (a gap in the manual), grey = sent to a person on purpose. ' +
       '"% answered" leaves out the questions that go to a person on purpose. The six topics shown made up ' + Math.round(tq.share) + '% of all questions in that period.';
     return s;
   }
@@ -300,7 +300,7 @@
     const s = new Slide('FFFFFF');
     const r = b.roi;
     if (!r.count) {
-      header(s, '4', 'No manual updates are being tracked yet', blue);
+      header(s, '4', (b.reported && b.reported.length ? 'No updates were detected in the questions file' : 'No manual updates are being tracked yet'), blue);
       s.text({ x: M, y: 2.2, w: 10.5, h: 3.2, text: 'Once a section is published, the next update will show how many questions it answered, how many tickets it removed and how much staff time it saved.', size: 26, color: GREY, valign: 'middle' });
       takeaway(s, 'No updates have been tracked yet.', blue);
       footer(s, b, n, total);
@@ -334,9 +334,37 @@
     });
     takeaway(s, 'Since going live, updates answered ' + n0(r.answersSince) + ' questions: an estimated ' + hrs(r.hoursSince) + ' staff hours.', blue);
     footer(s, b, n, total);
-    s.notes = 'For each published update: questions on its topics that the bot answered since publishing, and tickets a week in the four weeks before publishing compared with the weeks since. ' +
+    s.notes = 'For each published update: questions on its topics that the Beztakets Agent answered since publishing, and tickets a week in the four weeks before publishing compared with the weeks since. ' +
       'Staff hours = answered questions × ' + b.cfg.minutesPerTicket + ' minutes ÷ 60; ' + n0(r.answersThisMonth) + ' of the answers came in ' + b.range.label + '. "Fewer tickets a month" converts the weekly drop at 52 ÷ 12 weeks per month. ' +
       'These are estimates: they assume each answered question would otherwise have become a ticket, and some of the change may come from other causes.';
+    return s;
+  }
+
+  // ---------- 5b. updates the team reported ----------
+  // Only built when someone has said "I updated the manual" on the Results page.
+
+  function reported(b, blue, n, total) {
+    const s = new Slide('FFFFFF');
+    const rows = b.reported.slice(0, 5);
+    header(s, '5', n0(b.reported.length) + ' manual update' + (b.reported.length === 1 ? '' : 's') + ' reported by the team', blue);
+    s.text({ x: M, y: 1.75, w: 4.6, h: 0.3, text: 'UPDATE', size: 12, bold: true, color: GREY });
+    s.text({ x: 6.2, y: 1.75, w: 2.0, h: 0.3, text: 'WENT LIVE', size: 12, bold: true, color: GREY });
+    s.text({ x: 8.4, y: 1.75, w: 4.2, h: 0.3, text: 'TICKETS A WEEK, BEFORE → AFTER', size: 12, bold: true, color: GREY });
+    rows.forEach(function (u, i) {
+      const y = 2.15 + i * 0.84;
+      s.line({ x1: M, y1: y - 0.06, x2: W - M, y2: y - 0.06 });
+      s.text({ x: M, y: y, w: 5.3, h: 0.36, text: clip(u.title, 44), size: 18, bold: true });
+      s.text({ x: M, y: y + 0.36, w: 5.3, h: 0.3, text: (u.by ? 'Updated by ' + u.by : 'Updated by the team') + (u.note ? ': ' + clip(u.note, 48) : ''), size: 12, color: GREY });
+      s.text({ x: 6.2, y: y, w: 2.0, h: 0.5, text: u.liveMs ? new Date(u.liveMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—', size: 16, valign: 'middle' });
+      const res = u.ready && u.before != null && u.after != null
+        ? (Math.round(u.before * 10) / 10) + ' → ' + (Math.round(u.after * 10) / 10) + (u.cutPct != null ? '   (' + u.cutPct + '% fewer)' : '')
+        : 'Too soon to tell';
+      s.text({ x: 8.4, y: y, w: 4.2, h: 0.5, text: res, size: 16, bold: u.ready, color: u.ready ? GREEN : GREY, valign: 'middle' });
+    });
+    const measured = b.reported.filter(function (u) { return u.ready && u.cutPct != null; });
+    takeaway(s, measured.length ? 'Where we can measure it, tickets fell by ' + Math.round(measured.reduce(function (a, u) { return a + u.cutPct; }, 0) / measured.length) + '% on average.' : 'These updates are too new to measure. Results appear once a week of questions has come in.', blue);
+    footer(s, b, n, total);
+    s.notes = 'Updates the team reported on the Results page. Tickets a week compares the 4 weeks before each go-live date with the weeks since. Other causes may also have played a part.';
     return s;
   }
 
@@ -346,14 +374,14 @@
     const s = new Slide('FFFFFF');
     const list = b.fixes;
     if (!list.length) {
-      header(s, '5', 'No urgent changes to the manual', blue);
+      header(s, String(n - 1), 'No urgent changes to the manual', blue);
       s.text({ x: M, y: 2.2, w: 10.5, h: 3.2, text: 'No topic reached three tickets over ' + b.window.label + '. New gaps will appear here as soon as they do.', size: 26, color: GREY, valign: 'middle' });
       takeaway(s, 'Nothing needs fixing right now. The manual owner keeps watching.', blue);
       footer(s, b, n, total);
       s.notes = 'No fix reached the minimum of three tickets over the ranking window.';
       return s;
     }
-    header(s, '5', (list.length === 3 ? 'Three' : String(list.length)) + ' changes would lift the answer rate to about ' + pct0(b.projectedRate), blue);
+    header(s, String(n - 1), (list.length === 3 ? 'Three' : String(list.length)) + ' changes would lift the answer rate to about ' + pct0(b.projectedRate), blue);
     s.text({ x: M, y: 1.62, w: 9, h: 0.3, text: 'THE BIGGEST GAPS IN THE MANUAL, RANKED OVER ' + b.window.label.toUpperCase(), size: 12, bold: true, color: GREY });
     const rowH = 1.28; const y0 = 2.0;
     list.forEach(function (f, i) {
@@ -368,10 +396,10 @@
       s.text({ x: 9.2, y: y + 0.9, w: 3.38, h: 0.32, text: 'more answered a month (estimate)', size: 14, color: GREY, align: 'right' });
     });
     s.line({ x1: M, y1: y0 + list.length * rowH, x2: W - M, y2: y0 + list.length * rowH, color: GREY_LINE });
-    s.text({ x: M, y: 5.9, w: W - 2 * M, h: 0.45, text: 'Estimates, not promises: each change is assumed to let the bot answer about ' + Math.round(b.fixFactor.factor * 100) + '% of the repeat questions on its topic (' + (b.fixFactor.fromHistory ? 'the average of ' + b.fixFactor.n + ' past updates' : 'a typical figure; there is not enough history yet') + '). Real results will vary.', size: 12, color: GREY, valign: 'middle' });
+    s.text({ x: M, y: 5.9, w: W - 2 * M, h: 0.45, text: 'Estimates, not promises: each change is assumed to let the Beztakets Agent answer about ' + Math.round(b.fixFactor.factor * 100) + '% of the repeat questions on its topic (' + (b.fixFactor.fromHistory ? 'the average of ' + b.fixFactor.n + ' past updates' : 'a typical figure; there is not enough history yet') + '). Real results will vary.', size: 12, color: GREY, valign: 'middle' });
     takeaway(s, 'The manual owner is tracking owners and progress on all ' + b.changes.length + ' changes.', blue);
     footer(s, b, n, total);
-    s.notes = 'Estimate, not a promise: each change is assumed to let the bot answer ' + Math.round(b.fixFactor.factor * 100) + '% of the repeat questions on its topic' +
+    s.notes = 'Estimate, not a promise: each change is assumed to let the Beztakets Agent answer ' + Math.round(b.fixFactor.factor * 100) + '% of the repeat questions on its topic' +
       (b.fixFactor.fromHistory ? ' (the average of ' + b.fixFactor.n + ' of our own past updates)' : ' (a typical figure; there is not enough history yet)') +
       '. Ranking uses the last ' + b.window.months + ' month' + (b.window.months === 1 ? '' : 's') + ' (' + b.window.label + ') so one unusual month does not reorder the list. Together the top ' + list.length + ' would answer about ' + n0(b.moreFromFixes) + ' more questions a month, about ' + hrs((b.moreFromFixes * b.cfg.minutesPerTicket) / 60) + ' staff hours at ' + b.cfg.minutesPerTicket + ' minutes of a person\'s time per ticket. ' +
       'The Fix list shows every change with the questions behind it, and lets each one be assigned to an owner.';
@@ -381,12 +409,13 @@
   // ---------- email text ----------
 
   function email(b) {
-    const subject = 'Operating manual update, ' + b.range.label + ': ' + pct0(b.rate) + ' of questions answered by the bot';
-    const lines = ['Hello,', '', 'Attached is the ' + b.range.label + ' operating manual update (6 slides, a two-minute read).', '', 'The short version:', '- ' + verdict(b)];
+    const subject = 'Operating manual update, ' + b.range.label + ': ' + pct0(b.rate) + ' of questions answered by the Beztakets Agent';
+    const lines = ['Hello,', '', 'Attached is the ' + b.range.label + ' operating manual update (' + (b.reported && b.reported.length ? 7 : 6) + ' slides, a two-minute read).', '', 'The short version:', '- ' + verdict(b)];
     if (b.byDesign) lines.push('- ' + n0(b.byDesign) + ' of ' + n0(b.b.total) + ' questions go to a person on purpose (personal or approval questions, and topics outside the manual), so they are not counted either way.');
     if (b.prevRate != null) lines.push('- ' + fromPrev(b).charAt(0).toUpperCase() + fromPrev(b).slice(1) + '.');
     if (b.topQuestions.rows.length) lines.push('- The most-asked topic was “' + clip(b.topQuestions.rows[0].example, 70) + '” (' + n0(b.topQuestions.rows[0].asked) + ' questions over ' + b.topQuestions.label + ').');
     if (b.roi.count) lines.push('- Manual updates have answered ' + n0(b.roi.answersSince) + ' questions, an estimated ' + hrs(b.roi.hoursSince) + ' staff hours saved.');
+    if (b.reported && b.reported.length) lines.push('- The team reported ' + n0(b.reported.length) + ' manual update' + (b.reported.length === 1 ? '' : 's') + ' (see the results slide).');
     if (b.fixes.length) lines.push('- Next: ' + b.fixes.length + ' changes to the manual could lift the rate to about ' + pct0(b.projectedRate) + '.');
     if (String(b.cfg.note || '').trim()) lines.push('', b.cfg.note.trim());
     lines.push('', 'Best regards,', b.cfg.preparedBy || b.cfg.org);
@@ -397,15 +426,17 @@
 
   function build(b) {
     const blue = hex(b.cfg.brand) || '1473E6';
-    const total = 6;
+    const hasRep = !!(b.reported && b.reported.length);
+    const total = hasRep ? 7 : 6;
     const slides = [
       cover(b, blue),
       goalSlide(b, blue, 2, total),
       trend(b, blue, 3, total),
       topQuestions(b, blue, 4, total),
-      roi(b, blue, 5, total),
-      next(b, blue, 6, total)
+      roi(b, blue, 5, total)
     ];
+    if (hasRep) slides.push(reported(b, blue, 6, total));
+    slides.push(next(b, blue, total, total));
     return { id: 'update', name: 'Executive update', w: W, h: H, font: SANS, slides: slides, visible: total, email: email(b), fileBase: 'Board-Update-' + b.range.ym };
   }
 

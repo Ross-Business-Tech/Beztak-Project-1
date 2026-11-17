@@ -450,3 +450,7 @@ html.embedded[data-theme="dark"] .logo { filter: none; }
 .tbl.fixes .c-fix b { font-weight: 600; }
 .tbl.fixes .c-type, .tbl.fixes .c-cat, .tbl.fixes .c-st, .tbl.fixes .c-ow, .tbl.fixes .c-est { white-space: nowrap; }
 @media (max-width: 860px) { .tbl.fixes th, .tbl.fixes td { padding: 7px 8px; } .tbl.fixes .c-rk { display: none; } }
+.report { margin: 16px 0; padding: 16px 18px 18px; }
+.report h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.report select, .report textarea { width: 100%; }
+.row-gap { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }

@@ -97,7 +97,7 @@
 
   const REASON_INFO = [
     { key: 'no-match', label: 'The manual has nothing on it', help: 'Staff asked about something no section covers.', fixable: true },
-    { key: 'unclear', label: 'The section did not settle it', help: 'The bot found a section, but it did not answer the question.', fixable: true },
+    { key: 'unclear', label: 'The section did not settle it', help: 'The Beztakets Agent found a section, but it did not answer the question.', fixable: true },
     { key: 'policy', label: 'Goes to a person by policy', help: 'Personal, confidential and approval questions, on purpose.', fixable: false },
     { key: 'out-of-scope', label: 'Outside the manual', help: 'Not an operating-procedures topic, such as parking or IT.', fixable: false }
   ];
