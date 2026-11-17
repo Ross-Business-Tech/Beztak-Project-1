@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { AGENTS } from './data'
 import { topicLabel } from './triage'
 import { suggestReply } from './aiAgent'
@@ -25,8 +25,8 @@ export const Label = ({ color = 'gray', children, title }) => <span className={`
 // Blanks left in a reply: [like this], {like this} or TBD. A reply with blanks cannot be sent.
 const BLANKS_LEFT = /\[[^\]\n]{1,120}\]|\{[^}\n]{1,120}\}|\bTBD\b/
 const TAG_NAMES = { 'asked-for-person': 'Asked for a person', 'follow-up': 'Employee follow-up', 'created-by-hr': 'Created by HR' }
-const TAG_COLORS = { 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange', 'AI draft: check': 'orange' }
-export const VIEW_NAMES = { check: 'Needs your check', mine: 'My open tickets', due: 'Due soon', advice: 'Advice requested', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
+const TAG_COLORS = { 'Due soon': 'red', 'Answered automatically': 'brown', 'Advice requested': 'yellow', 'Asked for a person': 'red', 'Employee follow-up': 'orange', 'AI draft: check': 'orange' }
+export const VIEW_NAMES = { mine: 'My open tickets', closed: 'Closed', ai: 'Answered automatically', all: 'All tickets' }
 
 // "New ticket": an HR person opens a ticket themselves (a phone call, a chat in the hallway, a walk-up).
 export function NewTicket({ onCreate, onClose }) {
@@ -71,21 +71,26 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
   const human = tickets.filter((t) => !t.resolvedByAI)
   const owned = human.filter((t) => t.assignee === me)
   const tags = [...new Set(tickets.flatMap((t) => t.tags || []))].sort()
+  const dueSoon = (t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)
+  // "My open tickets" holds my own open tickets plus ones where a teammate asked for my advice (tagged), split into sections.
+  const mineOpen = human.filter((t) => live(t) && (t.assignee === me || pendingAdviceFor(t, me).length))
   const VIEWS = [
-    ['check', 'Needs your check', owned.filter(needsCheck), 'The AI already wrote a reply for each of these. Open one, check the reply, then send it or edit it. Nothing is sent until you do.'],
-    ['mine', 'My open tickets', owned.filter(live), 'Tickets a person needs to answer, most urgent first.'],
-    ['due', 'Due soon', owned.filter((t) => live(t) && ['red', 'amber'].includes(dueInfo(t)?.cls)), 'Overdue or due within 4 work hours.'],
-    ['advice', 'Advice requested', human.filter((t) => pendingAdviceFor(t, me).length), 'Teammates asked for your advice on these.'],
+    ['mine', 'My open tickets', mineOpen, 'Tickets a person needs to answer, most urgent first. Tickets with an AI reply waiting come first, so you can check them.'],
     ['closed', 'Closed', owned.filter((t) => !live(t)), 'Tickets you have closed.'],
     ['ai', 'Answered automatically', tickets.filter((t) => t.resolvedByAI), 'Answered automatically from the Beztak manual (by the AI when it is connected) and closed. Open one to read the reply that was sent.'],
     ['all', 'All tickets', tickets, 'Everything you can see, including tickets the AI answered.'],
   ]
+  const known = VIEWS.some((v) => v[0] === view)
   const [, , list, note] = VIEWS.find((v) => v[0] === view) || VIEWS[0]
   const text = q.trim().toLowerCase()
   const rows = list
     .filter((t) => !tag || (t.tags || []).includes(tag))
     .filter((t) => !text || `${t.id} ${t.subject} ${t.customer} ${t.email} ${(t.tags || []).join(' ')}`.toLowerCase().includes(text))
     .sort(view === 'ai' || view === 'all' ? (a, b) => new Date(b.createdAt) - new Date(a.createdAt) : byUrgency)
+  const checking = (t) => t.assignee === me && needsCheck(t)
+  const sections = view === 'mine' || !known
+    ? [['Needs your check', rows.filter(checking)], ['Other open tickets', rows.filter((t) => !checking(t))]].filter(([, r]) => r.length)
+    : [['', rows]]
 
   return (
     <>
@@ -109,12 +114,15 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
           <div className="nrow nhead" role="row">
             {['Ticket', 'Priority', 'Status', 'Employee', 'Topic', 'Tags', 'Deadline', 'Owner'].map((h) => <span key={h} role="columnheader">{h}</span>)}
           </div>
-          {rows.length === 0 && <p className="empty">{view === 'check' ? 'All caught up: no AI replies are waiting for your check.' : view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
-          {rows.map((t) => {
+          {rows.length === 0 && <p className="empty">{view === 'mine' || !known ? 'All caught up: you have no open tickets.' : view === 'ai' ? 'No tickets have been answered automatically yet.' : 'Nothing here. You only see tickets assigned to you or where you were asked for advice.'}</p>}
+          {sections.map(([title, items]) => (
+            <Fragment key={title}>
+              {title && <div className="nsec" role="presentation">{title} <em>{items.length}</em></div>}
+              {items.map((t) => {
             const p = priorityOf(t)
             const d = dueInfo(t)
             const adv = pendingAdviceFor(t, me).length > 0
-            const tg = [...(t.resolvedByAI ? ['Answered automatically'] : []), ...(t.assignee === me && needsCheck(t) ? ['AI draft: check'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved').map((g) => TAG_NAMES[g] || g)].sort((a, b) => Number(!(a in TAG_COLORS)) - Number(!(b in TAG_COLORS)))
+            const tg = [...(dueSoon(t) ? ['Due soon'] : []), ...(t.resolvedByAI ? ['Answered automatically'] : []), ...(t.assignee === me && needsCheck(t) ? ['AI draft: check'] : []), ...(adv ? ['Advice requested'] : []), ...(t.tags || []).filter((g) => g !== 'ai-resolved').map((g) => TAG_NAMES[g] || g)].sort((a, b) => Number(!(a in TAG_COLORS)) - Number(!(b in TAG_COLORS)))
             return (
               <div key={t.id} className="nrow" role="row" tabIndex={0} onClick={() => open(t.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(t.id) } }}>
                 <span className="ncell nfirst" role="cell"><b>{t.subject}</b><small>#{t.id}{t.escalatedAt && t.status !== 'Closed' && <> · <span className="esc">{t.escalatedBecause === 'person' ? 'Asked for a person' : 'Employee follow-up'}</span></>}</small></span>
@@ -127,7 +135,9 @@ export function List({ tickets, me, open, nav, setNav, onNew }) {
                 <span className="ncell" role="cell">{t.resolvedByAI ? <><Avatar name="AI agent" />AI agent</> : <><Avatar name={agentName(t.assignee)} />{t.assignee === me ? 'Me' : agentName(t.assignee)}</>}</span>
               </div>
             )
-          })}
+              })}
+            </Fragment>
+          ))}
         </div>
       </div>
       <p className="nfoot"><span className="mute small">{rows.length} ticket{rows.length === 1 ? '' : 's'}</span></p>
