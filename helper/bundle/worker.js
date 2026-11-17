@@ -1637,7 +1637,7 @@ async function chatAnswer(env, input = {}, opts = {}) {
 		kind: "smalltalk",
 		refs: [],
 		related: [],
-		text: "Hi! I can help with Beztak operations questions, like rent, work orders, purchasing, maintenance and on-call. What would you like to know?"
+		text: "Hi! I can help with Beztak operations questions, like rent, work orders, purchasing and timecards. What would you like to know?"
 	};
 	if (/^(thanks?( you)?( so much| a lot)?|thank u|thx|ty|cheers|perfect|great|awesome|got it|ok(ay)?|cool|sounds good)( thanks?( you)?)?$/.test(small)) return {
 		kind: "smalltalk",

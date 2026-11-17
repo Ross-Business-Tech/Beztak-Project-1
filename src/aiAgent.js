@@ -446,6 +446,10 @@ const judgeUrgent = (whole, explain) =>
   || HARD_STOPS.some(([re, kind]) => ['crisis', 'danger', 'emergency', 'injury', 'concern'].includes(kind) && re.test(whole))
   || TIME_PRESSURE.test(explain)
 
+// The suggested questions the chat shows before the first question. Each must be one the chat answers on its own,
+// straight from the manual, with no hand-off (guardrail C19 checks this).
+export const CHAT_STARTERS = ['When is rent due?', 'How fast must work orders be completed?', 'When do I need a purchase order?', 'When must timecards be approved?']
+
 export async function chatAnswer(env, input = {}, opts = {}) {
   const corpus = opts.corpus || BUILTIN
   const message = String(input.message || '').replace(/\s+/g, ' ').trim().slice(0, 1000)
@@ -454,7 +458,7 @@ export async function chatAnswer(env, input = {}, opts = {}) {
   // Greetings, thanks and goodbyes get a friendly reply, not "I could not find that in the manual".
   const small = message.toLowerCase().replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()
   if (/^(hey+|hi+|hello+|hiya|yo|howdy|good (morning|afternoon|evening)|hey there|hi there|hello there)( (there|team|bot|beztak|ask beztak))?$/.test(small)) {
-    return { kind: 'smalltalk', refs: [], related: [], text: 'Hi! I can help with Beztak operations questions, like rent, work orders, purchasing, maintenance and on-call. What would you like to know?' }
+    return { kind: 'smalltalk', refs: [], related: [], text: 'Hi! I can help with Beztak operations questions, like rent, work orders, purchasing and timecards. What would you like to know?' }
   }
   if (/^(thanks?( you)?( so much| a lot)?|thank u|thx|ty|cheers|perfect|great|awesome|got it|ok(ay)?|cool|sounds good)( thanks?( you)?)?$/.test(small)) {
     return { kind: 'smalltalk', refs: [], related: [], text: 'You\'re welcome! Ask me anything else about Beztak operations.' }

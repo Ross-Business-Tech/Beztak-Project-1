@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { askChat, handToPerson } from './chatClient'
+import { CHAT_STARTERS } from '../aiAgent'
 import { HR_ADDRESS } from '../data'
 import './chat.css'
 
 // Starter questions show what the chat is for: day-to-day operations from the Beztak Operations Manual.
-const STARTERS = ['When is rent due?', 'How fast must work orders be completed?', 'When do I need a purchase order?', 'How fast must on-call respond to an emergency?']
+// They live with the chat's rules, so the guardrail tests check that the chat answers every one of them.
+const STARTERS = CHAT_STARTERS
 
 // Name and email are asked once and remembered on this device (never sent anywhere except with the chat's ticket).
 const CONTACT_KEY = 'ask-beztak-contact'

@@ -8,7 +8,7 @@
 // reply through the real gates, so the checks on AI-written answers run without an AI key.
 // `draft` checks the suggested reply HR gets for tickets a person must answer.
 import { AGENTS } from './data'
-import { BUILTIN_MANUAL, buildCorpus, chatAnswer, chatTicketState, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
+import { BUILTIN_MANUAL, buildCorpus, CHAT_STARTERS, chatAnswer, chatTicketState, decide, FOOTER, PLACEHOLDER_RE, suggestReply } from './aiAgent'
 import { ackText } from './triage'
 import { followUp } from './escalate'
 import { dueIn } from './util'
@@ -316,6 +316,8 @@ export const EVALS = [
     ticket: { turns: ['When is rent due?'], askedForPerson: true, resolved: false } },
   { id: 'C18', lane: 'chat', subject: 'Chat', body: 'how to deal with maintence order', variants: ['How fast must work orders be completed?', 'what do I do with a work order'], tests: 'A new question after an answered one gets its own answer, without repeating the earlier answer',
     chat: { history: [{ role: 'user', text: 'When is rent due?' }, { role: 'assistant', kind: 'answer', text: 'Rent is due on or before the first day of each month.' }], notContains: ['Rent is due'] } },
+  { id: 'C19', lane: 'chat', subject: 'Chat', body: CHAT_STARTERS[0], variants: CHAT_STARTERS.slice(1), tests: 'Every suggested question the chat shows is one it answers from the manual, never a hand-off',
+    chat: { history: [], kind: 'answer', notContains: ["can't answer that one"] } },
   { id: 'C17', lane: 'chat', subject: 'Chat', body: 'wait so what can u answer', variants: ['What can you help with?', 'what kind of questions can I ask', 'help'], tests: '"What can you answer?" lists the manual\'s topics instead of making a ticket for a person',
     chat: { history: [], kind: 'smalltalk', contains: ['Rent Collections', 'Work Orders and On-Call'], notContains: ["can't answer that one"] } },
   { id: 'C6', lane: 'chat', subject: 'Chat', body: 'How many vacation days do I get?', tests: 'With the AI on: an AI chat answer with an invented number is blocked',
