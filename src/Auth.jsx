@@ -42,7 +42,6 @@ function SignIn() {
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="btn primary auth-btn" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         <p className="mute small">New accounts can't be created from this page. If you don't have one, ask your manager or HR.</p>
-        <p className="mute small">Just have a quick question? <a href="/ask">Ask Beztak without signing in</a>.</p>
       </form>
     </div>
   )

@@ -9,8 +9,9 @@ export default function ChatBubble({ onUseInReply }) {
     <>
       {open && (
         <section className="bubble-panel" role="dialog" aria-label="Ask Beztak">
-          <div className="bubble-head"><div><b>Ask Beztak</b><small>The same chat employees use</small></div><button onClick={() => setOpen(false)} aria-label="Close chat">✕</button></div>
+          <div className="bubble-head"><div><b>Ask Beztak</b><small>Answers from the Beztak Operations Manual</small></div><button onClick={() => setOpen(false)} aria-label="Close chat">✕</button></div>
           <Chat compact alwaysAsk onUseInReply={onUseInReply} />
+          <p className="ask-foot">An automated assistant. It never answers personal, pay or approval questions; those go to a person. Don't share passwords, ID or bank numbers.</p>
         </section>
       )}
       <button className="bubble-btn" onClick={() => setOpen((o) => !o)} aria-label={open ? 'Close chat' : 'Ask Beztak'} aria-expanded={open}>
